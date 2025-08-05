@@ -58,8 +58,12 @@ const ProfileStack: React.FC = () => (
 const CaregiverNavigator: React.FC = () => {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
+      screenOptions={({
+        route,
+      }: {
+        route: { name: keyof CaregiverTabParamList };
+      }) => ({
+        tabBarIcon: ({ focused, color, size }: { focused: boolean; color: string; size: number }) => {
           let iconName: keyof typeof Ionicons.glyphMap;
 
           if (route.name === 'Dashboard') {

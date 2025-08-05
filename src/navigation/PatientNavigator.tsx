@@ -1,4 +1,4 @@
-import React from 'react';
+/*import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -113,3 +113,4 @@ const PatientNavigator: React.FC = () => {
 };
 
 export default PatientNavigator;
+*/

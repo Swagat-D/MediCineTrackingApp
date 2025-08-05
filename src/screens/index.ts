@@ -16,13 +16,15 @@ export { default as BarcodeGeneratorScreen } from './caregiver/BarcodeGeneratorS
 export { default as CaregiverProfileScreen } from './caregiver/ProfileScreen';
 
 // Patient Screens
+/*
 export { default as PatientHomeScreen } from './patient/HomeScreen/HomeScreen';
 export { default as MedicationListScreen } from './patient/MedicationListScreen/MedicationListScreen';
 export { default as BarcodeScannerScreen } from './patient/BarcodeScannerScreen/BarcodeScannerScreen';
 export { default as MealSettingsScreen } from './patient/MealSettingsScreen/MealSettingsScreen';
 export { default as PatientProfileScreen } from './patient/ProfileScreen/ProfileScreen';
 export { default as SOSScreen } from './patient/SOSScreen/SOSScreen';
+*/
 
 // Shared Screens
-export { default as NotificationsScreen } from './shared/NotificationsScreen/NotificationsScreen';
-export { default as SettingsScreen } from './shared/SettingsScreen/SettingsScreen';
+export { default as NotificationsScreen } from './shared/NotificationsScreen';
+export { default as SettingsScreen } from './shared/SettingsScreen';

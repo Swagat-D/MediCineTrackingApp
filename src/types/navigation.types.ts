@@ -1,7 +1,18 @@
-import { NavigatorScreenParams } from '@react-navigation/native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { UserRole } from './auth.types';
+
+// Helper type for nested navigators
+export type NavigatorScreenParams<ParamList = Record<string, object | undefined>> = {
+  screen?: never;
+  params?: never;
+  initial?: never;
+  path?: never;
+} & {
+  [K in keyof ParamList]: undefined extends ParamList[K]
+    ? { screen: K; params?: ParamList[K] }
+    : { screen: K; params: ParamList[K] };
+}[keyof ParamList];
 
 // Root Stack Navigator
 export type RootStackParamList = {

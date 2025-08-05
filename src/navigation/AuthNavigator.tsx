@@ -2,14 +2,12 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Animated } from 'react-native';
 
-// Screens
 import RoleSelectionScreen from '../screens/auth/RoleSelectionScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
 import OTPVerificationScreen from '../screens/auth/OTPVerificationScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 
-// Types
 import { AuthStackParamList } from '../types/navigation.types';
 
 const Stack = createStackNavigator<AuthStackParamList>();

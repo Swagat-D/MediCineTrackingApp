@@ -1,9 +1,12 @@
+import 'react-native-url-polyfill/auto';
+
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { Provider } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PaperProvider } from 'react-native-paper';
+import { registerRootComponent } from 'expo';
 
 import { store } from './src/store';
 import MainNavigator from './src/navigation/MainNavigator';
@@ -36,3 +39,5 @@ const App: React.FC = () => {
 };
 
 export default App;
+
+registerRootComponent(App);

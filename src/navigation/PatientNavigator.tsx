@@ -1,0 +1,115 @@
+import React from 'react';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
+import { Ionicons } from '@expo/vector-icons';
+
+// Screens
+import HomeScreen from '../screens/patient/HomeScreen';
+import MedicationListScreen from '../screens/patient/MedicationListScreen';
+import BarcodeScannerScreen from '../screens/patient/BarcodeScannerScreen';
+import MealSettingsScreen from '../screens/patient/MealSettingsScreen';
+import ProfileScreen from '../screens/patient/ProfileScreen';
+import SOSScreen from '../screens/patient/SOSScreen';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
+import SettingsScreen from '../screens/shared/SettingsScreen';
+
+// Types
+import { PatientTabParamList, PatientStackParamList } from '../types/navigation.types';
+import { COLORS, TYPOGRAPHY } from '../constants/themes/theme';
+
+const Tab = createBottomTabNavigator<PatientTabParamList>();
+const Stack = createStackNavigator<PatientStackParamList>();
+
+// Home Stack
+const HomeStack: React.FC = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Home" component={HomeScreen} />
+    <Stack.Screen name="MealSettings" component={MealSettingsScreen} />
+    <Stack.Screen name="SOS" component={SOSScreen} />
+    <Stack.Screen name="Notifications" component={NotificationsScreen} />
+  </Stack.Navigator>
+);
+
+// Medications Stack
+const MedicationsStack: React.FC = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="MedicationList" component={MedicationListScreen} />
+  </Stack.Navigator>
+);
+
+// Scanner Stack
+const ScannerStack: React.FC = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
+  </Stack.Navigator>
+);
+
+// Profile Stack
+const ProfileStack: React.FC = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Profile" component={ProfileScreen} />
+    <Stack.Screen name="Settings" component={SettingsScreen} />
+  </Stack.Navigator>
+);
+
+const PatientNavigator: React.FC = () => {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName: keyof typeof Ionicons.glyphMap;
+
+          if (route.name === 'Home') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Medications') {
+            iconName = focused ? 'medical' : 'medical-outline';
+          } else if (route.name === 'Scanner') {
+            iconName = focused ? 'scan' : 'scan-outline';
+          } else {
+            iconName = focused ? 'person' : 'person-outline';
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: COLORS.primary[500],
+        tabBarInactiveTintColor: COLORS.gray[500],
+        tabBarLabelStyle: {
+          fontSize: TYPOGRAPHY.fontSize.xs,
+          fontWeight: TYPOGRAPHY.fontWeight.medium,
+        },
+        tabBarStyle: {
+          backgroundColor: COLORS.background,
+          borderTopWidth: 1,
+          borderTopColor: COLORS.gray[200],
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        headerShown: false,
+      })}
+    >
+      <Tab.Screen 
+        name="Home" 
+        component={HomeStack}
+        options={{ tabBarLabel: 'Home' }}
+      />
+      <Tab.Screen 
+        name="Medications" 
+        component={MedicationsStack}
+        options={{ tabBarLabel: 'Medications' }}
+      />
+      <Tab.Screen 
+        name="Scanner" 
+        component={ScannerStack}
+        options={{ tabBarLabel: 'Scanner' }}
+      />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileStack}
+        options={{ tabBarLabel: 'Profile' }}
+      />
+    </Tab.Navigator>
+  );
+};
+
+export default PatientNavigator;

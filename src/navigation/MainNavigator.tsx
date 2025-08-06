@@ -7,11 +7,7 @@ import { checkAuthStatus } from '../store/slices/authSlice';
 import AuthNavigator from './AuthNavigator';
 import CaregiverNavigator from './CaregiverNavigator';
 import PatientNavigator from './PatientNavigator';
-
-// Screens
 import SplashScreen from '../screens/auth/SplashScreen';
-
-// Types
 import { RootStackParamList } from '../types/navigation.types';
 
 const Stack = createStackNavigator<RootStackParamList>();

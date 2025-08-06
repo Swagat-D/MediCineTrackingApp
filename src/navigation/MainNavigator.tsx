@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useAppDispatch, useAppSelector } from '../store';
 import { checkAuthStatus } from '../store/slices/authSlice';
@@ -9,20 +9,31 @@ import CaregiverNavigator from './CaregiverNavigator';
 import PatientNavigator from './PatientNavigator';
 import SplashScreen from '../screens/auth/SplashScreen';
 import { RootStackParamList } from '../types/navigation.types';
+import { APP_CONFIG } from '../constants/app';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
 const MainNavigator: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, user, isLoading } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in on app start
-    dispatch(checkAuthStatus());
+
+  const initializeApp = async() =>{
+
+    await dispatch(checkAuthStatus());
+
+    setTimeout(() => {
+      setShowSplash(false);
+    }, APP_CONFIG.SPLASH_DURATION)
+  };
+
+  initializeApp();
   }, [dispatch]);
 
-  if (isLoading) {
-    return <SplashScreen />;
+  if (showSplash){
+    return <SplashScreen />
   }
 
   return (

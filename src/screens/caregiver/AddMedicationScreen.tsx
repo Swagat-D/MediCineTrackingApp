@@ -3,13 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
-  StatusBar,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
   Alert,
+  Image,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -17,17 +16,22 @@ import * as yup from 'yup';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+
+// Components
+import SecondaryNavbar from '../../components/common/SecondaryNavbar';
 import Button from '../../components/common/Button/Button';
 import Input from '../../components/common/Input/Input';
-import { LoadingOverlay } from '../../components/common/Loading/LoadingSpinner';
+import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
+
+// Types and Constants
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
 import { MedicationFormData, DosageUnit, TimingRelation } from '../../types/medication.types';
-import { COLORS, TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
+import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import { MEDICATION_CONSTANTS } from '../../constants/app';
 
 type Props = CaregiverStackScreenProps<'AddMedication'>;
 
-// Validation schema
+// Validation schema - Instructions field is now optional
 const medicationSchema: yup.ObjectSchema<MedicationFormData> = yup.object({
   name: yup
     .string()
@@ -57,10 +61,12 @@ const medicationSchema: yup.ObjectSchema<MedicationFormData> = yup.object({
     .number()
     .required('Quantity is required')
     .min(1, 'Quantity must be at least 1'),
-  instructions: yup.string().optional(),
+  instructions: yup.string().optional(), // Made optional
 });
 
 const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { patientId } = route.params;
   
   const [isLoading, setIsLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -84,7 +90,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
       timingRelation: 'anytime',
       expiryDate: '',
       quantity: 30,
-      instructions: '',
+      instructions: '', // Can be empty now
     },
   });
 
@@ -110,8 +116,6 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
             text: 'View Barcode',
             onPress: () => {
               reset();
-              // Navigate to barcode generator with the new medication ID
-              // In real implementation, you'd get the medication ID from the API response
               navigation.navigate('BarcodeGenerator', { medicationId: 'new-med-id' });
             },
           },
@@ -172,21 +176,28 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
     return Math.floor(quantity / frequency);
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
-      <LoadingOverlay visible={isLoading} message="Adding medication..." />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.primary[500]} />
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>Add Medication</Text>
-        
-        <View style={styles.headerPlaceholder} />
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <SecondaryNavbar
+          title="Add Medication"
+          onBackPress={() => navigation.goBack()}
+        />
+        <View style={styles.loadingContainer}>
+          <LoadingSpinner size="large" />
+          <Text style={styles.loadingText}>Adding medication...</Text>
+        </View>
       </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <SecondaryNavbar
+        title="Add Medication"
+        onBackPress={() => navigation.goBack()}
+        subtitle="Fill in the medication details"
+      />
 
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
@@ -201,7 +212,11 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Form Header */}
           <View style={styles.formHeader}>
             <View style={styles.iconContainer}>
-              <Ionicons name="medical" size={60} color={COLORS.primary[500]} />
+              <Image
+                source={require('../../../assets/images/medicine.png')}
+                style={styles.medicineIcon}
+                resizeMode="contain"
+              />
             </View>
             <Text style={styles.formTitle}>Medication Details</Text>
             <Text style={styles.formSubtitle}>
@@ -366,7 +381,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
 
             {/* Schedule Preview */}
             <View style={styles.schedulePreview}>
-              <Ionicons name="time-outline" size={16} color={COLORS.primary[500]} />
+              <Ionicons name="time-outline" size={16} color="#059669" />
               <Text style={styles.schedulePreviewText}>
                 Take {calculateDosesPerDay()} time{calculateDosesPerDay() > 1 ? 's' : ''} daily
               </Text>
@@ -409,7 +424,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
                   ]}
                   onPress={() => setShowDatePicker(true)}
                 >
-                  <Ionicons name="calendar-outline" size={20} color={COLORS.gray[500]} />
+                  <Ionicons name="calendar-outline" size={20} color="#6B7280" />
                   <Text style={[
                     styles.dateButtonText,
                     !watch('expiryDate') && styles.dateButtonPlaceholder
@@ -427,7 +442,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
             {watch('quantity') && watchedFrequency && (
               <View style={styles.supplyInfo}>
                 <View style={styles.supplyItem}>
-                  <Ionicons name="calendar-outline" size={16} color={COLORS.secondary[500]} />
+                  <Ionicons name="calendar-outline" size={16} color="#059669" />
                   <Text style={styles.supplyText}>
                     Supply Duration: {calculateDaysSupply()} days
                   </Text>
@@ -438,11 +453,11 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
                     <Ionicons 
                       name="warning-outline" 
                       size={16} 
-                      color={getDaysUntilExpiry(watch('expiryDate'))! < 30 ? COLORS.error : COLORS.success} 
+                      color={getDaysUntilExpiry(watch('expiryDate'))! < 30 ? '#EF4444' : '#059669'} 
                     />
                     <Text style={[
                       styles.supplyText,
-                      { color: getDaysUntilExpiry(watch('expiryDate'))! < 30 ? COLORS.error : COLORS.success }
+                      { color: getDaysUntilExpiry(watch('expiryDate'))! < 30 ? '#EF4444' : '#059669' }
                     ]}>
                       Expires in {getDaysUntilExpiry(watch('expiryDate'))} days
                     </Text>
@@ -452,9 +467,10 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
             )}
           </View>
 
-          {/* Instructions */}
+          {/* Instructions - Now Optional */}
           <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Additional Instructions (Optional)</Text>
+            <Text style={styles.sectionTitle}>Additional Instructions</Text>
+            <Text style={styles.optionalLabel}>(Optional)</Text>
             
             <Controller
               control={control}
@@ -462,7 +478,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
               render={({ field: { onChange, onBlur, value } }) => (
                 <Input
                   label="Special Instructions"
-                  placeholder="Enter any special instructions or notes"
+                  placeholder="Enter any special instructions or notes (optional)"
                   value={value}
                   onChangeText={onChange}
                   onBlur={onBlur}
@@ -511,7 +527,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
             loading={isLoading}
             fullWidth
             style={styles.submitButton}
-            icon={<Ionicons name="add-circle" size={20} color={COLORS.background} />}
+            icon={<Ionicons name="add-circle" size={20} color="#FFFFFF" />}
           />
 
           {/* Date Picker Modal */}
@@ -526,69 +542,68 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F8FAFC',
   },
-  header: {
-    flexDirection: 'row',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING[6],
-    paddingVertical: SPACING[4],
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
+    marginTop: Platform.OS === 'ios' ? 114 : 70,
   },
-  backButton: {
-    padding: SPACING[2],
-  },
-  headerTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-  },
-  headerPlaceholder: {
-    width: 40,
+  loadingText: {
+    marginTop: SPACING[4],
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#64748B',
   },
   keyboardAvoidingView: {
     flex: 1,
   },
   scrollView: {
     flex: 1,
+    marginTop: Platform.OS === 'ios' ? 114 : 70,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: SPACING[6],
+    paddingHorizontal: SPACING[5],
     paddingVertical: SPACING[6],
   },
   formHeader: {
     alignItems: 'center',
-    marginBottom: SPACING[8],
+    paddingBottom: SPACING[6],
+    paddingTop: SPACING[8],
   },
   iconContainer: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: COLORS.primary[50],
+    backgroundColor: '#F0FDF4',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING[4],
+    borderWidth: 2,
+    borderColor: '#BBF7D0',
+  },
+  medicineIcon: {
+    width: 60,
+    height: 60,
   },
   formTitle: {
     fontSize: TYPOGRAPHY.fontSize['2xl'],
     fontWeight: 'bold',
-    color: COLORS.text.primary,
+    color: '#1E293B',
     marginBottom: SPACING[2],
     textAlign: 'center',
   },
   formSubtitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.text.secondary,
+    color: '#64748B',
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -598,11 +613,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: 'bold',
-    color: COLORS.text.primary,
+    color: '#1E293B',
+    marginBottom: SPACING[1],
+  },
+  optionalLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
     marginBottom: SPACING[4],
-    borderBottomWidth: 2,
-    borderBottomColor: COLORS.primary[100],
-    paddingBottom: SPACING[2],
+    fontStyle: 'italic',
   },
   rowContainer: {
     flexDirection: 'row',
@@ -620,87 +638,93 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '500',
-    color: COLORS.text.primary,
+    color: '#1E293B',
     marginBottom: SPACING[2],
   },
   required: {
-    color: COLORS.error,
+    color: '#EF4444',
   },
   pickerContainer: {
     borderWidth: 1.5,
-    borderColor: COLORS.gray[300],
+    borderColor: '#D1D5DB',
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#FFFFFF',
     minHeight: 48,
     justifyContent: 'center',
   },
   pickerError: {
-    borderColor: COLORS.error,
+    borderColor: '#EF4444',
   },
   picker: {
     height: 48,
-    color: COLORS.text.primary,
+    color: '#1E293B',
   },
   errorText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.error,
+    color: '#EF4444',
     marginTop: SPACING[1],
     marginLeft: SPACING[1],
   },
   dosagePreview: {
-    backgroundColor: COLORS.primary[50],
+    backgroundColor: '#F0FDF4',
     padding: SPACING[3],
     borderRadius: RADIUS.md,
     marginTop: SPACING[3],
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
   },
   dosagePreviewText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '500',
-    color: COLORS.primary[600],
+    color: '#059669',
   },
   schedulePreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.secondary[50],
+    backgroundColor: '#F0FDF4',
     padding: SPACING[3],
     borderRadius: RADIUS.md,
     marginTop: SPACING[3],
     gap: SPACING[2],
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
   },
   schedulePreviewText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '500',
-    color: COLORS.secondary[600],
+    color: '#059669',
   },
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: COLORS.gray[300],
+    borderColor: '#D1D5DB',
     borderRadius: RADIUS.md,
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[3],
     minHeight: 48,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#FFFFFF',
     gap: SPACING[2],
   },
   dateButtonError: {
-    borderColor: COLORS.error,
+    borderColor: '#EF4444',
   },
   dateButtonText: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.text.primary,
+    color: '#1E293B',
   },
   dateButtonPlaceholder: {
-    color: COLORS.gray[400],
+    color: '#9CA3AF',
   },
   supplyInfo: {
-    backgroundColor: COLORS.gray[50],
+    backgroundColor: '#F8FAFC',
     padding: SPACING[4],
     borderRadius: RADIUS.md,
     marginTop: SPACING[3],
     gap: SPACING[2],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   supplyItem: {
     flexDirection: 'row',
@@ -710,24 +734,29 @@ const styles = StyleSheet.create({
   supplyText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '500',
-    color: COLORS.text.primary,
+    color: '#1E293B',
   },
   textArea: {
     minHeight: 80,
     textAlignVertical: 'top',
   },
   summaryCard: {
-    backgroundColor: COLORS.background,
+    backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.xl,
     padding: SPACING[5],
     marginBottom: SPACING[6],
     borderWidth: 2,
-    borderColor: COLORS.primary[100],
+    borderColor: '#BBF7D0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   summaryTitle: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: 'bold',
-    color: COLORS.text.primary,
+    color: '#1E293B',
     marginBottom: SPACING[4],
     textAlign: 'center',
   },
@@ -737,16 +766,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SPACING[2],
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[100],
+    borderBottomColor: '#F1F5F9',
   },
   summaryLabel: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    color: '#64748B',
     fontWeight: '500',
   },
   summaryValue: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.primary,
+    color: '#1E293B',
     fontWeight: '600',
     maxWidth: '60%',
     textAlign: 'right',

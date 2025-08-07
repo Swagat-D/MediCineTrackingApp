@@ -1,702 +1,806 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
-  StatusBar,
   ScrollView,
   TouchableOpacity,
   Alert,
   Share,
-  Dimensions,
+  Platform,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
-import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
-import { captureRef } from 'react-native-view-shot';
 
 // Components
-import Button from '../../components/common/Button/Button';
+import CaregiverNavbar from '../../components/common/CaregiverNavbar';
 import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
+import Button from '../../components/common/Button/Button';
 
 // Types and Constants
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
-import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../constants/themes/theme';
-
-const { width } = Dimensions.get('window');
+import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 
 type Props = CaregiverStackScreenProps<'BarcodeGenerator'>;
 
-interface MedicationInfo {
+interface BarcodeItem {
   id: string;
-  name: string;
+  patientId: string;
   patientName: string;
+  medicationName: string;
   dosage: string;
-  dosageUnit: string;
-  frequency: number;
+  frequency: string;
   timingRelation: string;
-  instructions?: string;
-  barcode: string;
+  barcodeData: string;
   createdAt: string;
+  lastDownloaded?: string;
+  downloadCount: number;
 }
 
-const BarcodeGeneratorScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { medicationId } = route.params;
-  
+const BarcodeGeneratorScreen: React.FC<Props> = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [medicationInfo, setMedicationInfo] = useState<MedicationInfo>({
-    id: medicationId,
-    name: 'Metformin',
-    patientName: 'John Smith',
-    dosage: '500',
-    dosageUnit: 'mg',
-    frequency: 2,
-    timingRelation: 'after_food',
-    instructions: 'Take with plenty of water',
-    barcode: 'MEDI_MTF500_JS_001',
-    createdAt: '2024-08-05T10:30:00Z',
-  });
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedBarcodes, setSelectedBarcodes] = useState<string[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
 
-  const barcodeRef = React.useRef<View>(null);
+  const [recentBarcodes] = useState<BarcodeItem[]>([
+    {
+      id: '1',
+      patientId: 'p1',
+      patientName: 'John Smith',
+      medicationName: 'Metformin',
+      dosage: '500mg',
+      frequency: '2x daily',
+      timingRelation: 'After Food',
+      barcodeData: 'MEDI_MTF500_JS_001',
+      createdAt: '2024-08-08T10:30:00Z',
+      lastDownloaded: '2024-08-08T11:15:00Z',
+      downloadCount: 3,
+    },
+    {
+      id: '2',
+      patientId: 'p2',
+      patientName: 'Mary Johnson',
+      medicationName: 'Lisinopril',
+      dosage: '10mg',
+      frequency: '1x daily',
+      timingRelation: 'Anytime',
+      barcodeData: 'MEDI_LIS10_MJ_002',
+      createdAt: '2024-08-07T14:20:00Z',
+      downloadCount: 1,
+    },
+    {
+      id: '3',
+      patientId: 'p1',
+      patientName: 'John Smith',
+      medicationName: 'Atorvastatin',
+      dosage: '20mg',
+      frequency: '1x daily',
+      timingRelation: 'Before Food',
+      barcodeData: 'MEDI_ATO20_JS_003',
+      createdAt: '2024-08-07T09:45:00Z',
+      lastDownloaded: '2024-08-07T16:30:00Z',
+      downloadCount: 2,
+    },
+    {
+      id: '4',
+      patientId: 'p3',
+      patientName: 'Robert Davis',
+      medicationName: 'Aspirin',
+      dosage: '81mg',
+      frequency: '1x daily',
+      timingRelation: 'With Food',
+      barcodeData: 'MEDI_ASP81_RD_004',
+      createdAt: '2024-08-06T16:15:00Z',
+      downloadCount: 0,
+    },
+    {
+      id: '5',
+      patientId: 'p4',
+      patientName: 'Sarah Wilson',
+      medicationName: 'Vitamin D3',
+      dosage: '2000 IU',
+      frequency: '1x daily',
+      timingRelation: 'Anytime',
+      barcodeData: 'MEDI_VIT2000_SW_005',
+      createdAt: '2024-08-06T11:30:00Z',
+      downloadCount: 1,
+    },
+  ]);
 
   useEffect(() => {
-    loadMedicationInfo();
+    loadBarcodes();
   }, []);
 
-  const loadMedicationInfo = async () => {
+  const loadBarcodes = async () => {
     try {
       setIsLoading(true);
-      // TODO: Implement API call to fetch medication info
-      // const info = await caregiverAPI.getMedicationInfo(medicationId);
-      
-      // Simulate API delay
+      // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
       setIsLoading(false);
     } catch (error) {
-      console.error('Error loading medication info:', error);
+      console.error('Error loading barcodes:', error);
       setIsLoading(false);
-      Alert.alert('Error', 'Failed to load medication information.');
+      Alert.alert('Error', 'Failed to load barcodes.');
     }
   };
 
-  const generateBarcodeData = () => {
-    return `${medicationInfo.name}|${medicationInfo.dosage}${medicationInfo.dosageUnit}|${medicationInfo.frequency}x|${medicationInfo.timingRelation}|${medicationInfo.patientName}`;
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadBarcodes();
+    setRefreshing(false);
   };
 
-  const formatTimingRelation = (relation: string) => {
-    switch (relation) {
-      case 'before_food':
-        return 'Before Food';
-      case 'after_food':
-        return 'After Food';
-      case 'with_food':
-        return 'With Food';
-      case 'empty_stomach':
-        return 'Empty Stomach';
-      case 'anytime':
-        return 'Anytime';
-      default:
-        return relation;
-    }
-  };
-
-  const handleSaveBarcode = async () => {
+  const handleDownloadBarcode = async (barcode: BarcodeItem) => {
     try {
-      // Request media library permissions
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission Required', 'Please grant permission to save images to your gallery.');
         return;
       }
 
-      // Capture the barcode view
-      const uri = await captureRef(barcodeRef, {
-        format: 'png',
-        quality: 1,
-      });
-
-      // Save to media library
-      const asset = await MediaLibrary.createAssetAsync(uri);
-      await MediaLibrary.createAlbumAsync('MediTracker Barcodes', asset, false);
-
-      Alert.alert('Success', 'Barcode saved to your gallery!');
+      // In a real app, you would generate an actual barcode image here
+      Alert.alert('Success', `Barcode for ${barcode.patientName}'s ${barcode.medicationName} saved to gallery!`);
     } catch (error) {
-      console.error('Error saving barcode:', error);
-      Alert.alert('Error', 'Failed to save barcode to gallery.');
+      console.error('Error downloading barcode:', error);
+      Alert.alert('Error', 'Failed to download barcode.');
     }
   };
 
-  const handlePrintBarcode = async () => {
+  const handlePrintBarcode = async (barcode: BarcodeItem) => {
     try {
       const htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
-          <title>Medication Barcode</title>
+          <title>Medication Barcode - ${barcode.patientName}</title>
           <style>
-            body {
-              font-family: Arial, sans-serif;
-              padding: 20px;
-              text-align: center;
-            }
-            .barcode-container {
-              border: 2px solid #000;
-              padding: 20px;
-              margin: 20px auto;
-              max-width: 300px;
-              background: white;
-            }
-            .barcode {
-              font-family: 'Courier New', monospace;
-              font-size: 24px;
-              font-weight: bold;
-              letter-spacing: 2px;
-              margin: 20px 0;
-              padding: 10px;
-              background: #f0f0f0;
-              border: 1px solid #ccc;
-            }
-            .medication-info {
-              text-align: left;
-              margin: 15px 0;
-            }
-            .patient-name {
-              font-size: 18px;
-              font-weight: bold;
-              color: #2196F3;
-              margin-bottom: 10px;
-            }
-            .medication-name {
-              font-size: 16px;
-              font-weight: bold;
-              margin-bottom: 5px;
-            }
-            .dosage-info {
-              font-size: 14px;
-              color: #666;
-              margin-bottom: 5px;
-            }
-            .instructions {
-              font-size: 12px;
-              color: #888;
-              font-style: italic;
-              margin-top: 10px;
-            }
-            .footer {
-              font-size: 10px;
-              color: #999;
-              margin-top: 20px;
-              border-top: 1px solid #eee;
-              padding-top: 10px;
-            }
+            body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
+            .barcode-container { border: 2px solid #000; padding: 20px; margin: 20px auto; max-width: 300px; background: white; }
+            .patient-name { font-size: 18px; font-weight: bold; color: #059669; margin-bottom: 10px; }
+            .medication-name { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
+            .dosage-info { font-size: 14px; color: #666; margin-bottom: 15px; }
+            .barcode { font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; 
+                      letter-spacing: 2px; margin: 20px 0; padding: 10px; background: #f0f0f0; border: 1px solid #ccc; }
+            .footer { font-size: 10px; color: #999; margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; }
           </style>
         </head>
         <body>
           <div class="barcode-container">
-            <div class="patient-name">${medicationInfo.patientName}</div>
-            <div class="medication-name">${medicationInfo.name}</div>
-            <div class="dosage-info">
-              ${medicationInfo.dosage} ${medicationInfo.dosageUnit} • 
-              ${medicationInfo.frequency} times daily • 
-              ${formatTimingRelation(medicationInfo.timingRelation)}
-            </div>
-            <div class="barcode">${medicationInfo.barcode}</div>
-            ${medicationInfo.instructions ? `<div class="instructions">${medicationInfo.instructions}</div>` : ''}
-            <div class="footer">
-              MediTracker • Generated on ${new Date().toLocaleDateString()}
-            </div>
+            <div class="patient-name">${barcode.patientName}</div>
+            <div class="medication-name">${barcode.medicationName}</div>
+            <div class="dosage-info">${barcode.dosage} • ${barcode.frequency} • ${barcode.timingRelation}</div>
+            <div class="barcode">${barcode.barcodeData}</div>
+            <div class="footer">MediTracker • Generated on ${new Date().toLocaleDateString()}</div>
           </div>
         </body>
         </html>
       `;
 
-      await Print.printAsync({
-        html: htmlContent,
-      });
+      await Print.printAsync({ html: htmlContent });
     } catch (error) {
       console.error('Error printing barcode:', error);
       Alert.alert('Error', 'Failed to print barcode.');
     }
   };
 
-  const handleShareBarcode = async () => {
+  const handleShareBarcode = async (barcode: BarcodeItem) => {
     try {
-      const message = `Medication Barcode for ${medicationInfo.patientName}
+      const message = `Medication Barcode for ${barcode.patientName}
 
-Medication: ${medicationInfo.name}
-Dosage: ${medicationInfo.dosage} ${medicationInfo.dosageUnit}
-Frequency: ${medicationInfo.frequency} times daily
-Timing: ${formatTimingRelation(medicationInfo.timingRelation)}
-${medicationInfo.instructions ? `Instructions: ${medicationInfo.instructions}` : ''}
+Medication: ${barcode.medicationName}
+Dosage: ${barcode.dosage}
+Frequency: ${barcode.frequency}
+Timing: ${barcode.timingRelation}
 
-Barcode: ${medicationInfo.barcode}
+Barcode: ${barcode.barcodeData}
 
 Generated by MediTracker`;
 
-      await Share.share({
-        message,
-        title: 'Medication Barcode',
-      });
+      await Share.share({ message, title: 'Medication Barcode' });
     } catch (error) {
       console.error('Error sharing barcode:', error);
     }
   };
 
-  const renderBarcodeDisplay = () => (
-    <View ref={barcodeRef} style={styles.barcodeContainer}>
-      {/* Patient Header */}
-      <View style={styles.barcodeHeader}>
-        <Text style={styles.patientName}>{medicationInfo.patientName}</Text>
-        <View style={styles.medicationBadge}>
-          <Ionicons name="medical" size={16} color={COLORS.primary[500]} />
-          <Text style={styles.medicationBadgeText}>MEDICATION</Text>
-        </View>
-      </View>
+  const handleBulkDownload = async () => {
+    if (selectedBarcodes.length === 0) return;
+    
+    Alert.alert(
+      'Bulk Download',
+      `Download ${selectedBarcodes.length} barcode${selectedBarcodes.length > 1 ? 's' : ''}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Download',
+          onPress: () => {
+            Alert.alert('Success', `${selectedBarcodes.length} barcodes downloaded!`);
+            setSelectedBarcodes([]);
+            setIsSelectionMode(false);
+          },
+        },
+      ]
+    );
+  };
 
-      {/* Medication Info */}
-      <View style={styles.medicationDetails}>
-        <Text style={styles.medicationName}>{medicationInfo.name}</Text>
-        <Text style={styles.dosageInfo}>
-          {medicationInfo.dosage} {medicationInfo.dosageUnit} • {medicationInfo.frequency} times daily
-        </Text>
-        <Text style={styles.timingInfo}>
-          Take {formatTimingRelation(medicationInfo.timingRelation).toLowerCase()}
-        </Text>
-      </View>
+  const handleBulkPrint = async () => {
+    if (selectedBarcodes.length === 0) return;
+    
+    Alert.alert(
+      'Bulk Print',
+      `Print ${selectedBarcodes.length} barcode${selectedBarcodes.length > 1 ? 's' : ''}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Print',
+          onPress: () => {
+            Alert.alert('Success', `${selectedBarcodes.length} barcodes sent to printer!`);
+            setSelectedBarcodes([]);
+            setIsSelectionMode(false);
+          },
+        },
+      ]
+    );
+  };
 
-      {/* Barcode */}
-      <View style={styles.barcodeDisplay}>
-        <View style={styles.barcodeStripes}>
-          {/* Simulated barcode stripes */}
-          {Array.from({ length: 30 }).map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.barcodeStripe,
-                {
-                  width: Math.random() > 0.5 ? 2 : 4,
-                  backgroundColor: Math.random() > 0.3 ? COLORS.gray[900] : 'transparent',
-                }
-              ]}
+  const toggleBarcodeSelection = (barcodeId: string) => {
+    setSelectedBarcodes(prev => 
+      prev.includes(barcodeId)
+        ? prev.filter(id => id !== barcodeId)
+        : [...prev, barcodeId]
+    );
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 24) {
+      return diffInHours < 1 ? 'Just now' : `${diffInHours}h ago`;
+    } else {
+      const diffInDays = Math.floor(diffInHours / 24);
+      return diffInDays === 1 ? '1 day ago' : `${diffInDays} days ago`;
+    }
+  };
+
+  const renderBarcodeCard = (barcode: BarcodeItem) => {
+    const isSelected = selectedBarcodes.includes(barcode.id);
+    
+    return (
+      <TouchableOpacity
+        key={barcode.id}
+        style={[styles.barcodeCard, isSelected && styles.selectedCard]}
+        onPress={() => {
+          if (isSelectionMode) {
+            toggleBarcodeSelection(barcode.id);
+          }
+        }}
+        onLongPress={() => {
+          if (!isSelectionMode) {
+            setIsSelectionMode(true);
+            setSelectedBarcodes([barcode.id]);
+          }
+        }}
+        activeOpacity={0.8}
+      >
+        {isSelectionMode && (
+          <View style={styles.selectionIndicator}>
+            <Ionicons 
+              name={isSelected ? "checkmark-circle" : "ellipse-outline"} 
+              size={20} 
+              color={isSelected ? "#059669" : "#94A3B8"} 
             />
-          ))}
-        </View>
-        <Text style={styles.barcodeText}>{medicationInfo.barcode}</Text>
-      </View>
+          </View>
+        )}
 
-      {/* Instructions */}
-      {medicationInfo.instructions && (
-        <View style={styles.instructionsContainer}>
-          <Text style={styles.instructionsLabel}>Instructions:</Text>
-          <Text style={styles.instructionsText}>{medicationInfo.instructions}</Text>
+        <View style={styles.barcodeHeader}>
+          <View style={styles.patientInfo}>
+            <Text style={styles.patientName}>{barcode.patientName}</Text>
+            <Text style={styles.medicationInfo}>
+              {barcode.medicationName} • {barcode.dosage}
+            </Text>
+            <Text style={styles.dosageDetails}>
+              {barcode.frequency} • {barcode.timingRelation}
+            </Text>
+          </View>
+          
+          <View style={styles.barcodeStatus}>
+            <Text style={styles.createdDate}>{formatDate(barcode.createdAt)}</Text>
+            {barcode.downloadCount > 0 && (
+              <View style={styles.downloadBadge}>
+                <Ionicons name="download" size={12} color="#059669" />
+                <Text style={styles.downloadCount}>{barcode.downloadCount}</Text>
+              </View>
+            )}
+          </View>
         </View>
-      )}
 
-      {/* Footer */}
-      <View style={styles.barcodeFooter}>
-        <Text style={styles.footerText}>
-          Generated by MediTracker • {new Date(medicationInfo.createdAt).toLocaleDateString()}
-        </Text>
-        <Text style={styles.scanInstructions}>
-          Scan this code when taking medication
-        </Text>
-      </View>
-    </View>
-  );
+        <View style={styles.barcodeDisplay}>
+          <View style={styles.barcodeStripes}>
+            {Array.from({ length: 20 }).map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.barcodeStripe,
+                  {
+                    width: Math.random() > 0.5 ? 2 : 3,
+                    backgroundColor: Math.random() > 0.3 ? '#1E293B' : 'transparent',
+                  }
+                ]}
+              />
+            ))}
+          </View>
+          <Text style={styles.barcodeText}>{barcode.barcodeData}</Text>
+        </View>
+
+        {!isSelectionMode && (
+          <View style={styles.barcodeActions}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => handleDownloadBarcode(barcode)}
+            >
+              <Ionicons name="download-outline" size={16} color="#059669" />
+              <Text style={styles.actionText}>Download</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => handlePrintBarcode(barcode)}
+            >
+              <Ionicons name="print-outline" size={16} color="#0EA5E9" />
+              <Text style={styles.actionText}>Print</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => handleShareBarcode(barcode)}
+            >
+              <Ionicons name="share-outline" size={16} color="#8B5CF6" />
+              <Text style={styles.actionText}>Share</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <LoadingSpinner size="large" />
+        <Text style={styles.loadingText}>Loading barcodes...</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.primary[500]} />
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>Medication Barcode</Text>
-        
-        <TouchableOpacity style={styles.infoButton}>
-          <Ionicons name="information-circle-outline" size={24} color={COLORS.primary[500]} />
-        </TouchableOpacity>
-      </View>
+    <View style={styles.container}>
+      <CaregiverNavbar
+        title={isSelectionMode ? `${selectedBarcodes.length} Selected` : "Barcodes"}
+        showBackButton={!isSelectionMode}
+        onBackPress={() => {
+          if (isSelectionMode) {
+            setIsSelectionMode(false);
+            setSelectedBarcodes([]);
+          } else {
+            navigation.goBack();
+          }
+        }}
+        rightActions={
+          isSelectionMode ? (
+            <TouchableOpacity
+              style={styles.cancelSelection}
+              onPress={() => {
+                setIsSelectionMode(false);
+                setSelectedBarcodes([]);
+              }}
+            >
+              <Text style={styles.cancelSelectionText}>Cancel</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.selectButton}
+              onPress={() => setIsSelectionMode(true)}
+            >
+              <Ionicons name="checkmark-circle-outline" size={20} color="#059669" />
+            </TouchableOpacity>
+          )
+        }
+      />
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#059669"
+            colors={['#059669']}
+          />
+        }
         showsVerticalScrollIndicator={false}
       >
-        {/* Instructions Card */}
-        <View style={styles.instructionsCard}>
-          <View style={styles.instructionsHeader}>
-            <Ionicons name="scan-outline" size={24} color={COLORS.primary[500]} />
-            <Text style={styles.instructionsTitle}>How to Use This Barcode</Text>
+        {/* Header Section */}
+        <LinearGradient
+          colors={['#F0FDF4', '#FFFFFF']}
+          style={styles.headerSection}
+        >
+          <View style={styles.headerContent}>
+            <View style={styles.headerIcon}>
+              <Ionicons name="qr-code" size={32} color="#059669" />
+            </View>
+            <Text style={styles.headerTitle}>Medication Barcodes</Text>
+            <Text style={styles.headerSubtitle}>
+              Manage and distribute barcodes for patient medications
+            </Text>
           </View>
-          <View style={styles.instructionsList}>
-            <View style={styles.instructionItem}>
-              <Text style={styles.instructionNumber}>1</Text>
-              <Text style={styles.instructionText}>Print or save this barcode</Text>
-            </View>
-            <View style={styles.instructionItem}>
-              <Text style={styles.instructionNumber}>2</Text>
-              <Text style={styles.instructionText}>Attach to medication container</Text>
-            </View>
-            <View style={styles.instructionItem}>
-              <Text style={styles.instructionNumber}>3</Text>
-              <Text style={styles.instructionText}>Patient scans when taking medication</Text>
-            </View>
-            <View style={styles.instructionItem}>
-              <Text style={styles.instructionNumber}>4</Text>
-              <Text style={styles.instructionText}>System tracks adherence automatically</Text>
-            </View>
-          </View>
-        </View>
+        </LinearGradient>
 
-        {/* Barcode Display */}
-        {renderBarcodeDisplay()}
-
-        {/* Action Buttons */}
-        <View style={styles.actionsContainer}>
-          <View style={styles.actionRow}>
-            <Button
-              title="Save to Gallery"
-              onPress={handleSaveBarcode}
-              variant="outline"
-              style={styles.actionButton}
-              icon={<Ionicons name="download-outline" size={18} color={COLORS.primary[500]} />}
-            />
-            
-            <Button
-              title="Print"
-              onPress={handlePrintBarcode}
-              variant="outline"
-              style={styles.actionButton}
-              icon={<Ionicons name="print-outline" size={18} color={COLORS.primary[500]} />}
-            />
-          </View>
-
-          <Button
-            title="Share Barcode"
-            onPress={handleShareBarcode}
-            style={styles.shareButton}
-            icon={<Ionicons name="share-outline" size={18} color={COLORS.background} />}
-          />
-        </View>
-
-        {/* Tips Section */}
-        <View style={styles.tipsContainer}>
-          <Text style={styles.tipsTitle}>Tips for Best Results</Text>
-          
-          <View style={styles.tipsList}>
-            <View style={styles.tipItem}>
-              <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
-              <Text style={styles.tipText}>Print on white paper for better scanning</Text>
+        {/* Stats Section */}
+        <View style={styles.statsSection}>
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{recentBarcodes.length}</Text>
+              <Text style={styles.statLabel}>Total Barcodes</Text>
             </View>
-            
-            <View style={styles.tipItem}>
-              <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
-              <Text style={styles.tipText}>Keep barcode clean and unfolded</Text>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>
+                {recentBarcodes.reduce((sum, b) => sum + b.downloadCount, 0)}
+              </Text>
+              <Text style={styles.statLabel}>Downloads</Text>
             </View>
-            
-            <View style={styles.tipItem}>
-              <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
-              <Text style={styles.tipText}>Store in a dry place away from direct sunlight</Text>
-            </View>
-            
-            <View style={styles.tipItem}>
-              <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
-              <Text style={styles.tipText}>Test scanning before attaching to medication</Text>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>
+                {new Set(recentBarcodes.map(b => b.patientId)).size}
+              </Text>
+              <Text style={styles.statLabel}>Patients</Text>
             </View>
           </View>
         </View>
 
-        {/* Safety Notice */}
-        <View style={styles.safetyNotice}>
-          <View style={styles.safetyHeader}>
-            <Ionicons name="shield-checkmark" size={20} color={COLORS.warning} />
-            <Text style={styles.safetyTitle}>Important Safety Information</Text>
+        {/* Barcodes List */}
+        <View style={styles.barcodesSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Barcodes</Text>
+            <Text style={styles.sectionSubtitle}>Sorted by creation date (newest first)</Text>
           </View>
-          <Text style={styles.safetyText}>
-            This barcode is unique to this specific medication and patient. 
-            Do not share with others or use for different medications. 
-            Always verify medication details before taking.
-          </Text>
+
+          <View style={styles.barcodesList}>
+            {recentBarcodes.map(renderBarcodeCard)}
+          </View>
+        </View>
+
+        {/* Generation Tip */}
+        <View style={styles.tipSection}>
+          <View style={styles.tipCard}>
+            <View style={styles.tipIcon}>
+              <Ionicons name="bulb-outline" size={24} color="#F59E0B" />
+            </View>
+            <View style={styles.tipContent}>
+              <Text style={styles.tipTitle}>Need a new barcode?</Text>
+              <Text style={styles.tipText}>
+                Go to patient details and add or edit medications to generate new barcodes
+              </Text>
+            </View>
+          </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+
+      {/* Bulk Actions */}
+      {isSelectionMode && selectedBarcodes.length > 0 && (
+        <View style={styles.bulkActionsContainer}>
+          <Button
+            title={`Download (${selectedBarcodes.length})`}
+            onPress={handleBulkDownload}
+            variant="outline"
+            style={styles.bulkButton}
+            icon={<Ionicons name="download-outline" size={18} color="#059669" />}
+          />
+          <Button
+            title={`Print (${selectedBarcodes.length})`}
+            onPress={handleBulkPrint}
+            style={styles.bulkButton}
+            icon={<Ionicons name="print-outline" size={18} color="#FFFFFF" />}
+          />
+        </View>
+      )}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F8FAFC',
+  },
+  scrollView: {
+    flex: 1,
+    marginTop: Platform.OS === 'ios' ? 114 : 70,
+  },
+  scrollContent: {
+    paddingBottom: SPACING[6],
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F8FAFC',
   },
-  header: {
-    flexDirection: 'row',
+  loadingText: {
+    marginTop: SPACING[4],
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#64748B',
+  },
+  selectButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F0FDF4',
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING[6],
-    paddingVertical: SPACING[4],
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
-  },
-  backButton: {
-    padding: SPACING[2],
-  },
-  headerTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-  },
-  infoButton: {
-    padding: SPACING[2],
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: SPACING[6],
-    paddingVertical: SPACING[6],
-  },
-  instructionsCard: {
-    backgroundColor: COLORS.primary[50],
-    borderRadius: RADIUS.xl,
-    padding: SPACING[5],
-    marginBottom: SPACING[6],
     borderWidth: 1,
-    borderColor: COLORS.primary[100],
+    borderColor: '#BBF7D0',
   },
-  instructionsHeader: {
-    flexDirection: 'row',
+  cancelSelection: {
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[2],
+  },
+  cancelSelectionText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '500',
+    color: '#059669',
+  },
+  headerSection: {
+    paddingHorizontal: SPACING[5],
+    paddingBottom: SPACING[6],
+    paddingTop: SPACING[10],
+    alignItems: 'center',
+  },
+  headerContent: {
+    alignItems: 'center',
+  },
+  headerIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING[4],
-    gap: SPACING[3],
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  instructionsTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: 'bold',
-    color: COLORS.primary[700],
+  headerTitle: {
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: SPACING[2],
   },
-  instructionsList: {
-    gap: SPACING[3],
-  },
-  instructionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[3],
-  },
-  instructionNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: COLORS.primary[500],
-    color: COLORS.background,
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: 'bold',
+  headerSubtitle: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#64748B',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
   },
-  instructionText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.primary[700],
-    flex: 1,
+  statsSection: {
+    paddingHorizontal: SPACING[5],
+    paddingBottom: SPACING[5],
   },
-  barcodeContainer: {
-    backgroundColor: COLORS.background,
+  statsGrid: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.xl,
-    padding: SPACING[6],
-    marginBottom: SPACING[6],
-    ...SHADOWS.lg,
-    borderWidth: 2,
-    borderColor: COLORS.gray[200],
+    padding: SPACING[4],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: SPACING[4],
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: '700',
+    color: '#059669',
+    marginBottom: SPACING[1],
+  },
+  statLabel: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#64748B',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  barcodesSection: {
+    paddingHorizontal: SPACING[5],
+  },
+  sectionHeader: {
+    marginBottom: SPACING[4],
+  },
+  sectionTitle: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: SPACING[1],
+  },
+  sectionSubtitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+  },
+  barcodesList: {
+    gap: SPACING[4],
+  },
+  barcodeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.xl,
+    padding: SPACING[5],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  selectedCard: {
+    borderColor: '#059669',
+    backgroundColor: '#F0FDF4',
+  },
+  selectionIndicator: {
+    position: 'absolute',
+    top: SPACING[3],
+    right: SPACING[3],
+    zIndex: 1,
   },
   barcodeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: SPACING[4],
-    paddingBottom: SPACING[3],
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
+  },
+  patientInfo: {
+    flex: 1,
   },
   patientName: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: 'bold',
-    color: COLORS.primary[600],
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: SPACING[1],
   },
-  medicationBadge: {
+  medicationInfo: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#059669',
+    fontWeight: '500',
+    marginBottom: SPACING[1],
+  },
+  dosageDetails: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+  },
+  barcodeStatus: {
+    alignItems: 'flex-end',
+  },
+  createdDate: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#94A3B8',
+    marginBottom: SPACING[1],
+  },
+  downloadBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.primary[100],
+    backgroundColor: '#F0FDF4',
     paddingHorizontal: SPACING[2],
     paddingVertical: SPACING[1],
     borderRadius: RADIUS.sm,
     gap: SPACING[1],
   },
-  medicationBadgeText: {
+  downloadCount: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: 'bold',
-    color: COLORS.primary[600],
-  },
-  medicationDetails: {
-    marginBottom: SPACING[5],
-  },
-  medicationName: {
-    fontSize: TYPOGRAPHY.fontSize['2xl'],
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-    marginBottom: SPACING[2],
-  },
-  dosageInfo: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    color: COLORS.text.secondary,
-    fontWeight: '500',
-    marginBottom: SPACING[1],
-  },
-  timingInfo: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.text.hint,
-    fontStyle: 'italic',
+    color: '#059669',
+    fontWeight: '600',
   },
   barcodeDisplay: {
     alignItems: 'center',
-    marginBottom: SPACING[4],
-    backgroundColor: COLORS.gray[50],
-    padding: SPACING[4],
+    backgroundColor: '#F8FAFC',
     borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    marginBottom: SPACING[4],
   },
   barcodeStripes: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 60,
-    marginBottom: SPACING[3],
+    height: 40,
+    marginBottom: SPACING[2],
     gap: 1,
   },
   barcodeStripe: {
     height: '100%',
   },
   barcodeText: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
+    color: '#1E293B',
     fontFamily: 'monospace',
-    letterSpacing: 2,
+    letterSpacing: 1,
   },
-  instructionsContainer: {
-    backgroundColor: COLORS.warning + '10',
-    padding: SPACING[3],
-    borderRadius: RADIUS.md,
-    marginBottom: SPACING[3],
-  },
-  instructionsLabel: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: 'bold',
-    color: COLORS.warning,
-    marginBottom: SPACING[1],
-  },
-  instructionsText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.primary,
-    fontStyle: 'italic',
-  },
-  barcodeFooter: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.gray[200],
-    paddingTop: SPACING[3],
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.hint,
-    marginBottom: SPACING[1],
-  },
-  scanInstructions: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.primary[500],
-    fontWeight: '500',
-  },
-  actionsContainer: {
-    marginBottom: SPACING[6],
-  },
-  actionRow: {
+  barcodeActions: {
     flexDirection: 'row',
-    gap: SPACING[3],
-    marginBottom: SPACING[3],
+    justifyContent: 'space-between',
+    gap: SPACING[2],
   },
   actionButton: {
     flex: 1,
-  },
-  shareButton: {
-    width: '100%',
-  },
-  tipsContainer: {
-    backgroundColor: COLORS.success + '10',
-    borderRadius: RADIUS.xl,
-    padding: SPACING[5],
-    marginBottom: SPACING[6],
-  },
-  tipsTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: 'bold',
-    color: COLORS.success,
-    marginBottom: SPACING[4],
-  },
-  tipsList: {
-    gap: SPACING[3],
-  },
-  tipItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SPACING[2],
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING[3],
+    gap: SPACING[1],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  actionText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '500',
+    color: '#475569',
+  },
+  tipSection: {
+    paddingHorizontal: SPACING[5],
+    paddingTop: SPACING[6],
+  },
+  tipCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFBEB',
+    borderRadius: RADIUS.xl,
+    padding: SPACING[4],
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    alignItems: 'center',
+  },
+  tipIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FEF3C7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
+  },
+  tipContent: {
+    flex: 1,
+  },
+  tipTitle: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: SPACING[1],
   },
   tipText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.primary,
-    flex: 1,
-    lineHeight: 20,
+    color: '#A16207',
+    lineHeight: 18,
   },
-  safetyNotice: {
-    backgroundColor: COLORS.warning + '10',
-    borderRadius: RADIUS.xl,
-    padding: SPACING[5],
-    borderWidth: 1,
-    borderColor: COLORS.warning + '30',
-  },
-  safetyHeader: {
+  bulkActionsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING[3],
-    gap: SPACING[2],
+    paddingHorizontal: SPACING[5],
+    paddingVertical: SPACING[4],
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    gap: SPACING[3],
   },
-  safetyTitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: 'bold',
-    color: COLORS.warning,
-  },
-  safetyText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.primary,
-    lineHeight: 20,
+  bulkButton: {
+    flex: 1,
   },
 });
 

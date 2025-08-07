@@ -27,7 +27,7 @@ export interface ButtonProps {
 const Button: React.FC<ButtonProps> = ({
   title,
   onPress,
-  variant = 'primary',
+  variant = 'secondary',
   size = 'medium',
   disabled = false,
   loading = false,

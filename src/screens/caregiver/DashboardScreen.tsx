@@ -342,7 +342,8 @@ const styles = StyleSheet.create({
   },
   greetingContainer: {
     paddingHorizontal: SPACING[5],
-    paddingVertical: SPACING[6],
+    paddingBottom: SPACING[6],
+    paddingTop: SPACING[10],
   },
   greetingContent: {
     flexDirection: 'row',

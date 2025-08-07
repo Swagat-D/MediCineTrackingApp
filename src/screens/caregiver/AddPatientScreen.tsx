@@ -3,694 +3,684 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
-  StatusBar,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   TouchableOpacity,
-  Alert,
+  Modal,
+  Image,
+  Platform,
 } from 'react-native';
-import { useForm, Controller } from 'react-hook-form';
-import { yupResolver } from '@hookform/resolvers/yup';
-import * as yup from 'yup';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
-
-// Components
-import Button from '../../components/common/Button/Button';
+import SecondaryNavbar from '../../components/common/SecondaryNavbar';
 import Input from '../../components/common/Input/Input';
-import { LoadingOverlay } from '../../components/common/Loading/LoadingSpinner';
-
-// Types and Constants
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
-import { PatientFormData } from '../../types/patient.types';
-import { COLORS, TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
-import { VALIDATION_RULES } from '../../constants/app';
-import { Gender } from '@/types/auth.types';
+import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
+
 type Props = CaregiverStackScreenProps<'AddPatient'>;
 
-// Validation schema
-const addPatientSchema: yup.ObjectSchema<PatientFormData> = yup.object({
-  name: yup
-    .string()
-    .required('Name is required')
-    .min(VALIDATION_RULES.NAME_MIN_LENGTH, `Name must be at least ${VALIDATION_RULES.NAME_MIN_LENGTH} characters`)
-    .matches(/^[a-zA-Z\s]+$/, 'Name can only contain letters and spaces'),
-  email: yup
-    .string()
-    .required('Email is required')
-    .matches(VALIDATION_RULES.EMAIL, 'Please enter a valid email'),
-  age: yup
-    .number()
-    .required('Age is required')
-    .min(VALIDATION_RULES.AGE_MIN, `Age must be at least ${VALIDATION_RULES.AGE_MIN}`)
-    .max(VALIDATION_RULES.AGE_MAX, `Age must be less than ${VALIDATION_RULES.AGE_MAX}`),
-  gender: yup
-    .mixed<Gender>()
-    .oneOf(['male', 'female', 'other', 'prefer_not_to_say'])
-    .required('Please select gender'),
-  phoneNumber: yup
-    .string()
-    .required('Phone number is required')
-    .matches(VALIDATION_RULES.PHONE, 'Please enter a valid phone number'),
-  emergencyContacts: yup.array().of(
-    yup.object({
-      id: yup.string().required('Contact ID is required'),
-      name: yup.string().required('Contact name is required'),
-      relationship: yup.string().required('Relationship is required'),
-      phoneNumber: yup.string().required('Contact phone number is required'),
-      isPrimary: yup.boolean().default(false),
-    })
-  ).optional(),
-  medicalHistory: yup.array().of(yup.string().required()).optional(),
-  allergies: yup.array().of(yup.string().required()).optional(),
-});
-
-const genderOptions: { label: string; value: Gender | '' }[] = [
-  { label: 'Select Gender', value: '' },
-  { label: 'Male', value: 'male' },
-  { label: 'Female', value: 'female' },
-  { label: 'Other', value: 'other' },
-  { label: 'Prefer not to say', value: 'prefer_not_to_say' },
-];
-
 const AddPatientScreen: React.FC<Props> = ({ navigation }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [searchMode, setSearchMode] = useState<'search' | 'register'>('search');
-  const [searchEmail, setSearchEmail] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
 
-  const {
-    control,
-    handleSubmit,
-    formState: { errors, isValid },
-    reset,
-    setValue,
-  } = useForm<PatientFormData>({
-    resolver: yupResolver(addPatientSchema),
-    mode: 'onChange',
-    defaultValues: {
-      name: '',
-      email: '',
-      age: undefined,
-      gender: '' as Gender,
-      phoneNumber: '',
-      emergencyContacts: [],
-      medicalHistory: [],
-      allergies: [],
+  // Mock patient data for search
+  const [suggestedPatients] = useState([
+    {
+      id: '1',
+      name: 'John Smith',
+      email: 'john.smith@email.com',
+      phoneNumber: '+1-555-0101',
+      lastSeen: '2 days ago',
     },
-  });
+    {
+      id: '2',
+      name: 'Mary Johnson', 
+      email: 'mary.johnson@email.com',
+      phoneNumber: '+1-555-0102',
+      lastSeen: '1 week ago',
+    },
+    {
+      id: '3',
+      name: 'Robert Davis',
+      email: 'robert.davis@email.com', 
+      phoneNumber: '+1-555-0103',
+      lastSeen: '3 days ago',
+    },
+  ]);
 
-  const handleSearchPatient = async () => {
-    if (!searchEmail.trim()) {
-      Alert.alert('Error', 'Please enter an email address to search');
-      return;
-    }
+  const filteredPatients = suggestedPatients.filter(patient =>
+    patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    patient.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-    try {
-      setIsLoading(true);
-      
-      // TODO: Implement API call to search for existing patient
-      // const patient = await caregiverAPI.searchPatient(searchEmail);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Simulate patient found/not found
-      const patientExists = Math.random() > 0.5;
-      
-      if (patientExists) {
-        Alert.alert(
-          'Patient Found',
-          'We found an existing patient with this email. Would you like to add them to your patient list?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Add Patient',
-              onPress: () => {
-                Alert.alert('Success', 'Patient has been added to your list');
-                navigation.goBack();
-              },
-            },
-          ]
-        );
-      } else {
-        Alert.alert(
-          'Patient Not Found',
-          'No existing patient found with this email. Would you like to register a new patient?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Register New Patient',
-              onPress: () => {
-                setSearchMode('register');
-                setValue('email', searchEmail);
-              },
-            },
-          ]
-        );
-      }
-      
-      setIsLoading(false);
-    } catch (error) {
-      console.error(error)
-      setIsLoading(false);
-      Alert.alert('Error', 'Failed to search for patient. Please try again.');
-    }
-  };
-
-  const onSubmit = async (data: PatientFormData) => {
-    try {
-      setIsLoading(true);
-      
-      // TODO: Implement API call to register new patient
-      // const result = await caregiverAPI.addPatient(data);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      Alert.alert(
-        'Success',
-        'Patient has been registered and added to your list successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              reset();
-              navigation.goBack();
-            },
-          },
-        ]
-      );
-      
-    } catch (error) {
-      console.error(error)
-      Alert.alert('Error', 'Failed to register patient. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleBackToSearch = () => {
-    setSearchMode('search');
-    setSearchEmail('');
-    reset();
-  };
-
-  const handleBack = () => {
+  const handleAddExistingPatient = (patientId: string) => {
+    // Add existing patient to caregiver's list
     navigation.goBack();
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
-      <LoadingOverlay visible={isLoading} message={searchMode === 'search' ? 'Searching for patient...' : 'Registering patient...'} />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.primary[500]} />
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>
-          {searchMode === 'search' ? 'Add Patient' : 'Register New Patient'}
-        </Text>
-        
-        {searchMode === 'register' && (
-          <TouchableOpacity style={styles.switchButton} onPress={handleBackToSearch}>
-            <Text style={styles.switchButtonText}>Back to Search</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+  const handleRegisterNewPatient = () => {
+    setShowConfirmationModal(true);
+  };
 
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {searchMode === 'search' ? (
-            /* Search Mode */
-            <View style={styles.searchContainer}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="search" size={60} color={COLORS.primary[500]} />
-              </View>
-              
-              <Text style={styles.searchTitle}>Find Existing Patient</Text>
-              <Text style={styles.searchSubtitle}>
-                Search for an existing patient by their email address to add them to your patient list
-              </Text>
+  const handleConfirmRedirect = () => {
+    setShowConfirmationModal(false);
+    // Navigate to role selection screen for new patient registration
+    navigation.navigate('RoleSelection');
+  };
 
-              <View style={styles.searchFormContainer}>
-                <Input
-                  label="Patient Email Address"
-                  placeholder="Enter patient's email"
-                  value={searchEmail}
-                  onChangeText={setSearchEmail}
-                  leftIcon="mail-outline"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  required
-                />
-
-                <Button
-                  title="Search Patient"
-                  onPress={handleSearchPatient}
-                  disabled={!searchEmail.trim() || isLoading}
-                  loading={isLoading}
-                  fullWidth
-                  style={styles.searchButton}
-                />
-              </View>
-
-              <View style={styles.divider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>or</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              <Button
-                title="Register New Patient"
-                onPress={() => setSearchMode('register')}
-                variant="outline"
-                fullWidth
-                icon={<Ionicons name="person-add" size={20} color={COLORS.primary[500]} />}
-              />
+  const renderConfirmationModal = () => (
+    <Modal
+      visible={showConfirmationModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowConfirmationModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <View style={styles.modalIcon}>
+              <Ionicons name="person-add" size={32} color="#059669" />
             </View>
-          ) : (
-            /* Registration Mode */
-            <View style={styles.formContainer}>
-              <View style={styles.formHeader}>
-                <View style={styles.iconContainer}>
-                  <Ionicons name="person-add" size={60} color={COLORS.secondary[500]} />
-                </View>
-                
-                <Text style={styles.formTitle}>Patient Registration</Text>
-                <Text style={styles.formSubtitle}>
-                  Fill in the patient&apos;s details to create their account
-                </Text>
+            <Text style={styles.modalTitle}>Register New Patient</Text>
+            <Text style={styles.modalSubtitle}>
+              You will be redirected to the registration page where you can sign up a new patient account.
+            </Text>
+          </View>
+
+          <View style={styles.modalContent}>
+            <View style={styles.instructionItem}>
+              <View style={styles.instructionNumber}>
+                <Text style={styles.instructionNumberText}>1</Text>
               </View>
+              <Text style={styles.instructionText}>
+                Make sure the patient is near you
+              </Text>
+            </View>
 
-              {/* Basic Information */}
-              <View style={styles.sectionContainer}>
-                <Text style={styles.sectionTitle}>Basic Information</Text>
-                
-                <Controller
-                  control={control}
-                  name="name"
-                  render={({ field: { onChange, onBlur, value } }) => (
-                    <Input
-                      label="Full Name"
-                      placeholder="Enter patient's full name"
-                      value={value}
-                      onChangeText={onChange}
-                      onBlur={onBlur}
-                      error={errors.name?.message}
-                      leftIcon="person-outline"
-                      autoCapitalize="words"
-                      required
-                    />
-                  )}
-                />
-
-                <Controller
-                  control={control}
-                  name="email"
-                  render={({ field: { onChange, onBlur, value } }) => (
-                    <Input
-                      label="Email Address"
-                      placeholder="Enter patient's email"
-                      value={value}
-                      onChangeText={onChange}
-                      onBlur={onBlur}
-                      error={errors.email?.message}
-                      leftIcon="mail-outline"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoComplete="email"
-                      required
-                    />
-                  )}
-                />
-
-                <Controller
-                  control={control}
-                  name="phoneNumber"
-                  render={({ field: { onChange, onBlur, value } }) => (
-                    <Input
-                      label="Phone Number"
-                      placeholder="Enter patient's phone number"
-                      value={value}
-                      onChangeText={onChange}
-                      onBlur={onBlur}
-                      error={errors.phoneNumber?.message}
-                      leftIcon="call-outline"
-                      keyboardType="phone-pad"
-                      autoComplete="tel"
-                      required
-                    />
-                  )}
-                />
-
-                <View style={styles.rowContainer}>
-                  <View style={styles.halfWidth}>
-                    <Controller
-                      control={control}
-                      name="age"
-                      render={({ field: { onChange, onBlur, value } }) => (
-                        <Input
-                          label="Age"
-                          placeholder="Age"
-                          value={value?.toString() || ''}
-                          onChangeText={(text) => onChange(text ? parseInt(text) : undefined)}
-                          onBlur={onBlur}
-                          error={errors.age?.message}
-                          leftIcon="calendar-outline"
-                          keyboardType="numeric"
-                          required
-                        />
-                      )}
-                    />
-                  </View>
-
-                  <View style={styles.halfWidth}>
-                    <Text style={styles.inputLabel}>
-                      Gender <Text style={styles.required}>*</Text>
-                    </Text>
-                    <Controller
-                      control={control}
-                      name="gender"
-                      render={({ field: { onChange, value } }) => (
-                        <View style={[styles.pickerContainer, errors.gender && styles.pickerError]}>
-                          <Picker
-                            selectedValue={value}
-                            onValueChange={onChange}
-                            style={styles.picker}
-                          >
-                            {genderOptions.map((option) => (
-                              <Picker.Item
-                                key={option.value}
-                                label={option.label}
-                                value={option.value}
-                              />
-                            ))}
-                          </Picker>
-                        </View>
-                      )}
-                    />
-                    {errors.gender && (
-                      <Text style={styles.errorText}>{errors.gender.message}</Text>
-                    )}
-                  </View>
-                </View>
+            <View style={styles.instructionItem}>
+              <View style={styles.instructionNumber}>
+                <Text style={styles.instructionNumberText}>2</Text>
               </View>
+              <Text style={styles.instructionText}>
+                Choose &quot;Patient&quot; role during registration
+              </Text>
+            </View>
 
-              {/* Medical Information */}
-              <View style={styles.sectionContainer}>
-                <Text style={styles.sectionTitle}>Medical Information (Optional)</Text>
-                
-                <Input
-                  label="Medical History"
-                  placeholder="Enter any relevant medical conditions"
-                  multiline
-                  numberOfLines={3}
-                  style={styles.textArea}
-                  leftIcon="medical-outline"
-                />
-
-                <Input
-                  label="Known Allergies"
-                  placeholder="Enter any known allergies"
-                  multiline
-                  numberOfLines={2}
-                  style={styles.textArea}
-                  leftIcon="warning-outline"
-                />
+            <View style={styles.instructionItem}>
+              <View style={styles.instructionNumber}>
+                <Text style={styles.instructionNumberText}>3</Text>
               </View>
+              <Text style={styles.instructionText}>
+                Complete the sign-up process together
+              </Text>
+            </View>
+          </View>
 
-              {/* Emergency Contact */}
-              <View style={styles.sectionContainer}>
-                <Text style={styles.sectionTitle}>Emergency Contact (Optional)</Text>
-                
-                <Input
-                  label="Contact Name"
-                  placeholder="Emergency contact name"
-                  leftIcon="person-outline"
-                />
+          <View style={styles.modalActions}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setShowConfirmationModal(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
 
-                <Input
-                  label="Relationship"
-                  placeholder="Relationship to patient"
-                  leftIcon="heart-outline"
-                />
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={handleConfirmRedirect}
+            >
+              <Text style={styles.confirmButtonText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 
-                <Input
-                  label="Contact Phone"
-                  placeholder="Emergency contact phone"
-                  leftIcon="call-outline"
-                  keyboardType="phone-pad"
-                />
-              </View>
+  return (
+    <View style={styles.container}>
+      <SecondaryNavbar
+        title="Add Patient"
+        onBackPress={() => navigation.goBack()}
+        subtitle="Search existing or register new"
+      />
 
-              {/* Terms and Consent */}
-              <View style={styles.consentContainer}>
-                <View style={styles.consentItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-                  <Text style={styles.consentText}>
-                    Patient has consented to medication management
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header Section */}
+        <LinearGradient
+          colors={['#F0FDF4', '#FFFFFF']}
+          style={styles.headerSection}
+        >
+          <View style={styles.headerContent}>
+            <View style={styles.headerIcon}>
+              <Ionicons name="people-outline" size={32} color="#059669" />
+            </View>
+            <Text style={styles.headerTitle}>Add Patient to Your Care</Text>
+            <Text style={styles.headerSubtitle}>
+              Search for existing patients or help register a new patient account
+            </Text>
+          </View>
+        </LinearGradient>
+
+        {/* Search Section */}
+        <View style={styles.searchSection}>
+          <Text style={styles.sectionTitle}>Search Existing Patients</Text>
+          
+          <View style={styles.searchContainer}>
+            <Image
+              source={require('../../../assets/images/search.png')}
+              style={styles.searchIcon}
+              resizeMode="contain"
+            />
+            <Input
+              placeholder="Search by name or email..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={styles.searchInput}
+              containerStyle={styles.searchInputContainer}
+            />
+          </View>
+
+          {searchQuery.length > 0 && (
+            <View style={styles.searchResults}>
+              <Text style={styles.resultsTitle}>
+                {filteredPatients.length} result{filteredPatients.length !== 1 ? 's' : ''} found
+              </Text>
+              
+              {filteredPatients.length > 0 ? (
+                filteredPatients.map(patient => (
+                  <TouchableOpacity
+                    key={patient.id}
+                    style={styles.patientResultCard}
+                    onPress={() => handleAddExistingPatient(patient.id)}
+                  >
+                    <View style={styles.patientAvatar}>
+                      <Text style={styles.patientInitials}>
+                        {patient.name.split(' ').map(n => n[0]).join('')}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.patientInfo}>
+                      <Text style={styles.patientName}>{patient.name}</Text>
+                      <Text style={styles.patientEmail}>{patient.email}</Text>
+                      <Text style={styles.patientLastSeen}>Last seen: {patient.lastSeen}</Text>
+                    </View>
+                    
+                    <TouchableOpacity
+                      style={styles.addPatientButton}
+                      onPress={() => handleAddExistingPatient(patient.id)}
+                    >
+                      <Ionicons name="add" size={20} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.noResultsContainer}>
+                  <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+                  <Text style={styles.noResultsTitle}>No patients found</Text>
+                  <Text style={styles.noResultsText}>
+                    Try adjusting your search or register a new patient
                   </Text>
                 </View>
-                
-                <View style={styles.consentItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-                  <Text style={styles.consentText}>
-                    HIPAA privacy notice has been provided
-                  </Text>
-                </View>
-                
-                <View style={styles.consentItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-                  <Text style={styles.consentText}>
-                    Emergency contact permissions obtained
-                  </Text>
-                </View>
-              </View>
-
-              {/* Submit Button */}
-              <Button
-                title="Register Patient"
-                onPress={handleSubmit(onSubmit)}
-                disabled={!isValid || isLoading}
-                loading={isLoading}
-                fullWidth
-                style={styles.submitButton}
-                icon={<Ionicons name="person-add" size={20} color={COLORS.background} />}
-              />
+              )}
             </View>
           )}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+
+          {searchQuery.length === 0 && (
+            <View style={styles.searchPlaceholder}>
+              <View style={styles.placeholderIcon}>
+                <Image
+                  source={require('../../../assets/images/search.png')}
+                  style={styles.placeholderSearchIcon}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={styles.placeholderTitle}>Search for Patients</Text>
+              <Text style={styles.placeholderText}>
+                Start typing to search for existing patients by name or email
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Divider */}
+        <View style={styles.dividerContainer}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {/* Register New Patient Section */}
+        <View style={styles.registerSection}>
+          <Text style={styles.sectionTitle}>Register New Patient</Text>
+          
+          <View style={styles.registerCard}>
+            <View style={styles.registerIcon}>
+              <Ionicons name="person-add-outline" size={32} color="#059669" />
+            </View>
+            
+            <View style={styles.registerContent}>
+              <Text style={styles.registerTitle}>Help Patient Sign Up</Text>
+              <Text style={styles.registerDescription}>
+                Guide your patient through the registration process to create their own MediTracker account
+              </Text>
+              
+              <View style={styles.benefitsList}>
+                <View style={styles.benefitItem}>
+                  <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                  <Text style={styles.benefitText}>Patient gets their own secure account</Text>
+                </View>
+                <View style={styles.benefitItem}>
+                  <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                  <Text style={styles.benefitText}>Direct medication reminders</Text>
+                </View>
+                <View style={styles.benefitItem}>
+                  <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                  <Text style={styles.benefitText}>Better care coordination</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.registerButton}
+            onPress={handleRegisterNewPatient}
+          >
+            <Ionicons name="person-add" size={20} color="#FFFFFF" />
+            <Text style={styles.registerButtonText}>Register New Patient</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {renderConfirmationModal()}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING[6],
-    paddingVertical: SPACING[4],
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
-  },
-  backButton: {
-    padding: SPACING[2],
-  },
-  headerTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-    flex: 1,
-    textAlign: 'center',
-    marginHorizontal: SPACING[4],
-  },
-  switchButton: {
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[2],
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.primary[50],
-  },
-  switchButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: '500',
-    color: COLORS.primary[500],
-  },
-  keyboardAvoidingView: {
-    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   scrollView: {
     flex: 1,
+    marginTop: Platform.OS === 'ios' ? 114 : 70,
   },
   scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: SPACING[6],
-    paddingVertical: SPACING[6],
+    paddingBottom: SPACING[6],
   },
-  searchContainer: {
-    flex: 1,
+  headerSection: {
+    paddingHorizontal: SPACING[5],
+    paddingVertical: SPACING[6],
     alignItems: 'center',
   },
-  iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: COLORS.primary[50],
+  headerContent: {
+    alignItems: 'center',
+  },
+  headerIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING[6],
+    marginBottom: SPACING[4],
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  searchTitle: {
+  headerTitle: {
     fontSize: TYPOGRAPHY.fontSize['2xl'],
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-    marginBottom: SPACING[3],
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: SPACING[2],
     textAlign: 'center',
   },
-  searchSubtitle: {
+  headerSubtitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.text.secondary,
+    color: '#64748B',
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: SPACING[8],
-    maxWidth: '90%',
+    lineHeight: 22,
   },
-  searchFormContainer: {
-    width: '100%',
-    marginBottom: SPACING[8],
+  searchSection: {
+    paddingHorizontal: SPACING[5],
+    paddingTop: SPACING[6],
   },
-  searchButton: {
-    marginTop: SPACING[4],
+  sectionTitle: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: SPACING[4],
   },
-  divider: {
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: SPACING[6],
-    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    paddingLeft: SPACING[4],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  searchIcon: {
+    width: 20,
+    height: 20,
+    marginRight: SPACING[3],
+  },
+  searchInputContainer: {
+    marginBottom: 0,
+    flex: 1,
+  },
+  searchInput: {
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+  },
+  searchResults: {
+    marginTop: SPACING[4],
+  },
+  resultsTitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+    marginBottom: SPACING[3],
+    fontWeight: '500',
+  },
+  patientResultCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    marginBottom: SPACING[3],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  patientAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#059669',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
+  },
+  patientInitials: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  patientInfo: {
+    flex: 1,
+  },
+  patientName: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  patientEmail: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  patientLastSeen: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#94A3B8',
+  },
+  addPatientButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#059669',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noResultsContainer: {
+    alignItems: 'center',
+    paddingVertical: SPACING[8],
+  },
+  noResultsTitle: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginTop: SPACING[3],
+    marginBottom: SPACING[2],
+  },
+  noResultsText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  searchPlaceholder: {
+    alignItems: 'center',
+    paddingVertical: SPACING[8],
+  },
+  placeholderIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING[4],
+  },
+  placeholderSearchIcon: {
+    width: 32,
+    height: 32,
+    tintColor: '#94A3B8',
+  },
+  placeholderTitle: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: SPACING[2],
+  },
+  placeholderText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING[5],
+    paddingVertical: SPACING[6],
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: COLORS.gray[300],
+    backgroundColor: '#E2E8F0',
   },
   dividerText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    color: '#64748B',
+    fontWeight: '500',
     marginHorizontal: SPACING[4],
   },
-  formContainer: {
-    flex: 1,
+  registerSection: {
+    paddingHorizontal: SPACING[5],
+    paddingBottom: SPACING[6],
   },
-  formHeader: {
-    alignItems: 'center',
-    marginBottom: SPACING[8],
-  },
-  formTitle: {
-    fontSize: TYPOGRAPHY.fontSize['2xl'],
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-    marginBottom: SPACING[3],
-    textAlign: 'center',
-  },
-  formSubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  sectionContainer: {
-    marginBottom: SPACING[8],
-  },
-  sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-    marginBottom: SPACING[4],
-    borderBottomWidth: 2,
-    borderBottomColor: COLORS.primary[100],
-    paddingBottom: SPACING[2],
-  },
-  rowContainer: {
+  registerCard: {
     flexDirection: 'row',
-    gap: SPACING[3],
-  },
-  halfWidth: {
-    flex: 1,
-  },
-  inputLabel: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: '500',
-    color: COLORS.text.primary,
-    marginBottom: SPACING[2],
-  },
-  required: {
-    color: COLORS.error,
-  },
-  pickerContainer: {
-    borderWidth: 1.5,
-    borderColor: COLORS.gray[300],
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.background,
-    minHeight: 48,
-    justifyContent: 'center',
-  },
-  pickerError: {
-    borderColor: COLORS.error,
-  },
-  picker: {
-    height: 48,
-    color: COLORS.text.primary,
-  },
-  errorText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.error,
-    marginTop: SPACING[1],
-    marginLeft: SPACING[1],
-  },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  consentContainer: {
-    backgroundColor: COLORS.success + '10',
+    backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.xl,
     padding: SPACING[5],
-    marginBottom: SPACING[8],
     borderWidth: 1,
-    borderColor: COLORS.success + '30',
+    borderColor: '#E2E8F0',
+    marginBottom: SPACING[4],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  consentItem: {
-    flexDirection: 'row',
+  registerIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#F0FDF4',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: SPACING[3],
-    marginBottom: SPACING[3],
+    marginRight: SPACING[4],
   },
-  consentText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.primary,
+  registerContent: {
     flex: 1,
   },
-  submitButton: {
+  registerTitle: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: SPACING[2],
+  },
+  registerDescription: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+    lineHeight: 20,
+    marginBottom: SPACING[3],
+  },
+  benefitsList: {
+    gap: SPACING[2],
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+  },
+  benefitText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#475569',
+    flex: 1,
+  },
+  registerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#059669',
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[4],
+    gap: SPACING[2],
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  registerButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING[4],
+  },
+  modalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.xl,
+    padding: SPACING[6],
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalHeader: {
+    alignItems: 'center',
     marginBottom: SPACING[6],
+  },
+  modalIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#F0FDF4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING[4],
+  },
+  modalTitle: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: SPACING[2],
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  modalContent: {
+    marginBottom: SPACING[6],
+  },
+  instructionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING[3],
+    gap: SPACING[3],
+  },
+  instructionNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#059669',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  instructionNumberText: {
+  fontSize: TYPOGRAPHY.fontSize.sm,
+  fontWeight: '600',
+  color: '#FFFFFF',
+},
+  instructionText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#475569',
+    flex: 1,
+    lineHeight: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: SPACING[3],
+  },
+  cancelButton: {
+    flex: 1,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[3],
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  confirmButton: {
+    flex: 1,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[3],
+    backgroundColor: '#059669',
+    alignItems: 'center',
+  },
+  confirmButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
 

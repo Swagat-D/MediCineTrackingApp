@@ -89,7 +89,7 @@ const Input = forwardRef<TextInput, InputProps>(
             <Ionicons
               name={leftIcon}
               size={20}
-              color={isFocused ? COLORS.primary[500] : COLORS.gray[500]}
+              color={isFocused ? COLORS.secondary[500] : COLORS.gray[500]}
               style={styles.leftIcon}
             />
           )}
@@ -128,7 +128,7 @@ const Input = forwardRef<TextInput, InputProps>(
               <Ionicons
                 name={rightIcon}
                 size={20}
-                color={isFocused ? COLORS.primary[500] : COLORS.gray[500]}
+                color={isFocused ? COLORS.secondary[500] : COLORS.gray[500]}
               />
             </TouchableOpacity>
           )}
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '500',
-    color: COLORS.text.primary,
+    color: COLORS.text.secondary,
   },
   required: {
     color: COLORS.error,
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   focused: {
-    borderColor: COLORS.primary[500],
+    borderColor: COLORS.secondary[500],
   },
   error: {
     borderColor: COLORS.error,
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.text.primary,
+    color: COLORS.text.secondary,
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[3],
   },

@@ -78,7 +78,7 @@ const CaregiverNavigator: React.FC = () => {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: COLORS.primary[500],
+        tabBarActiveTintColor: COLORS.secondary[500],
         tabBarInactiveTintColor: COLORS.gray[500],
         tabBarLabelStyle: {
           fontSize: TYPOGRAPHY.fontSize.xs,

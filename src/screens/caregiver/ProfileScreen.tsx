@@ -3,37 +3,27 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
-  StatusBar,
   ScrollView,
   TouchableOpacity,
   Alert,
   Switch,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-
-// Components
-import Button from '../../components/common/Button/Button';
 import Input from '../../components/common/Input/Input';
-import { LoadingOverlay } from '../../components/common/Loading/LoadingSpinner';
+import CaregiverNavbar from '../../components/common/CaregiverNavbar';
+import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
 
 // Types and Constants
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
-import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../constants/themes/theme';
+import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 
 // Redux
 import { useAppDispatch, useAppSelector } from '../../store';
 import { logoutUser, updateUser } from '../../store/slices/authSlice';
 
 type Props = CaregiverStackScreenProps<'Profile'>;
-
-interface ProfileStats {
-  totalPatients: number;
-  activeMedications: number;
-  completionRate: number;
-  joinedDate: string;
-}
 
 const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const dispatch = useAppDispatch();
@@ -47,29 +37,12 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     phoneNumber: user?.phoneNumber || '',
   });
 
-  // Settings state
-  const [settings, setSettings] = useState({
-    notifications: true,
-    emailAlerts: true,
-    smsAlerts: false,
-    dosageReminders: true,
-    weeklyReports: true,
-    darkMode: false,
-  });
-
-  const [profileStats] = useState<ProfileStats>({
-    totalPatients: 12,
-    activeMedications: 48,
-    completionRate: 94,
-    joinedDate: '2024-01-15',
-  });
+  // Essential settings only
+  const [notifications, setNotifications] = useState(true);
 
   const handleSaveProfile = async () => {
     try {
       setIsLoading(true);
-      
-      // TODO: Implement API call to update profile
-      // await caregiverAPI.updateProfile(formData);
       
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -105,594 +78,566 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete your account? This action cannot be undone and will remove all your data.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Confirm Deletion',
-              'Please type "DELETE" to confirm account deletion.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Confirm', style: 'destructive' },
-              ]
-            );
-          },
-        },
-      ]
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <LoadingSpinner size="large" />
+        <Text style={styles.loadingText}>Updating profile...</Text>
+      </View>
     );
-  };
-
-  const renderProfileHeader = () => (
-    <LinearGradient
-      colors={[COLORS.primary[500], COLORS.primary[700]]}
-      style={styles.profileHeader}
-    >
-      <View style={styles.profileContent}>
-        <TouchableOpacity
-          style={styles.avatarContainer}
-          onPress={() => {
-            // TODO: Implement avatar change functionality
-            Alert.alert('Feature Coming Soon', 'Avatar customization will be available in a future update.');
-          }}
-        >
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={40} color={COLORS.primary[500]} />
-          </View>
-          <View style={styles.avatarBadge}>
-            <Ionicons name="camera" size={16} color={COLORS.background} />
-          </View>
-        </TouchableOpacity>
-
-        <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{user?.name}</Text>
-          <Text style={styles.profileRole}>Healthcare Caregiver</Text>
-          <Text style={styles.profileJoinDate}>
-            Member since {new Date(profileStats.joinedDate).toLocaleDateString('en-US', { 
-              month: 'long', 
-              year: 'numeric' 
-            })}
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => setIsEditing(!isEditing)}
-        >
-          <Ionicons
-            name={isEditing ? "close" : "create-outline"}
-            size={20}
-            color={COLORS.background}
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* Stats Cards */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{profileStats.totalPatients}</Text>
-          <Text style={styles.statLabel}>Patients</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{profileStats.activeMedications}</Text>
-          <Text style={styles.statLabel}>Medications</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{profileStats.completionRate}%</Text>
-          <Text style={styles.statLabel}>Adherence</Text>
-        </View>
-      </View>
-    </LinearGradient>
-  );
-
-  const renderProfileForm = () => (
-    <View style={styles.formContainer}>
-      <Text style={styles.sectionTitle}>Personal Information</Text>
-      
-      <Input
-        label="Full Name"
-        value={formData.name}
-        onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
-        leftIcon="person-outline"
-        editable={isEditing}
-        style={!isEditing && styles.disabledInput}
-      />
-
-      <Input
-        label="Email Address"
-        value={formData.email}
-        onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
-        leftIcon="mail-outline"
-        keyboardType="email-address"
-        editable={isEditing}
-        style={!isEditing && styles.disabledInput}
-      />
-
-      <Input
-        label="Phone Number"
-        value={formData.phoneNumber}
-        onChangeText={(text) => setFormData(prev => ({ ...prev, phoneNumber: text }))}
-        leftIcon="call-outline"
-        keyboardType="phone-pad"
-        editable={isEditing}
-        style={!isEditing && styles.disabledInput}
-      />
-
-      {isEditing && (
-        <View style={styles.formActions}>
-          <Button
-            title="Cancel"
-            onPress={() => {
-              setIsEditing(false);
-              setFormData({
-                name: user?.name || '',
-                email: user?.email || '',
-                phoneNumber: user?.phoneNumber || '',
-              });
-            }}
-            variant="outline"
-            style={styles.cancelButton}
-          />
-          <Button
-            title="Save Changes"
-            onPress={handleSaveProfile}
-            loading={isLoading}
-            style={styles.saveButton}
-          />
-        </View>
-      )}
-    </View>
-  );
-
-  const renderSettingsSection = () => (
-    <View style={styles.settingsContainer}>
-      <Text style={styles.sectionTitle}>Notification Settings</Text>
-      
-      <View style={styles.settingsList}>
-        <View style={styles.settingItem}>
-          <View style={styles.settingInfo}>
-            <Ionicons name="notifications-outline" size={20} color={COLORS.text.secondary} />
-            <View style={styles.settingText}>
-              <Text style={styles.settingLabel}>Push Notifications</Text>
-              <Text style={styles.settingDescription}>Receive alerts for medication reminders</Text>
-            </View>
-          </View>
-          <Switch
-            value={settings.notifications}
-            onValueChange={(value) => setSettings(prev => ({ ...prev, notifications: value }))}
-            trackColor={{ false: COLORS.gray[300], true: COLORS.primary[200] }}
-            thumbColor={settings.notifications ? COLORS.primary[500] : COLORS.gray[400]}
-          />
-        </View>
-
-        <View style={styles.settingItem}>
-          <View style={styles.settingInfo}>
-            <Ionicons name="mail-outline" size={20} color={COLORS.text.secondary} />
-            <View style={styles.settingText}>
-              <Text style={styles.settingLabel}>Email Alerts</Text>
-              <Text style={styles.settingDescription}>Get email notifications for critical events</Text>
-            </View>
-          </View>
-          <Switch
-            value={settings.emailAlerts}
-            onValueChange={(value) => setSettings(prev => ({ ...prev, emailAlerts: value }))}
-            trackColor={{ false: COLORS.gray[300], true: COLORS.primary[200] }}
-            thumbColor={settings.emailAlerts ? COLORS.primary[500] : COLORS.gray[400]}
-          />
-        </View>
-
-        <View style={styles.settingItem}>
-          <View style={styles.settingInfo}>
-            <Ionicons name="chatbubble-outline" size={20} color={COLORS.text.secondary} />
-            <View style={styles.settingText}>
-              <Text style={styles.settingLabel}>SMS Alerts</Text>
-              <Text style={styles.settingDescription}>Receive text messages for urgent alerts</Text>
-            </View>
-          </View>
-          <Switch
-            value={settings.smsAlerts}
-            onValueChange={(value) => setSettings(prev => ({ ...prev, smsAlerts: value }))}
-            trackColor={{ false: COLORS.gray[300], true: COLORS.primary[200] }}
-            thumbColor={settings.smsAlerts ? COLORS.primary[500] : COLORS.gray[400]}
-          />
-        </View>
-
-        <View style={styles.settingItem}>
-          <View style={styles.settingInfo}>
-            <Ionicons name="medical-outline" size={20} color={COLORS.text.secondary} />
-            <View style={styles.settingText}>
-              <Text style={styles.settingLabel}>Dosage Reminders</Text>
-              <Text style={styles.settingDescription}>Automatic reminders for patient medications</Text>
-            </View>
-          </View>
-          <Switch
-            value={settings.dosageReminders}
-            onValueChange={(value) => setSettings(prev => ({ ...prev, dosageReminders: value }))}
-            trackColor={{ false: COLORS.gray[300], true: COLORS.primary[200] }}
-            thumbColor={settings.dosageReminders ? COLORS.primary[500] : COLORS.gray[400]}
-          />
-        </View>
-
-        <View style={styles.settingItem}>
-          <View style={styles.settingInfo}>
-            <Ionicons name="document-text-outline" size={20} color={COLORS.text.secondary} />
-            <View style={styles.settingText}>
-              <Text style={styles.settingLabel}>Weekly Reports</Text>
-              <Text style={styles.settingDescription}>Receive weekly adherence summary reports</Text>
-            </View>
-          </View>
-          <Switch
-            value={settings.weeklyReports}
-            onValueChange={(value) => setSettings(prev => ({ ...prev, weeklyReports: value }))}
-            trackColor={{ false: COLORS.gray[300], true: COLORS.primary[200] }}
-            thumbColor={settings.weeklyReports ? COLORS.primary[500] : COLORS.gray[400]}
-          />
-        </View>
-      </View>
-    </View>
-  );
-
-  const renderQuickActions = () => (
-    <View style={styles.actionsContainer}>
-      <Text style={styles.sectionTitle}>Quick Actions</Text>
-      
-      <View style={styles.actionsList}>
-        <TouchableOpacity
-          style={styles.actionItem}
-          onPress={() => navigation.navigate('Settings')}
-        >
-          <View style={styles.actionIcon}>
-            <Ionicons name="settings-outline" size={24} color={COLORS.primary[500]} />
-          </View>
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>App Settings</Text>
-            <Text style={styles.actionDescription}>Customize app preferences and behavior</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.text.hint} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionItem}
-          onPress={() => {
-            Alert.alert('Feature Coming Soon', 'Data export will be available in a future update.');
-          }}
-        >
-          <View style={styles.actionIcon}>
-            <Ionicons name="download-outline" size={24} color={COLORS.secondary[500]} />
-          </View>
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>Export Data</Text>
-            <Text style={styles.actionDescription}>Download your patient data and reports</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.text.hint} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionItem}
-          onPress={() => {
-            Alert.alert('Help & Support', 'Contact us at support@meditracker.com for assistance.');
-          }}
-        >
-          <View style={styles.actionIcon}>
-            <Ionicons name="help-circle-outline" size={24} color={COLORS.info} />
-          </View>
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>Help & Support</Text>
-            <Text style={styles.actionDescription}>Get help and contact support</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.text.hint} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionItem}
-          onPress={() => {
-            Alert.alert('Privacy Policy', 'View our privacy policy at meditracker.com/privacy');
-          }}
-        >
-          <View style={styles.actionIcon}>
-            <Ionicons name="shield-checkmark-outline" size={24} color={COLORS.success} />
-          </View>
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>Privacy & Security</Text>
-            <Text style={styles.actionDescription}>Review privacy policy and security settings</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.text.hint} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  const renderDangerZone = () => (
-    <View style={styles.dangerZone}>
-      <Text style={styles.dangerTitle}>Account Management</Text>
-      
-      <View style={styles.dangerActions}>
-        <Button
-          title="Logout"
-          onPress={handleLogout}
-          variant="outline"
-          style={styles.logoutButton}
-          icon={<Ionicons name="log-out-outline" size={18} color={COLORS.warning} />}
-        />
-
-        <Button
-          title="Delete Account"
-          onPress={handleDeleteAccount}
-          variant="outline"
-          style={styles.deleteButton}
-          icon={<Ionicons name="trash-outline" size={18} color={COLORS.error} />}
-        />
-      </View>
-
-      <Text style={styles.dangerWarning}>
-        Deleting your account will permanently remove all your data and cannot be undone.
-      </Text>
-    </View>
-  );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary[600]} />
-      <LoadingOverlay visible={isLoading} message="Updating profile..." />
-      
+    <View style={styles.container}>
+      <CaregiverNavbar
+        title="Profile"
+        showBackButton={true}
+        onBackPress={() => navigation.goBack()}
+      />
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {renderProfileHeader()}
-        {renderProfileForm()}
-        {renderSettingsSection()}
-        {renderQuickActions()}
-        {renderDangerZone()}
+        {/* Profile Header */}
+        <LinearGradient
+          colors={['#F0FDF4', '#FFFFFF']}
+          style={styles.headerContainer}
+        >
+          <View style={styles.profileHeader}>
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatar}>
+                <Ionicons name="person" size={40} color="#059669" />
+              </View>
+            </View>
+            
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>{user?.name || 'User'}</Text>
+              <Text style={styles.profileRole}>Healthcare Caregiver</Text>
+              <View style={styles.profileStats}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>12</Text>
+                  <Text style={styles.statLabel}>Patients</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>94%</Text>
+                  <Text style={styles.statLabel}>Adherence</Text>
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={() => setIsEditing(!isEditing)}
+            >
+              <Ionicons
+                name={isEditing ? "checkmark" : "create-outline"}
+                size={20}
+                color="#059669"
+              />
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+
+        {/* Profile Form */}
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>Personal Information</Text>
+          
+          <View style={styles.formContainer}>
+            {!isEditing ? (
+              // Display Mode
+              <>
+                <View style={styles.profileField}>
+                  <View style={styles.fieldIcon}>
+                    <Ionicons name="person-outline" size={18} color="#059669" />
+                  </View>
+                  <View style={styles.fieldContent}>
+                    <Text style={styles.fieldLabel}>Full Name</Text>
+                    <Text style={styles.fieldValue}>{user?.name || 'Not provided'}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.profileField}>
+                  <View style={styles.fieldIcon}>
+                    <Ionicons name="mail-outline" size={18} color="#059669" />
+                  </View>
+                  <View style={styles.fieldContent}>
+                    <Text style={styles.fieldLabel}>Email Address</Text>
+                    <Text style={styles.fieldValue}>{user?.email || 'Not provided'}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.profileField}>
+                  <View style={styles.fieldIcon}>
+                    <Ionicons name="call-outline" size={18} color="#059669" />
+                  </View>
+                  <View style={styles.fieldContent}>
+                    <Text style={styles.fieldLabel}>Phone Number</Text>
+                    <Text style={styles.fieldValue}>{user?.phoneNumber || 'Not provided'}</Text>
+                  </View>
+                </View>
+              </>
+            ) : (
+              // Edit Mode
+              <>
+                <Input
+                  label="Full Name"
+                  value={formData.name}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
+                  leftIcon="person-outline"
+                />
+
+                <View style={styles.disabledFieldContainer}>
+                  <Text style={styles.disabledFieldLabel}>Email Address</Text>
+                  <View style={styles.disabledField}>
+                    <Ionicons name="mail-outline" size={18} color="#94A3B8" />
+                    <Text style={styles.disabledFieldText}>{user?.email}</Text>
+                    <Ionicons name="lock-closed" size={16} color="#94A3B8" />
+                  </View>
+                  <Text style={styles.disabledFieldNote}>Email cannot be changed</Text>
+                </View>
+
+                <Input
+                  label="Phone Number"
+                  value={formData.phoneNumber}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, phoneNumber: text }))}
+                  leftIcon="call-outline"
+                  keyboardType="phone-pad"
+                />
+
+                <View style={styles.editActions}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => {
+                      setIsEditing(false);
+                      setFormData({
+                        name: user?.name || '',
+                        email: user?.email || '',
+                        phoneNumber: user?.phoneNumber || '',
+                      });
+                    }}
+                  >
+                    <Ionicons name="close" size={18} color="#EF4444" />
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.saveButton}
+                    onPress={handleSaveProfile}
+                  >
+                    <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                    <Text style={styles.saveButtonText}>Save Changes</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+
+        {/* Preferences */}
+        <View style={styles.preferencesSection}>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          
+          <View style={styles.preferenceCard}>
+            <View style={styles.preferenceItem}>
+              <View style={styles.preferenceInfo}>
+                <View style={styles.preferenceIcon}>
+                  <Ionicons name="notifications-outline" size={20} color="#059669" />
+                </View>
+                <View style={styles.preferenceText}>
+                  <Text style={styles.preferenceLabel}>Push Notifications</Text>
+                  <Text style={styles.preferenceDescription}>
+                    Get notified about patient updates and reminders
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={notifications}
+                onValueChange={setNotifications}
+                trackColor={{ false: '#E2E8F0', true: '#BBF7D0' }}
+                thumbColor={notifications ? '#059669' : '#94A3B8'}
+                ios_backgroundColor="#E2E8F0"
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Quick Actions */}
+        <View style={styles.actionsSection}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          
+          <View style={styles.actionsList}>
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => {
+                Alert.alert('Help & Support', 'Contact us at support@meditracker.com for assistance.');
+              }}
+            >
+              <View style={styles.actionIcon}>
+                <Ionicons name="help-circle-outline" size={20} color="#059669" />
+              </View>
+              <Text style={styles.actionText}>Help & Support</Text>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => {
+                Alert.alert('About', 'MediTracker v1.0.0\nBuilt with care for healthcare professionals.');
+              }}
+            >
+              <View style={styles.actionIcon}>
+                <Ionicons name="information-circle-outline" size={20} color="#059669" />
+              </View>
+              <Text style={styles.actionText}>About MediTracker</Text>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => {
+                Alert.alert('Privacy Policy', 'Your privacy is important to us. View our privacy policy at meditracker.com/privacy');
+              }}
+            >
+              <View style={styles.actionIcon}>
+                <Ionicons name="shield-checkmark-outline" size={20} color="#059669" />
+              </View>
+              <Text style={styles.actionText}>Privacy Policy</Text>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Logout Button */}
+        <View style={styles.logoutSection}>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={handleLogout}
+          >
+            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F8FAFC',
   },
   scrollView: {
     flex: 1,
+    marginTop: Platform.OS === 'ios' ? 114 : 70,
   },
   scrollContent: {
     paddingBottom: SPACING[6],
   },
-  profileHeader: {
-    paddingTop: SPACING[4],
-    paddingBottom: SPACING[8],
-    paddingHorizontal: SPACING[6],
-    borderBottomLeftRadius: RADIUS['2xl'],
-    borderBottomRightRadius: RADIUS['2xl'],
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
-  profileContent: {
+  loadingText: {
+    marginTop: SPACING[4],
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#64748B',
+  },
+  headerContainer: {
+    paddingHorizontal: SPACING[5],
+    paddingBottom: SPACING[6],
+    paddingTop: SPACING[10],
+  },
+  profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING[6],
   },
   avatarContainer: {
-    position: 'relative',
     marginRight: SPACING[4],
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.background,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    ...SHADOWS.md,
-  },
-  avatarBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: COLORS.primary[400],
-    justifyContent: 'center',
-    alignItems: 'center',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
     borderWidth: 2,
-    borderColor: COLORS.background,
+    borderColor: '#E2E8F0',
   },
   profileInfo: {
     flex: 1,
   },
   profileName: {
     fontSize: TYPOGRAPHY.fontSize['2xl'],
-    fontWeight: 'bold',
-    color: COLORS.background,
+    fontWeight: '700',
+    color: '#1E293B',
     marginBottom: SPACING[1],
   },
   profileRole: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.background,
-    opacity: 0.9,
-    marginBottom: SPACING[1],
+    color: '#64748B',
+    marginBottom: SPACING[3],
   },
-  profileJoinDate: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.background,
-    opacity: 0.8,
+  profileStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '700',
+    color: '#059669',
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  statDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#E2E8F0',
+    marginHorizontal: SPACING[4],
   },
   editButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: SPACING[3],
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: RADIUS.xl,
-    padding: SPACING[4],
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: TYPOGRAPHY.fontSize['2xl'],
-    fontWeight: 'bold',
-    color: COLORS.background,
-    marginBottom: SPACING[1],
-  },
-  statLabel: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.background,
-    opacity: 0.9,
-  },
-  formContainer: {
-    paddingHorizontal: SPACING[6],
+  formSection: {
+    paddingHorizontal: SPACING[5],
     paddingTop: SPACING[6],
-    marginBottom: SPACING[6],
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#1E293B',
     marginBottom: SPACING[4],
   },
-  disabledInput: {
-    backgroundColor: COLORS.gray[50],
-    opacity: 0.8,
+  formContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.xl,
+    padding: SPACING[5],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  formActions: {
+  profileField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING[4],
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  fieldIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F0FDF4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
+  },
+  fieldContent: {
+    flex: 1,
+  },
+  fieldLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+    marginBottom: 2,
+    fontWeight: '500',
+  },
+  fieldValue: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#1E293B',
+    fontWeight: '500',
+  },
+  disabledFieldContainer: {
+    marginBottom: SPACING[4],
+  },
+  disabledFieldLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+    marginBottom: SPACING[2],
+    fontWeight: '500',
+  },
+  disabledField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[3],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: SPACING[2],
+  },
+  disabledFieldText: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#64748B',
+  },
+  disabledFieldNote: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#94A3B8',
+    marginTop: SPACING[1],
+    fontStyle: 'italic',
+  },
+  editActions: {
     flexDirection: 'row',
     gap: SPACING[3],
-    marginTop: SPACING[4],
+    marginTop: SPACING[5],
   },
   cancelButton: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[3],
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    gap: SPACING[2],
+  },
+  cancelButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '500',
+    color: '#EF4444',
   },
   saveButton: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#059669',
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[3],
+    gap: SPACING[2],
   },
-  settingsContainer: {
-    paddingHorizontal: SPACING[6],
-    marginBottom: SPACING[6],
+  saveButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '500',
+    color: '#FFFFFF',
   },
-  settingsList: {
-    backgroundColor: COLORS.background,
+  preferencesSection: {
+    paddingHorizontal: SPACING[5],
+    paddingTop: SPACING[6],
+  },
+  preferenceCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.xl,
-    ...SHADOWS.sm,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  settingItem: {
+  preferenceItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SPACING[4],
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[100],
+    padding: SPACING[5],
   },
-  settingInfo: {
+  preferenceInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    gap: SPACING[3],
   },
-  settingText: {
+  preferenceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F0FDF4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
+  },
+  preferenceText: {
     flex: 1,
   },
-  settingLabel: {
+  preferenceLabel: {
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '500',
-    color: COLORS.text.primary,
-    marginBottom: SPACING[1],
+    color: '#1E293B',
+    marginBottom: 2,
   },
-  settingDescription: {
+  preferenceDescription: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    color: '#64748B',
     lineHeight: 18,
   },
-  actionsContainer: {
-    paddingHorizontal: SPACING[6],
-    marginBottom: SPACING[6],
+  actionsSection: {
+    paddingHorizontal: SPACING[5],
+    paddingTop: SPACING[6],
   },
   actionsList: {
-    backgroundColor: COLORS.background,
+    backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.xl,
-    ...SHADOWS.sm,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING[4],
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[100],
+    borderBottomColor: '#F1F5F9',
   },
   actionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.gray[50],
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F0FDF4',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING[3],
   },
-  actionContent: {
+  actionText: {
     flex: 1,
-  },
-  actionTitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '500',
-    color: COLORS.text.primary,
-    marginBottom: SPACING[1],
+    color: '#475569',
   },
-  actionDescription: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
-    lineHeight: 18,
-  },
-  dangerZone: {
-    paddingHorizontal: SPACING[6],
-    backgroundColor: COLORS.error + '05',
-    marginHorizontal: SPACING[6],
-    borderRadius: RADIUS.xl,
-    padding: SPACING[5],
-    borderWidth: 1,
-    borderColor: COLORS.error + '20',
-  },
-  dangerTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: 'bold',
-    color: COLORS.error,
-    marginBottom: SPACING[4],
-    textAlign: 'center',
-  },
-  dangerActions: {
-    flexDirection: 'row',
-    gap: SPACING[3],
-    marginBottom: SPACING[4],
+  logoutSection: {
+    paddingHorizontal: SPACING[5],
+    paddingTop: SPACING[8],
   },
   logoutButton: {
-    flex: 1,
-    borderColor: COLORS.warning,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[4],
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    gap: SPACING[2],
   },
-  deleteButton: {
-    flex: 1,
-    borderColor: COLORS.error,
-  },
-  dangerWarning: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-    lineHeight: 20,
-    fontStyle: 'italic',
+  logoutText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '500',
+    color: '#EF4444',
   },
 });
 

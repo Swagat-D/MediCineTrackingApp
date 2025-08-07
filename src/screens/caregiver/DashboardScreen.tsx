@@ -1,29 +1,22 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
-  StatusBar,
   ScrollView,
   TouchableOpacity,
   RefreshControl,
   Dimensions,
+  Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-
-// Components
-import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
-
-// Types and Constants
+import { LinearGradient } from 'expo-linear-gradient';
+import { useAppSelector } from '../../store';
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
-import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../constants/themes/theme';
+import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
+import CaregiverNavbar from '../../components/common/CaregiverNavbar';
 
-// Redux
-import { useAppDispatch, useAppSelector } from '../../store';
-
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { width } = Dimensions.get('window');
 
 type Props = CaregiverStackScreenProps<'Dashboard'>;
@@ -31,13 +24,13 @@ type Props = CaregiverStackScreenProps<'Dashboard'>;
 interface DashboardStats {
   totalPatients: number;
   activeMedications: number;
-  upcomingReminders: number;
+  todayReminders: number;
   criticalAlerts: number;
 }
 
 interface RecentActivity {
   id: string;
-  type: 'dose_taken' | 'dose_missed' | 'new_patient' | 'low_stock' | 'sos_alert';
+  type: 'dose_taken' | 'dose_missed' | 'low_stock' | 'sos_alert';
   patientName: string;
   message: string;
   timestamp: string;
@@ -45,40 +38,38 @@ interface RecentActivity {
 }
 
 const DashboardScreen: React.FC<Props> = ({ navigation }) => {
-  const dispatch = useAppDispatch();
   const { user } = useAppSelector(state => state.auth);
-  
-  const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
-    totalPatients: 12,
-    activeMedications: 48,
-    upcomingReminders: 8,
-    criticalAlerts: 2,
+  
+  const [dashboardStats] = useState<DashboardStats>({
+    totalPatients: 8,
+    activeMedications: 24,
+    todayReminders: 6,
+    criticalAlerts: 1,
   });
   
-  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([
+  const [recentActivities] = useState<RecentActivity[]>([
     {
       id: '1',
       type: 'dose_taken',
       patientName: 'John Smith',
-      message: 'Took Aspirin 100mg as scheduled',
-      timestamp: '2 minutes ago',
+      message: 'Took morning medication (Metformin 500mg)',
+      timestamp: '5 min ago',
       priority: 'low',
     },
     {
       id: '2',
       type: 'sos_alert',
       patientName: 'Mary Johnson',
-      message: 'Emergency alert triggered',
-      timestamp: '15 minutes ago',
+      message: 'Emergency alert - needs assistance',
+      timestamp: '12 min ago',
       priority: 'critical',
     },
     {
       id: '3',
       type: 'dose_missed',
       patientName: 'Robert Davis',
-      message: 'Missed morning medication',
+      message: 'Missed evening dose (Lisinopril 10mg)',
       timestamp: '1 hour ago',
       priority: 'high',
     },
@@ -86,37 +77,15 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
       id: '4',
       type: 'low_stock',
       patientName: 'Sarah Wilson',
-      message: 'Metformin running low (2 days left)',
+      message: 'Medication running low (3 days remaining)',
       timestamp: '2 hours ago',
       priority: 'medium',
     },
   ]);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
-    try {
-      setIsLoading(true);
-      // TODO: Implement API calls to fetch dashboard data
-      // const stats = await caregiverAPI.getDashboardStats();
-      // const activities = await caregiverAPI.getRecentActivities();
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-      setIsLoading(false);
-    }
-  };
-
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadDashboardData();
-    setRefreshing(false);
+    setTimeout(() => setRefreshing(false), 1000);
   };
 
   const getGreeting = () => {
@@ -128,99 +97,31 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
 
   const getActivityIcon = (type: RecentActivity['type']) => {
     switch (type) {
-      case 'dose_taken':
-        return 'checkmark-circle';
-      case 'dose_missed':
-        return 'alert-circle';
-      case 'new_patient':
-        return 'person-add';
-      case 'low_stock':
-        return 'warning';
-      case 'sos_alert':
-        return 'alert';
-      default:
-        return 'information-circle';
+      case 'dose_taken': return 'checkmark-circle';
+      case 'dose_missed': return 'close-circle';
+      case 'low_stock': return 'warning';
+      case 'sos_alert': return 'alert-circle';
+      default: return 'information-circle';
     }
   };
 
   const getActivityColor = (priority: RecentActivity['priority']) => {
     switch (priority) {
-      case 'critical':
-        return COLORS.error;
-      case 'high':
-        return COLORS.warning;
-      case 'medium':
-        return COLORS.primary[500];
-      case 'low':
-        return COLORS.success;
-      default:
-        return COLORS.gray[500];
+      case 'critical': return '#EF4444';
+      case 'high': return '#F59E0B';
+      case 'medium': return '#059669';
+      case 'low': return '#6B7280';
+      default: return '#6B7280';
     }
   };
 
-  const renderStatsCard = (
-    title: string,
-    value: number,
-    icon: keyof typeof Ionicons.glyphMap,
-    color: string,
-    onPress?: () => void
-  ) => (
-    <TouchableOpacity
-      style={[styles.statsCard, { backgroundColor: color + '10' }]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <View style={styles.statsCardContent}>
-        <View style={[styles.statsIcon, { backgroundColor: color + '20' }]}>
-          <Ionicons name={icon} size={24} color={color} />
-        </View>
-        <Text style={[styles.statsValue, { color }]}>{value}</Text>
-        <Text style={styles.statsTitle}>{title}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderActivityItem = (activity: RecentActivity) => (
-    <TouchableOpacity
-      key={activity.id}
-      style={styles.activityItem}
-      activeOpacity={0.8}
-    >
-      <View style={[
-        styles.activityIcon,
-        { backgroundColor: getActivityColor(activity.priority) + '20' }
-      ]}>
-        <Ionicons
-          name={getActivityIcon(activity.type)}
-          size={20}
-          color={getActivityColor(activity.priority)}
-        />
-      </View>
-      
-      <View style={styles.activityContent}>
-        <Text style={styles.activityPatient}>{activity.patientName}</Text>
-        <Text style={styles.activityMessage}>{activity.message}</Text>
-        <Text style={styles.activityTime}>{activity.timestamp}</Text>
-      </View>
-      
-      <View style={[
-        styles.priorityIndicator,
-        { backgroundColor: getActivityColor(activity.priority) }
-      ]} />
-    </TouchableOpacity>
-  );
-
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <LoadingSpinner size="large" />
-      </View>
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary[600]} />
+    <View style={styles.container}>
+      <CaregiverNavbar
+        onNotificationPress={() => navigation.navigate('Notifications')}
+        onSettingsPress={() => navigation.navigate('Settings')}
+        notificationCount={dashboardStats.criticalAlerts}
+      />
       
       <ScrollView
         style={styles.scrollView}
@@ -229,119 +130,135 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={COLORS.primary[500]}
-            colors={[COLORS.primary[500]]}
+            tintColor="#059669"
+            colors={['#059669']}
           />
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* Enhanced Greeting Section */}
         <LinearGradient
-          colors={[COLORS.primary[500], COLORS.primary[700]]}
-          style={styles.header}
+          colors={['#F0FDF4', '#FFFFFF']}
+          style={styles.greetingContainer}
         >
-          <View style={styles.headerContent}>
-            <View style={styles.greetingContainer}>
+          <View style={styles.greetingContent}>
+            <View style={styles.greetingText}>
               <Text style={styles.greeting}>{getGreeting()},</Text>
               <Text style={styles.userName}>{user?.name || 'Caregiver'}</Text>
+              <Text style={styles.subtitle}>Here&apos;s your patient overview for today</Text>
             </View>
-            
-            <View style={styles.headerActions}>
-              <TouchableOpacity
-                style={styles.headerButton}
-                onPress={() => navigation.navigate('Notifications')}
-              >
-                <Ionicons name="notifications-outline" size={24} color={COLORS.background} />
-                {dashboardStats.criticalAlerts > 0 && (
-                  <View style={styles.notificationBadge}>
-                    <Text style={styles.badgeText}>{dashboardStats.criticalAlerts}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.headerButton}
-                onPress={() => navigation.navigate('Settings')}
-              >
-                <Ionicons name="settings-outline" size={24} color={COLORS.background} />
-              </TouchableOpacity>
+            <View style={styles.greetingIcon}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="medical" size={28} color="#059669" />
+              </View>
             </View>
           </View>
         </LinearGradient>
 
-        {/* Quick Stats */}
-        <View style={styles.statsContainer}>
+        {/* Stats Overview */}
+        <View style={styles.statsSection}>
           <View style={styles.statsRow}>
-            {renderStatsCard(
-              'Total Patients',
-              dashboardStats.totalPatients,
-              'people',
-              COLORS.primary[500],
-              () => navigation.navigate('Patients')
-            )}
-            {renderStatsCard(
-              'Active Medications',
-              dashboardStats.activeMedications,
-              'medical',
-              COLORS.secondary[500]
-            )}
+            <TouchableOpacity
+              style={[styles.statItem, styles.primaryStat]}
+              onPress={() => navigation.navigate('Patients')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statContent}>
+                <View style={styles.statHeader}>
+                  <Ionicons name="people" size={20} color="#059669" />
+                  <Text style={styles.statLabel}>Total Patients</Text>
+                </View>
+                <Text style={styles.statValue}>{dashboardStats.totalPatients}</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.statItem}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statContent}>
+                <View style={styles.statHeader}>
+                  <Ionicons name="medical" size={20} color="#0EA5E9" />
+                  <Text style={styles.statLabel}>Medications</Text>
+                </View>
+                <Text style={styles.statValue}>{dashboardStats.activeMedications}</Text>
+              </View>
+            </TouchableOpacity>
           </View>
-          
+
           <View style={styles.statsRow}>
-            {renderStatsCard(
-              'Upcoming Reminders',
-              dashboardStats.upcomingReminders,
-              'time',
-              COLORS.warning
-            )}
-            {renderStatsCard(
-              'Critical Alerts',
-              dashboardStats.criticalAlerts,
-              'alert-circle',
-              COLORS.error
-            )}
+            <TouchableOpacity
+              style={styles.statItem}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statContent}>
+                <View style={styles.statHeader}>
+                  <Ionicons name="time" size={20} color="#F59E0B" />
+                  <Text style={styles.statLabel}>Reminders</Text>
+                </View>
+                <Text style={styles.statValue}>{dashboardStats.todayReminders}</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.statItem, dashboardStats.criticalAlerts > 0 && styles.alertStat]}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statContent}>
+                <View style={styles.statHeader}>
+                  <Ionicons 
+                    name="alert-circle" 
+                    size={20} 
+                    color={dashboardStats.criticalAlerts > 0 ? "#EF4444" : "#6B7280"} 
+                  />
+                  <Text style={styles.statLabel}>Alerts</Text>
+                </View>
+                <Text style={[
+                  styles.statValue,
+                  dashboardStats.criticalAlerts > 0 && styles.alertValue
+                ]}>
+                  {dashboardStats.criticalAlerts}
+                </Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 
         {/* Quick Actions */}
-        <View style={styles.quickActionsContainer}>
+        <View style={styles.quickActionsSection}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
-          
           <View style={styles.quickActionsGrid}>
             <TouchableOpacity
-              style={styles.quickActionCard}
+              style={styles.actionCard}
               onPress={() => navigation.navigate('AddPatient')}
+              activeOpacity={0.7}
             >
-              <View style={[styles.quickActionIcon, { backgroundColor: COLORS.primary[100] }]}>
-                <Ionicons name="person-add" size={28} color={COLORS.primary[500]} />
-              </View>
-              <Text style={styles.quickActionText}>Add Patient</Text>
+              <Ionicons name="person-add-outline" size={24} color="#059669" />
+              <Text style={styles.actionText}>Add Patient</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={styles.quickActionCard}
+              style={styles.actionCard}
               onPress={() => navigation.navigate('BarcodeGenerator')}
+              activeOpacity={0.7}
             >
-              <View style={[styles.quickActionIcon, { backgroundColor: COLORS.secondary[100] }]}>
-                <Ionicons name="qr-code" size={28} color={COLORS.secondary[500]} />
-              </View>
-              <Text style={styles.quickActionText}>Generate Barcode</Text>
+              <Ionicons name="qr-code-outline" size={24} color="#059669" />
+              <Text style={styles.actionText}>Generate Code</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={styles.quickActionCard}
+              style={styles.actionCard}
               onPress={() => navigation.navigate('Patients')}
+              activeOpacity={0.7}
             >
-              <View style={[styles.quickActionIcon, { backgroundColor: COLORS.warning + '20' }]}>
-                <Ionicons name="list" size={28} color={COLORS.warning} />
-              </View>
-              <Text style={styles.quickActionText}>View All Patients</Text>
+              <Ionicons name="list-outline" size={24} color="#059669" />
+              <Text style={styles.actionText}>All Patients</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Recent Activity */}
-        <View style={styles.activityContainer}>
+        <View style={styles.activitySection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
             <TouchableOpacity>
@@ -350,162 +267,204 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           
           <View style={styles.activityList}>
-            {recentActivities.map(renderActivityItem)}
+            {recentActivities.map((activity, index) => (
+              <TouchableOpacity
+                key={activity.id}
+                style={[
+                  styles.activityItem,
+                  index === recentActivities.length - 1 && styles.lastActivityItem
+                ]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  if (activity.type === 'sos_alert') {
+                    navigation.navigate('PatientDetails', { patientId: activity.id });
+                  }
+                }}
+              >
+                <View style={[
+                  styles.activityIconContainer,
+                  { backgroundColor: getActivityColor(activity.priority) + '15' }
+                ]}>
+                  <Ionicons
+                    name={getActivityIcon(activity.type)}
+                    size={18}
+                    color={getActivityColor(activity.priority)}
+                  />
+                </View>
+                
+                <View style={styles.activityContent}>
+                  <View style={styles.activityHeader}>
+                    <Text style={styles.activityPatient}>{activity.patientName}</Text>
+                    <Text style={styles.activityTime}>{activity.timestamp}</Text>
+                  </View>
+                  <Text style={styles.activityMessage}>{activity.message}</Text>
+                </View>
+                
+                {activity.priority === 'critical' && (
+                  <View style={styles.criticalIndicator} />
+                )}
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
+
+        {/* Emergency Alert */}
+        {dashboardStats.criticalAlerts > 0 && (
+          <TouchableOpacity style={styles.emergencyAlert} activeOpacity={0.8}>
+            <View style={styles.emergencyContent}>
+              <Ionicons name="warning" size={20} color="#EF4444" />
+              <View style={styles.emergencyText}>
+                <Text style={styles.emergencyTitle}>Emergency Attention Required</Text>
+                <Text style={styles.emergencyMessage}>
+                  {dashboardStats.criticalAlerts} critical alert{dashboardStats.criticalAlerts > 1 ? 's' : ''} need immediate attention
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#EF4444" />
+          </TouchableOpacity>
+        )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F8FAFC',
   },
   scrollView: {
     flex: 1,
+    marginTop: Platform.OS === 'ios' ? 114 : 70,
   },
   scrollContent: {
     paddingBottom: SPACING[6],
   },
-  header: {
-    paddingTop: SPACING[2],
-    paddingBottom: SPACING[6],
-    paddingHorizontal: SPACING[6],
-    borderBottomLeftRadius: RADIUS['2xl'],
-    borderBottomRightRadius: RADIUS['2xl'],
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
   greetingContainer: {
+    paddingHorizontal: SPACING[5],
+    paddingVertical: SPACING[6],
+  },
+  greetingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  greetingText: {
     flex: 1,
   },
-  greeting: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    color: COLORS.background,
-    opacity: 0.9,
+  greetingIcon: {
+    marginLeft: SPACING[4],
   },
-  userName: {
-    fontSize: TYPOGRAPHY.fontSize['2xl'],
-    fontWeight: 'bold',
-    color: COLORS.background,
-    marginTop: SPACING[1],
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: SPACING[3],
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: COLORS.error,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.background,
-    fontWeight: 'bold',
-  },
-  statsContainer: {
-    paddingHorizontal: SPACING[6],
-    marginTop: -SPACING[4],
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: SPACING[4],
-    marginBottom: SPACING[4],
-  },
-  statsCard: {
-    flex: 1,
-    borderRadius: RADIUS.xl,
-    padding: SPACING[5],
-    ...SHADOWS.md,
-  },
-  statsCardContent: {
-    alignItems: 'center',
-  },
-  statsIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING[3],
-  },
-  statsValue: {
-    fontSize: TYPOGRAPHY.fontSize['3xl'],
-    fontWeight: 'bold',
-    marginBottom: SPACING[1],
-  },
-  statsTitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  quickActionsContainer: {
-    paddingHorizontal: SPACING[6],
-    marginTop: SPACING[6],
-  },
-  sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-    marginBottom: SPACING[4],
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    gap: SPACING[4],
-  },
-  quickActionCard: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    borderRadius: RADIUS.xl,
-    padding: SPACING[5],
-    alignItems: 'center',
-    ...SHADOWS.sm,
-  },
-  quickActionIcon: {
+  iconContainer: {
     width: 56,
     height: 56,
     borderRadius: 28,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING[3],
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  quickActionText: {
+  greeting: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginBottom: SPACING[1],
+  },
+  userName: {
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: SPACING[2],
+  },
+  subtitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+    lineHeight: 20,
+  },
+  sectionTitle: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: SPACING[4],
+  },
+  statsSection: {
+    paddingHorizontal: SPACING[5],
+    paddingVertical: SPACING[5],
+  },
+  statsRow: {
+    flexDirection: 'row',
+    marginBottom: SPACING[3],
+    gap: SPACING[3],
+  },
+  statItem: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  primaryStat: {
+    borderColor: '#059669',
+    backgroundColor: '#F0FDF4',
+  },
+  alertStat: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
+  statContent: {
+    alignItems: 'flex-start',
+  },
+  statHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING[2],
+    gap: SPACING[2],
+  },
+  statLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  statValue: {
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  alertValue: {
+    color: '#EF4444',
+  },
+  quickActionsSection: {
+    paddingHorizontal: SPACING[5],
+    paddingBottom: SPACING[6],
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    gap: SPACING[3],
+  },
+  actionCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: SPACING[2],
+  },
+  actionText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '500',
-    color: COLORS.text.primary,
+    color: '#475569',
     textAlign: 'center',
   },
-  activityContainer: {
-    paddingHorizontal: SPACING[6],
-    marginTop: SPACING[8],
+  activitySection: {
+    paddingHorizontal: SPACING[5],
+    paddingBottom: SPACING[6],
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -515,26 +474,29 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.primary[500],
-    fontWeight: '500',
+    color: '#059669',
+    fontWeight: '600',
   },
   activityList: {
-    backgroundColor: COLORS.background,
-    borderRadius: RADIUS.xl,
-    ...SHADOWS.sm,
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING[4],
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[100],
-    position: 'relative',
+    borderBottomColor: '#F1F5F9',
   },
-  activityIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  lastActivityItem: {
+    borderBottomWidth: 0,
+  },
+  activityIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING[3],
@@ -542,27 +504,63 @@ const styles = StyleSheet.create({
   activityContent: {
     flex: 1,
   },
+  activityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING[1],
+  },
   activityPatient: {
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '600',
-    color: COLORS.text.primary,
-    marginBottom: SPACING[1],
-  },
-  activityMessage: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
-    marginBottom: SPACING[1],
+    color: '#1E293B',
   },
   activityTime: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.hint,
+    color: '#94A3B8',
   },
-  priorityIndicator: {
+  activityMessage: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#475569',
+    lineHeight: 18,
+  },
+  criticalIndicator: {
     width: 4,
-    height: '80%',
+    height: 4,
     borderRadius: 2,
-    position: 'absolute',
-    right: SPACING[4],
+    backgroundColor: '#EF4444',
+  },
+  emergencyAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FEF2F2',
+    marginHorizontal: SPACING[5],
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    marginBottom: SPACING[6],
+  },
+  emergencyContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: SPACING[3],
+  },
+  emergencyText: {
+    flex: 1,
+  },
+  emergencyTitle: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: '#DC2626',
+    marginBottom: SPACING[1],
+  },
+  emergencyMessage: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#B91C1C',
+    lineHeight: 18,
   },
 });
 

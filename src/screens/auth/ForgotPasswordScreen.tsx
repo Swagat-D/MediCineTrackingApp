@@ -28,7 +28,7 @@ import { ForgotPasswordData } from '../../types/auth.types';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import { VALIDATION_RULES } from '../../constants/app';
 import { useAppDispatch, useAppSelector } from '../../store';
-import { clearError } from '../../store/slices/authSlice';
+import { forgotPassword, clearError } from '../../store/slices/authSlice';
 
 const { width, height } = Dimensions.get('window');
 const isSmallDevice = width < 375;
@@ -104,28 +104,35 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
     try {
       dispatch(clearError());
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Call the actual API
+      const result = await dispatch(forgotPassword({ email: data.email }));
       
-      setEmailSent(true);
-      Alert.alert(
-        'Reset Link Sent',
-        `We've sent a password reset code to ${data.email}. Please check your email and follow the instructions to reset your password.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              navigation.navigate('OTPVerification', {
-                email: data.email,
-                type: 'forgot_password'
-              });
+      if (forgotPassword.fulfilled.match(result)) {
+        setEmailSent(true);
+        Alert.alert(
+          'Reset Code Sent',
+          `We've sent a password reset code to ${data.email}. Please check your email and enter the verification code.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.navigate('OTPVerification', {
+                  email: data.email,
+                  type: 'forgot_password'
+                });
+              }
             }
-          }
-        ]
-      );
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Error',
+          result.payload || 'Failed to send reset email. Please try again.'
+        );
+      }
       
     } catch (err) {
-      console.error(err)
+      console.error('Forgot password error:', err);
       Alert.alert('Error', 'Failed to send reset email. Please try again.');
     }
   };
@@ -134,17 +141,36 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
     navigation.goBack();
   };
 
-  const handleResendEmail = () => {
+  const handleResendEmail = async () => {
     const email = getValues('email');
     if (email) {
-      onSubmit({ email });
+      try {
+        dispatch(clearError());
+        const result = await dispatch(forgotPassword({ email }));
+        
+        if (forgotPassword.fulfilled.match(result)) {
+          Alert.alert(
+            'Code Resent',
+            'A new verification code has been sent to your email.',
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert(
+            'Error',
+            result.payload || 'Failed to resend email. Please try again.'
+          );
+        }
+      } catch (err) {
+        console.error('Resend email error:', err);
+        Alert.alert('Error', 'Failed to resend email. Please try again.');
+      }
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
-      <LoadingOverlay visible={isLoading} message="Sending reset link..." />
+      <LoadingOverlay visible={isLoading} message="Sending reset code..." />
       
       {/* Background Elements */}
       <View style={styles.backgroundElements}>
@@ -182,6 +208,13 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
                 }
               ]}
             >
+              <View style={styles.logoContainer}>
+                <Image 
+                  source={require('../../../assets/images/logo.png')} 
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
               <Text style={styles.appTitle}>MediTracker</Text>
               <Text style={styles.appSubtitle}>Password Recovery</Text>
             </Animated.View>
@@ -205,7 +238,7 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
                 <Text style={styles.mainTitle}>Forgot Password?</Text>
                 <Text style={styles.mainDescription}>
-                  Don&apos;t worry! Enter your email address and we&apos;ll send you a link to reset your password.
+                  Don&apos;t worry! Enter your email address and we&apos;ll send you a verification code to reset your password.
                 </Text>
               </View>
 
@@ -277,14 +310,14 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
                   <Ionicons name="checkmark-circle" size={80} color="#10B981" />
                 </View>
                 
-                <Text style={styles.successTitle}>Email Sent!</Text>
+                <Text style={styles.successTitle}>Reset Code Sent!</Text>
                 <Text style={styles.successMessage}>
-                  We&apos;ve sent a password reset link to your email address. 
-                  Please check your inbox (and spam folder) and follow the instructions.
+                  We&apos;ve sent a 6-digit verification code to your email address. 
+                  Please check your inbox (and spam folder) and enter the code to reset your password.
                 </Text>
 
                 <View style={styles.emailDisplayContainer}>
-                  <Text style={styles.emailDisplayLabel}>Email sent to:</Text>
+                  <Text style={styles.emailDisplayLabel}>Code sent to:</Text>
                   <Text style={styles.emailDisplayText}>{getValues('email')}</Text>
                 </View>
               </View>
@@ -302,11 +335,12 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
                 />
 
                 <Button
-                  title="Resend Email"
+                  title="Resend Code"
                   onPress={handleResendEmail}
                   variant="outline"
                   fullWidth
                   style={styles.secondaryAction}
+                  disabled={isLoading}
                 />
 
                 <TouchableOpacity 
@@ -429,6 +463,13 @@ const styles = StyleSheet.create({
   },
   logoSection: {
     alignItems: 'center',
+  },
+  logoContainer: {
+    marginBottom: SPACING[3],
+  },
+  logoImage: {
+    width: isSmallDevice ? 70 : 80,
+    height: isSmallDevice ? 70 : 80,
   },
   appTitle: {
     fontSize: isSmallDevice ? TYPOGRAPHY.fontSize.xl : TYPOGRAPHY.fontSize['2xl'],

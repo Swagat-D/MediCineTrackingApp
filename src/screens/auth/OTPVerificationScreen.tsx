@@ -145,41 +145,49 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleVerifyOTP = async (otpCode?: string) => {
-    const otpToVerify = otpCode || otp.join('');
-    
-    if (otpToVerify.length !== APP_CONFIG.OTP_LENGTH) {
-      Alert.alert('Invalid OTP', 'Please enter the complete 6-digit code.');
-      return;
-    }
+  const otpToVerify = otpCode || otp.join('');
+  
+  if (otpToVerify.length !== APP_CONFIG.OTP_LENGTH) {
+    Alert.alert('Invalid OTP', 'Please enter the complete 6-digit code.');
+    return;
+  }
 
-    try {
-      dispatch(clearError());
-      const result = await dispatch(verifyOTP({ 
-        email, 
-        otp: otpToVerify 
-      }));
-      
-      if (verifyOTP.fulfilled.match(result)) {
-        // Navigation will be handled by MainNavigator based on auth state
+  try {
+    dispatch(clearError());
+    const result = await dispatch(verifyOTP({ 
+      email, 
+      otp: otpToVerify,
+      type: type
+    }));
+    
+    if (verifyOTP.fulfilled.match(result)) {
+      if (type === 'forgot_password') {
+        // Navigate to ResetPassword screen
+        navigation.navigate('ResetPassword', {
+          email: email,
+          otp: otpToVerify
+        });
+      } else {
+        // Signup success - MainNavigator will handle navigation
         Alert.alert(
           'Success',
-          type === 'signup' ? 'Account created successfully!' : 'Email verified successfully!',
+          'Account created successfully!',
           [{ text: 'OK' }]
         );
-      } else {
-        Alert.alert(
-          'Verification Failed',
-          result.payload || 'Invalid OTP. Please try again.'
-        );
-        // Clear OTP inputs on failure
-        setOTP(['', '', '', '', '', '']);
-        inputRefs.current[0]?.focus();
       }
-    } catch (err) {
-      console.error(err)
-      Alert.alert('Error', 'An unexpected error occurred');
+    } else {
+      Alert.alert(
+        'Verification Failed',
+        result.payload || 'Invalid OTP. Please try again.'
+      );
+      setOTP(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
     }
-  };
+  } catch (err) {
+    console.error(err)
+    Alert.alert('Error', 'An unexpected error occurred');
+  }
+};
 
   const handleResendOTP = async () => {
     if (!canResend) return;

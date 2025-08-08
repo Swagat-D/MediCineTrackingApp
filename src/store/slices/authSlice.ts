@@ -20,41 +20,6 @@ export const loginUser = createAsyncThunk<
   'auth/loginUser',
   async (credentials, { rejectWithValue }) => {
     try {
-      // MOCK FOR DEVELOPMENT - REMOVE FOR PRODUCTION
-      if (__DEV__) {
-        console.log('🔥 DEV MODE: Mock login for', credentials.role);
-        
-        // Simulate loading delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const mockUser = {
-          id: credentials.role + '-mock-1',
-          email: credentials.email,
-          name: credentials.role === 'caregiver' ? 'Dr. Sarah Johnson' : 'John Smith',
-          role: credentials.role,
-          age: credentials.role === 'caregiver' ? 35 : 65,
-          gender: credentials.role === 'caregiver' ? 'female' : 'male',
-          phoneNumber: '+1-555-0101',
-          isEmailVerified: true,
-          createdAt: '2024-01-15T10:00:00Z',
-          updatedAt: '2024-08-05T10:00:00Z',
-        } as User;
-        
-        const mockResponse: AuthResponse = {
-          user: mockUser,
-          token: 'mock-jwt-token-' + credentials.role + '-' + Date.now(),
-        };
-        
-        // Store mock data
-        await storageService.setItem(STORAGE_KEYS.USER_TOKEN, mockResponse.token);
-        await storageService.setItem(STORAGE_KEYS.USER_ROLE, mockResponse.user.role);
-        await storageService.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(mockResponse.user));
-        
-        console.log('✅ DEV LOGIN SUCCESS:', mockResponse.user.name);
-        return mockResponse;
-      }
-      
-      // PRODUCTION CODE
       const response = await authAPI.login(credentials);
       
       // Store tokens and user data
@@ -78,29 +43,6 @@ export const signupUser = createAsyncThunk<
   'auth/signupUser',
   async (userData, { rejectWithValue }) => {
     try {
-      // MOCK FOR DEVELOPMENT
-      if (__DEV__) {
-        console.log('🔥 DEV MODE: Mock signup for', userData.role);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const mockUser = {
-          id: 'new-' + userData.role + '-' + Date.now(),
-          email: userData.email,
-          name: userData.name,
-          role: userData.role,
-          age: userData.age,
-          gender: userData.gender,
-          phoneNumber: userData.phoneNumber,
-          isEmailVerified: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        } as User;
-        
-        console.log('✅ DEV SIGNUP SUCCESS:', mockUser.name);
-        return { user: mockUser, otpSent: true };
-      }
-      
-      // PRODUCTION CODE
       const response = await authAPI.signup(userData);
       return response;
     } catch (error: any) {
@@ -111,54 +53,17 @@ export const signupUser = createAsyncThunk<
 );
 
 export const verifyOTP = createAsyncThunk<
-  AuthResponse,
-  OTPVerification,
+  AuthResponse | { success: boolean; message: string },
+  OTPVerification & { type?: string },
   { rejectValue: string }
 >(
   'auth/verifyOTP',
-  async ({ email, otp }, { rejectWithValue }) => {
+  async (otpData, { rejectWithValue }) => {
     try {
-      // MOCK FOR DEVELOPMENT
-      if (__DEV__) {
-        console.log('🔥 DEV MODE: Mock OTP verification');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Accept any 6-digit OTP
-        if (otp.length !== 6) {
-          throw new Error('OTP must be 6 digits');
-        }
-        
-        const role = email.includes('caregiver') ? 'caregiver' : 'patient';
-        const mockUser = {
-          id: role + '-verified-1',
-          email: email,
-          name: role === 'caregiver' ? 'Dr. Sarah Johnson' : 'John Smith',
-          role: role,
-          age: role === 'caregiver' ? 35 : 65,
-          gender: role === 'caregiver' ? 'female' : 'male',
-          phoneNumber: '+1-555-0101',
-          isEmailVerified: true,
-          createdAt: '2024-01-15T10:00:00Z',
-          updatedAt: '2024-08-05T10:00:00Z',
-        } as User;
-        
-        const mockResponse: AuthResponse = {
-          user: mockUser,
-          token: 'mock-verified-token-' + role + '-' + Date.now(),
-        };
-        
-        await storageService.setItem(STORAGE_KEYS.USER_TOKEN, mockResponse.token);
-        await storageService.setItem(STORAGE_KEYS.USER_ROLE, mockResponse.user.role);
-        await storageService.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(mockResponse.user));
-        
-        console.log('✅ DEV OTP SUCCESS');
-        return mockResponse;
-      }
+      const response = await authAPI.verifyOTP(otpData);
       
-      // PRODUCTION CODE
-      const response = await authAPI.verifyOTP({ email, otp });
-      
-      if (response.token) {
+      // Only store auth data if it's a signup flow (has token)
+      if ('token' in response && response.token) {
         await storageService.setItem(STORAGE_KEYS.USER_TOKEN, response.token);
         await storageService.setItem(STORAGE_KEYS.USER_ROLE, response.user.role);
         await storageService.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(response.user));
@@ -172,6 +77,57 @@ export const verifyOTP = createAsyncThunk<
   }
 );
 
+export const resendOTP = createAsyncThunk<
+  { message: string; otpSent: boolean },
+  string,
+  { rejectValue: string }
+>(
+  'auth/resendOTP',
+  async (email, { rejectWithValue }) => {
+    try {
+      const response = await authAPI.resendOTP(email);
+      return response;
+    } catch (error: any) {
+      console.log('❌ RESEND OTP ERROR:', error.message);
+      return rejectWithValue(error.message || 'Failed to resend OTP');
+    }
+  }
+);
+
+export const forgotPassword = createAsyncThunk<
+  { message: string; otpSent: boolean },
+  { email: string },
+  { rejectValue: string }
+>(
+  'auth/forgotPassword',
+  async ({ email }, { rejectWithValue }) => {
+    try {
+      const response = await authAPI.forgotPassword({ email });
+      return response;
+    } catch (error: any) {
+      console.log('❌ FORGOT PASSWORD ERROR:', error.message);
+      return rejectWithValue(error.message || 'Failed to send reset OTP');
+    }
+  }
+);
+
+export const resetPassword = createAsyncThunk<
+  { message: string; success: boolean },
+  { email: string; otp: string; newPassword: string; confirmPassword: string },
+  { rejectValue: string }
+>(
+  'auth/resetPassword',
+  async (data, { rejectWithValue }) => {
+    try {
+      const response = await authAPI.resetPassword(data);
+      return response;
+    } catch (error: any) {
+      console.log('❌ RESET PASSWORD ERROR:', error.message);
+      return rejectWithValue(error.message || 'Password reset failed');
+    }
+  }
+);
+
 export const logoutUser = createAsyncThunk<
   boolean,
   void,
@@ -180,16 +136,9 @@ export const logoutUser = createAsyncThunk<
   'auth/logoutUser',
   async (_, { rejectWithValue }) => {
     try {
-      // MOCK FOR DEVELOPMENT
-      if (__DEV__) {
-        console.log('🔥 DEV MODE: Mock logout');
-        await new Promise(resolve => setTimeout(resolve, 500));
-      } else {
-        // PRODUCTION CODE
-        await authAPI.logout();
-      }
+      await authAPI.logout();
       
-      // Clear stored data (both dev and production)
+      // Clear stored data
       await storageService.removeItem(STORAGE_KEYS.USER_TOKEN);
       await storageService.removeItem(STORAGE_KEYS.USER_ROLE);
       await storageService.removeItem(STORAGE_KEYS.USER_DATA);
@@ -197,8 +146,13 @@ export const logoutUser = createAsyncThunk<
       console.log('✅ LOGOUT SUCCESS');
       return true;
     } catch (error: any) {
-      console.log('❌ LOGOUT ERROR:', error.message);
-      return rejectWithValue(error.message || 'Logout failed');
+      // Even if API call fails, clear local storage
+      await storageService.removeItem(STORAGE_KEYS.USER_TOKEN);
+      await storageService.removeItem(STORAGE_KEYS.USER_ROLE);
+      await storageService.removeItem(STORAGE_KEYS.USER_DATA);
+      
+      console.log('⚠️ LOGOUT ERROR (but cleared locally):', error.message);
+      return true; // Return true anyway since we cleared locally
     }
   }
 );
@@ -234,6 +188,65 @@ export const checkAuthStatus = createAsyncThunk<
   }
 );
 
+export const getCurrentUser = createAsyncThunk<
+  User,
+  void,
+  { rejectValue: string }
+>(
+  'auth/getCurrentUser',
+  async (_, { rejectWithValue }) => {
+    try {
+      const user = await authAPI.getCurrentUser();
+      
+      // Update stored user data
+      await storageService.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+      
+      return user;
+    } catch (error: any) {
+      console.log('❌ GET USER ERROR:', error.message);
+      return rejectWithValue(error.message || 'Failed to get user data');
+    }
+  }
+);
+
+export const updateProfile = createAsyncThunk<
+  User,
+  Partial<User>,
+  { rejectValue: string }
+>(
+  'auth/updateProfile',
+  async (userData, { rejectWithValue }) => {
+    try {
+      const user = await authAPI.updateProfile(userData);
+      
+      // Update stored user data
+      await storageService.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+      
+      return user;
+    } catch (error: any) {
+      console.log('❌ UPDATE PROFILE ERROR:', error.message);
+      return rejectWithValue(error.message || 'Profile update failed');
+    }
+  }
+);
+
+export const changePassword = createAsyncThunk<
+  { message: string; success: boolean },
+  { currentPassword: string; newPassword: string },
+  { rejectValue: string }
+>(
+  'auth/changePassword',
+  async (data, { rejectWithValue }) => {
+    try {
+      const response = await authAPI.changePassword(data);
+      return response;
+    } catch (error: any) {
+      console.log('❌ CHANGE PASSWORD ERROR:', error.message);
+      return rejectWithValue(error.message || 'Password change failed');
+    }
+  }
+);
+
 const initialState: AuthState = {
   user: null,
   token: null,
@@ -260,31 +273,9 @@ const authSlice = createSlice({
         state.user = { ...state.user, ...action.payload };
       }
     },
-    // DEV ONLY - Quick Mock Login
-    mockLogin: (state, action: PayloadAction<'caregiver' | 'patient'>) => {
-      if (__DEV__) {
-        const role = action.payload;
-        const mockUser = {
-          id: role + '-quick-mock',
-          email: role + '@test.com',
-          name: role === 'caregiver' ? 'Dr. Sarah Johnson' : 'John Smith',
-          role: role,
-          age: role === 'caregiver' ? 35 : 65,
-          gender: role === 'caregiver' ? 'female' : 'male',
-          phoneNumber: '+1-555-0101',
-          isEmailVerified: true,
-          createdAt: '2024-01-15T10:00:00Z',
-          updatedAt: '2024-08-05T10:00:00Z',
-        } as User;
-        
-        state.isAuthenticated = true;
-        state.user = mockUser;
-        state.token = 'quick-mock-token-' + role;
-        state.error = null;
-        state.isLoading = false;
-        
-        console.log('🚀 QUICK MOCK LOGIN:', role);
-      }
+    clearOTPState: (state) => {
+      state.otpSent = false;
+      state.emailVerified = false;
     },
   },
   extraReducers: (builder) => {
@@ -330,18 +321,60 @@ const authSlice = createSlice({
       .addCase(verifyOTP.fulfilled, (state, action) => {
         state.isLoading = false;
         state.emailVerified = true;
-        
-        if (action.payload.token) {
+        if ('token' in action.payload && action.payload.token) {
           state.isAuthenticated = true;
           state.user = action.payload.user;
           state.token = action.payload.token;
         }
-        
         state.error = null;
       })
       .addCase(verifyOTP.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload || 'OTP verification failed';
+      })
+      
+      // Resend OTP
+      .addCase(resendOTP.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(resendOTP.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.otpSent = action.payload.otpSent;
+        state.error = null;
+      })
+      .addCase(resendOTP.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload || 'Failed to resend OTP';
+      })
+      
+      // Forgot Password
+      .addCase(forgotPassword.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(forgotPassword.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.otpSent = action.payload.otpSent;
+        state.error = null;
+      })
+      .addCase(forgotPassword.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload || 'Failed to send reset OTP';
+      })
+      
+      // Reset Password
+      .addCase(resetPassword.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(resetPassword.fulfilled, (state) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(resetPassword.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload || 'Password reset failed';
       })
       
       // Logout
@@ -353,9 +386,40 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.token = action.payload.token;
       })
-      .addCase(checkAuthStatus.rejected, () => initialState);
+      .addCase(checkAuthStatus.rejected, () => initialState)
+      
+      // Get Current User
+      .addCase(getCurrentUser.fulfilled, (state, action) => {
+        state.user = action.payload;
+      })
+      
+      // Update Profile
+      .addCase(updateProfile.fulfilled, (state, action) => {
+        state.user = action.payload;
+      })
+      
+      // Change Password
+      .addCase(changePassword.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(changePassword.fulfilled, (state) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(changePassword.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload || 'Password change failed';
+      });
   },
 });
 
-export const { clearError, setLoading, resetAuthState, updateUser, mockLogin } = authSlice.actions;
+export const { 
+  clearError, 
+  setLoading, 
+  resetAuthState, 
+  updateUser, 
+  clearOTPState 
+} = authSlice.actions;
+
 export default authSlice.reducer;

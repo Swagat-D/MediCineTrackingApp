@@ -15,7 +15,7 @@ export interface APIConfig {
 }
 
 export const API_CONFIG: APIConfig = {
-  BASE_URL: __DEV__ ? 'http://192.168.250.210:3000/api' : 'https://your-production-api.com/api',
+  BASE_URL: __DEV__ ? 'http://192.168.250.210:5000/api' : 'https://your-production-api.com/api',
   TIMEOUT: 10000,
   HEADERS: {
     'Content-Type': 'application/json',

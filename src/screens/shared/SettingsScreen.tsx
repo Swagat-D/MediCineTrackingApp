@@ -1,179 +1,65 @@
+// src/screens/shared/SettingsScreen.tsx
 import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
-  StatusBar,
   ScrollView,
   TouchableOpacity,
-  Switch,
   Alert,
-  Linking,
+  Platform,
+  Switch,
+  ColorValue,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Updates from 'expo-updates';
-import { LoadingOverlay } from '../../components/common/Loading/LoadingSpinner';
-import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../constants/themes/theme';
-import { APP_CONFIG } from '../../constants/app';
-import { useAppDispatch, useAppSelector } from '../../store';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useAppSelector, useAppDispatch } from '../../store';
 import { logoutUser } from '../../store/slices/authSlice';
-
-interface SettingsSection {
-  title: string;
-  items: SettingsItem[];
-}
-
-interface SettingsItem {
-  id: string;
-  title: string;
-  description?: string;
-  type: 'toggle' | 'navigation' | 'action';
-  icon: keyof typeof Ionicons.glyphMap;
-  value?: boolean;
-  onPress?: () => void;
-  onToggle?: (value: boolean) => void;
-  destructive?: boolean;
-  disabled?: boolean;
-}
+import CaregiverSecondaryNavbar from '../../components/common/SecondaryNavbar';
+import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
+import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 
 const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector(state => state.auth);
-  
-  const [isLoading, setIsLoading] = useState(false);
+  const isCaregiver = user?.role === 'caregiver';
+
   const [settings, setSettings] = useState({
-    // Notification Settings
     pushNotifications: true,
+    emailNotifications: false,
     medicationReminders: true,
     sosAlerts: true,
-    weeklyReports: true,
-    emailNotifications: false,
-    smsNotifications: false,
-    
-    // App Preferences
-    darkMode: false,
+    weeklyReports: isCaregiver,
     soundEnabled: true,
     vibrationEnabled: true,
-    autoLock: true,
     biometricAuth: false,
-    
-    // Data & Privacy
-    dataSync: true,
-    analytics: true,
-    crashReporting: true,
-    locationServices: false,
   });
 
-  const updateSetting = (key: string, value: boolean) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-    // TODO: Save to backend/storage
+
+  const themeColors = {
+    primary: isCaregiver ? '#059669' : '#2563EB',
+    primaryLight: isCaregiver ? '#ECFDF5' : '#EBF4FF',
+    primaryBorder: isCaregiver ? '#D1FAE5' : '#BFDBFE',
+    gradient: isCaregiver
+      ? (['#F0FDF4', '#FFFFFF'] as [ColorValue, ColorValue])
+      : (['#EBF4FF', '#FFFFFF'] as [ColorValue, ColorValue]),
   };
 
-  
-  const handleCheckForUpdates = async () => {
-    try {
-      setIsLoading(true);
-      
-      if (__DEV__) {
-        Alert.alert('Development Mode', 'Updates are not available in development mode.');
-        setIsLoading(false);
-        return;
-      }
-
-      const update = await Updates.checkForUpdateAsync();
-      if (update.isAvailable) {
-        Alert.alert(
-          'Update Available',
-          'A new version of the app is available. Would you like to update now?',
-          [
-            { text: 'Later', style: 'cancel' },
-            {
-              text: 'Update',
-              onPress: async () => {
-                await Updates.fetchUpdateAsync();
-                await Updates.reloadAsync();
-              },
-            },
-          ]
-        );
-      } else {
-        Alert.alert('Up to Date', 'You are running the latest version of MediTracker.');
-      }
-      
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Error checking for updates:', error);
-      setIsLoading(false);
-      Alert.alert('Error', 'Failed to check for updates. Please try again later.');
-    }
-  };
-
-  const handleExportData = () => {
-    Alert.alert(
-      'Export Data',
-      'This will create a backup of all your medication data and patient information.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Export',
-          onPress: () => {
-            Alert.alert('Feature Coming Soon', 'Data export will be available in a future update.');
-          },
-        },
-      ]
-    );
-  };
-
-  const handleDeleteAllData = () => {
-    Alert.alert(
-      'Delete All Data',
-      'This will permanently delete all your data from this device. This action cannot be undone. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete All Data',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Final Confirmation',
-              'Type "DELETE" to confirm permanent data deletion.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Confirm', style: 'destructive' },
-              ]
-            );
-          },
-        },
-      ]
-    );
-  };
-
-  const handleContactSupport = () => {
-    Alert.alert(
-      'Contact Support',
-      'Choose how you would like to contact our support team:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Email', onPress: () => Linking.openURL('mailto:support@meditracker.com') },
-        { text: 'Phone', onPress: () => Linking.openURL('tel:+1234567890') },
-      ]
-    );
-  };
-
-  const handleRateApp = () => {
-    // TODO: Implement store rating
-    Alert.alert('Feature Coming Soon', 'App rating will be available when published to app stores.');
+  const handleToggleSetting = (settingKey: keyof typeof settings) => {
+    setSettings(prev => ({
+      ...prev,
+      [settingKey]: !prev[settingKey]
+    }));
   };
 
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      'Sign Out',
+      'Are you sure you want to sign out?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Logout',
+          text: 'Sign Out',
           style: 'destructive',
           onPress: () => dispatch(logoutUser()),
         },
@@ -181,518 +67,444 @@ const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     );
   };
 
-  const settingsSections: SettingsSection[] = [
-    {
-      title: 'Notifications',
-      items: [
+  const handleResetApp = () => {
+    Alert.alert(
+      'Reset App Data',
+      'This will clear all app data including settings, notifications, and cached information. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
         {
-          id: 'pushNotifications',
-          title: 'Push Notifications',
-          description: 'Receive notifications on this device',
-          type: 'toggle',
-          icon: 'notifications-outline',
-          value: settings.pushNotifications,
-          onToggle: (value) => {
-            updateSetting('pushNotifications', value);
-          
-          },
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => Alert.alert('Success', 'App data has been reset'),
         },
-        {
-          id: 'medicationReminders',
-          title: 'Medication Reminders',
-          description: 'Get reminded when it\'s time to take medications',
-          type: 'toggle',
-          icon: 'medical-outline',
-          value: settings.medicationReminders,
-          onToggle: (value) => updateSetting('medicationReminders', value),
-          disabled: !settings.pushNotifications,
-        },
-        {
-          id: 'sosAlerts',
-          title: 'SOS Alerts',
-          description: 'Receive emergency alerts from patients',
-          type: 'toggle',
-          icon: 'alert-circle-outline',
-          value: settings.sosAlerts,
-          onToggle: (value) => updateSetting('sosAlerts', value),
-          disabled: !settings.pushNotifications,
-        },
-        {
-          id: 'weeklyReports',
-          title: 'Weekly Reports',
-          description: 'Get weekly adherence summary reports',
-          type: 'toggle',
-          icon: 'document-text-outline',
-          value: settings.weeklyReports,
-          onToggle: (value) => updateSetting('weeklyReports', value),
-        },
-      ],
-    },
-    {
-      title: 'App Preferences',
-      items: [
-        {
-          id: 'darkMode',
-          title: 'Dark Mode',
-          description: 'Use dark theme throughout the app',
-          type: 'toggle',
-          icon: 'moon-outline',
-          value: settings.darkMode,
-          onToggle: (value) => {
-            updateSetting('darkMode', value);
-            Alert.alert('Feature Coming Soon', 'Dark mode will be available in a future update.');
-          },
-        },
-        {
-          id: 'soundEnabled',
-          title: 'Sound Effects',
-          description: 'Play sounds for notifications and actions',
-          type: 'toggle',
-          icon: 'volume-high-outline',
-          value: settings.soundEnabled,
-          onToggle: (value) => updateSetting('soundEnabled', value),
-        },
-        {
-          id: 'vibrationEnabled',
-          title: 'Vibration',
-          description: 'Use vibration for alerts and notifications',
-          type: 'toggle',
-          icon: 'phone-portrait-outline',
-          value: settings.vibrationEnabled,
-          onToggle: (value) => updateSetting('vibrationEnabled', value),
-        },
-        {
-          id: 'biometricAuth',
-          title: 'Biometric Authentication',
-          description: 'Use fingerprint or face ID to unlock app',
-          type: 'toggle',
-          icon: 'finger-print-outline',
-          value: settings.biometricAuth,
-          onToggle: (value) => {
-            updateSetting('biometricAuth', value);
-            Alert.alert('Feature Coming Soon', 'Biometric authentication will be available in a future update.');
-          },
-        },
-      ],
-    },
-    {
-      title: 'Data & Privacy',
-      items: [
-        {
-          id: 'dataSync',
-          title: 'Data Synchronization',
-          description: 'Sync data across your devices',
-          type: 'toggle',
-          icon: 'sync-outline',
-          value: settings.dataSync,
-          onToggle: (value) => updateSetting('dataSync', value),
-        },
-        {
-          id: 'analytics',
-          title: 'Usage Analytics',
-          description: 'Help improve the app by sharing anonymous usage data',
-          type: 'toggle',
-          icon: 'analytics-outline',
-          value: settings.analytics,
-          onToggle: (value) => updateSetting('analytics', value),
-        },
-        {
-          id: 'exportData',
-          title: 'Export Data',
-          description: 'Download a copy of your data',
-          type: 'action',
-          icon: 'download-outline',
-          onPress: handleExportData,
-        },
-        {
-          id: 'privacyPolicy',
-          title: 'Privacy Policy',
-          description: 'View our privacy policy',
-          type: 'navigation',
-          icon: 'shield-checkmark-outline',
-          onPress: () => Linking.openURL('https://meditracker.com/privacy'),
-        },
-      ],
-    },
-    {
-      title: 'Support & Feedback',
-      items: [
-        {
-          id: 'checkUpdates',
-          title: 'Check for Updates',
-          description: 'Check if a newer version is available',
-          type: 'action',
-          icon: 'refresh-outline',
-          onPress: handleCheckForUpdates,
-        },
-        {
-          id: 'contactSupport',
-          title: 'Contact Support',
-          description: 'Get help from our support team',
-          type: 'action',
-          icon: 'help-circle-outline',
-          onPress: handleContactSupport,
-        },
-        {
-          id: 'rateApp',
-          title: 'Rate This App',
-          description: 'Leave a review on the app store',
-          type: 'action',
-          icon: 'star-outline',
-          onPress: handleRateApp,
-        },
-        {
-          id: 'termsOfService',
-          title: 'Terms of Service',
-          description: 'View our terms of service',
-          type: 'navigation',
-          icon: 'document-outline',
-          onPress: () => Linking.openURL('https://meditracker.com/terms'),
-        },
-      ],
-    },
-    {
-      title: 'Account',
-      items: [
-        {
-          id: 'logout',
-          title: 'Logout',
-          description: 'Sign out of your account',
-          type: 'action',
-          icon: 'log-out-outline',
-          onPress: handleLogout,
-          destructive: true,
-        },
-        {
-          id: 'deleteData',
-          title: 'Delete All Data',
-          description: 'Permanently delete all data from this device',
-          type: 'action',
-          icon: 'trash-outline',
-          onPress: handleDeleteAllData,
-          destructive: true,
-        },
-      ],
-    },
-  ];
-
-  const renderSettingsItem = (item: SettingsItem) => {
-    const isDisabled = item.disabled || false;
-    
-    return (
-      <TouchableOpacity
-        key={item.id}
-        style={[
-          styles.settingsItem,
-          isDisabled && styles.disabledItem,
-          item.destructive && styles.destructiveItem,
-        ]}
-        onPress={item.onPress}
-        disabled={isDisabled || (item.type === 'toggle' && !item.onToggle)}
-        activeOpacity={0.8}
-      >
-        <View style={styles.settingsItemContent}>
-          <View style={[
-            styles.settingsIcon,
-            item.destructive && styles.destructiveIcon,
-            isDisabled && styles.disabledIcon,
-          ]}>
-            <Ionicons
-              name={item.icon}
-              size={20}
-              color={
-                item.destructive 
-                  ? COLORS.error 
-                  : isDisabled 
-                    ? COLORS.gray[400] 
-                    : COLORS.text.secondary
-              }
-            />
-          </View>
-          
-          <View style={styles.settingsText}>
-            <Text style={[
-              styles.settingsTitle,
-              item.destructive && styles.destructiveText,
-              isDisabled && styles.disabledText,
-            ]}>
-              {item.title}
-            </Text>
-            {item.description && (
-              <Text style={[
-                styles.settingsDescription,
-                isDisabled && styles.disabledText,
-              ]}>
-                {item.description}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.settingsAction}>
-          {item.type === 'toggle' && item.onToggle && (
-            <Switch
-              value={item.value || false}
-              onValueChange={item.onToggle}
-              disabled={isDisabled}
-              trackColor={{ 
-                false: COLORS.gray[300], 
-                true: COLORS.primary[200] 
-              }}
-              thumbColor={
-                (item.value && !isDisabled) 
-                  ? COLORS.primary[500] 
-                  : COLORS.gray[400]
-              }
-            />
-          )}
-          
-          {(item.type === 'navigation' || item.type === 'action') && (
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={
-                item.destructive 
-                  ? COLORS.error 
-                  : isDisabled 
-                    ? COLORS.gray[400] 
-                    : COLORS.text.hint
-              }
-            />
-          )}
-        </View>
-      </TouchableOpacity>
+      ]
     );
   };
 
-  const renderSettingsSection = (section: SettingsSection) => (
-    <View key={section.title} style={styles.settingsSection}>
-      <Text style={styles.sectionTitle}>{section.title}</Text>
+  const handleExportData = () => {
+    Alert.alert(
+      'Export Data',
+      isCaregiver 
+        ? 'Export patient data and reports for backup or sharing with healthcare providers.'
+        : 'Export your medication history and adherence reports.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Export', onPress: () => Alert.alert('Exported', 'Data exported successfully') },
+      ]
+    );
+  };
+
+  const SettingSection = ({ 
+    title, 
+    items 
+  }: { 
+    title: string; 
+    items: {
+      icon: keyof typeof Ionicons.glyphMap;
+      title: string;
+      subtitle?: string;
+      onPress?: () => void;
+      toggle?: keyof typeof settings;
+      showChevron?: boolean;
+      destructive?: boolean;
+    }[];
+  }) => (
+    <View style={styles.settingSection}>
+      <Text style={styles.sectionTitle}>{title}</Text>
       <View style={styles.sectionContent}>
-        {section.items.map(renderSettingsItem)}
+        {items.map((item, index) => (
+          <View
+            key={index}
+            style={[
+              styles.settingItem,
+              index === items.length - 1 && styles.settingItemLast
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.settingItemContent}
+              onPress={item.onPress}
+              activeOpacity={item.onPress ? 0.7 : 1}
+              disabled={!item.onPress && !item.toggle}
+            >
+              <View style={styles.settingItemLeft}>
+                <View style={[
+                  styles.settingItemIcon,
+                  item.destructive && styles.destructiveIcon
+                ]}>
+                  <Ionicons 
+                    name={item.icon} 
+                    size={20} 
+                    color={item.destructive ? '#EF4444' : '#64748B'} 
+                  />
+                </View>
+                <View style={styles.settingItemContent}>
+                  <Text style={[
+                    styles.settingItemTitle,
+                    item.destructive && styles.destructiveText
+                  ]}>
+                    {item.title}
+                  </Text>
+                  {item.subtitle && (
+                    <Text style={styles.settingItemSubtitle}>{item.subtitle}</Text>
+                  )}
+                </View>
+              </View>
+              
+              {item.toggle ? (
+                <Switch
+                  value={settings[item.toggle]}
+                  onValueChange={() => handleToggleSetting(item.toggle!)}
+                  trackColor={{ 
+                    false: '#F1F5F9', 
+                    true: themeColors.primary + '40' 
+                  }}
+                  thumbColor={settings[item.toggle] ? themeColors.primary : '#FFFFFF'}
+                  ios_backgroundColor="#F1F5F9"
+                />
+              ) : item.showChevron ? (
+                <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+              ) : null}
+            </TouchableOpacity>
+          </View>
+        ))}
       </View>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
-      <LoadingOverlay visible={isLoading} message="Checking for updates..." />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color={COLORS.primary[500]} />
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>Settings</Text>
-        
-        <View style={styles.headerPlaceholder} />
-      </View>
+    <View style={styles.container}>
+      {isCaregiver ? (
+        <CaregiverSecondaryNavbar
+          title="Settings"
+          onBackPress={() => navigation.goBack()}
+        />
+      ) : (
+        <PatientSecondaryNavbar
+          title="Settings"
+          onBackPress={() => navigation.goBack()}
+          onSOSPress={() => navigation.navigate('SOS')}
+        />
+      )}
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* User Info */}
-        <View style={styles.userInfo}>
-          <View style={styles.userAvatar}>
-            <Ionicons name="person" size={32} color={COLORS.primary[500]} />
-          </View>
-          <View style={styles.userDetails}>
-            <Text style={styles.userName}>{user?.name}</Text>
-            <Text style={styles.userRole}>
-              {user?.role === 'caregiver' ? 'Healthcare Caregiver' : 'Patient'}
+        {/* Header Section */}
+        <LinearGradient
+          colors={themeColors.gradient}
+          style={styles.headerSection}
+        >
+          <View style={styles.headerContent}>
+            <View style={[styles.headerIcon, { backgroundColor: themeColors.primaryLight }]}>
+              <Ionicons name="settings" size={24} color={themeColors.primary} />
+            </View>
+            <Text style={styles.headerTitle}>App Settings</Text>
+            <Text style={styles.headerSubtitle}>
+              Customize your {isCaregiver ? 'caregiving' : 'medication tracking'} experience
             </Text>
-            <Text style={styles.userEmail}>{user?.email}</Text>
           </View>
-        </View>
+        </LinearGradient>
 
-        {/* Settings Sections */}
-        {settingsSections.map(renderSettingsSection)}
+        {/* Notifications Settings */}
+        <SettingSection
+          title="Notifications"
+          items={[
+            {
+              icon: 'notifications-outline',
+              title: 'Push Notifications',
+              subtitle: 'Receive notifications on this device',
+              toggle: 'pushNotifications',
+            },
+            {
+              icon: 'mail-outline',
+              title: 'Email Notifications',
+              subtitle: 'Receive notifications via email',
+              toggle: 'emailNotifications',
+            },
+            {
+              icon: 'medical-outline',
+              title: 'Medication Reminders',
+              subtitle: isCaregiver ? 'Patient medication alerts' : 'Daily medication reminders',
+              toggle: 'medicationReminders',
+            },
+            {
+              icon: 'alert-circle-outline',
+              title: 'SOS Alerts',
+              subtitle: isCaregiver ? 'Emergency patient alerts' : 'Emergency notification system',
+              toggle: 'sosAlerts',
+            },
+            ...(isCaregiver ? [{
+              icon: 'analytics-outline' as keyof typeof Ionicons.glyphMap,
+              title: 'Weekly Reports',
+              subtitle: 'Patient adherence summary reports',
+              toggle: 'weeklyReports' as keyof typeof settings,
+            }] : []),
+          ]}
+        />
 
-        {/* App Info */}
-        <View style={styles.appInfo}>
-          <Text style={styles.appName}>{APP_CONFIG.NAME}</Text>
-          <Text style={styles.appVersion}>Version {APP_CONFIG.VERSION}</Text>
-          <Text style={styles.appCopyright}>
-            © 2024 MediTracker. All rights reserved.
+        {/* Sound & Vibration */}
+        <SettingSection
+          title="Sound & Vibration"
+          items={[
+            {
+              icon: 'volume-high-outline',
+              title: 'Sound',
+              subtitle: 'Play sounds for notifications',
+              toggle: 'soundEnabled',
+            },
+            {
+              icon: 'phone-portrait-outline',
+              title: 'Vibration',
+              subtitle: 'Vibrate for important alerts',
+              toggle: 'vibrationEnabled',
+            },
+          ]}
+        />
+
+        {/* Security Settings */}
+        <SettingSection
+          title="Security & Privacy"
+          items={[
+            {
+              icon: 'finger-print-outline',
+              title: 'Biometric Authentication',
+              subtitle: 'Use fingerprint or face ID to unlock',
+              toggle: 'biometricAuth',
+            },
+            {
+              icon: 'shield-checkmark-outline',
+              title: 'Privacy Policy',
+              subtitle: 'View our privacy policy',
+              onPress: () => Alert.alert('Privacy Policy', 'This will open our privacy policy'),
+              showChevron: true,
+            },
+            {
+              icon: 'document-text-outline',
+              title: 'Terms of Service',
+              subtitle: 'View terms and conditions',
+              onPress: () => Alert.alert('Terms of Service', 'This will open our terms of service'),
+              showChevron: true,
+            },
+          ]}
+        />
+
+        {/* Data Management */}
+        <SettingSection
+          title="Data Management"
+          items={[
+            {
+              icon: 'cloud-download-outline',
+              title: 'Export Data',
+              subtitle: isCaregiver ? 'Export patient reports and data' : 'Export medication history',
+              onPress: handleExportData,
+              showChevron: true,
+            },
+            {
+              icon: 'refresh-outline',
+              title: 'Reset App Data',
+              subtitle: 'Clear all app data and settings',
+              onPress: handleResetApp,
+              showChevron: true,
+              destructive: true,
+            },
+          ]}
+        />
+
+        {/* Support */}
+        <SettingSection
+          title="Support & Information"
+          items={[
+            {
+              icon: 'help-circle-outline',
+              title: 'Help & Support',
+              subtitle: 'Get help using the app',
+              onPress: () => Alert.alert('Support', 'Contact support team'),
+              showChevron: true,
+            },
+            {
+              icon: 'chatbubble-outline',
+              title: 'Send Feedback',
+              subtitle: 'Share your thoughts and suggestions',
+              onPress: () => Alert.alert('Feedback', 'Thank you for your feedback'),
+              showChevron: true,
+            },
+            {
+              icon: 'star-outline',
+              title: 'Rate the App',
+              subtitle: 'Rate us on the App Store',
+              onPress: () => Alert.alert('Rate App', 'This will open the App Store'),
+              showChevron: true,
+            },
+            {
+              icon: 'information-circle-outline',
+              title: 'About MediTracker',
+              subtitle: 'Version 1.0.0',
+              onPress: () => Alert.alert('About', 'MediTracker v1.0.0\nMade with care for your health'),
+              showChevron: true,
+            },
+          ]}
+        />
+
+        {/* Account */}
+        <SettingSection
+          title="Account"
+          items={[
+            {
+              icon: 'person-outline',
+              title: 'Account Information',
+              subtitle: `${user?.name} (${user?.email})`,
+              onPress: () => Alert.alert('Account', 'View account details'),
+              showChevron: true,
+            },
+            {
+              icon: 'log-out-outline',
+              title: 'Sign Out',
+              subtitle: 'Sign out of your account',
+              onPress: handleLogout,
+              destructive: true,
+              showChevron: true,
+            },
+          ]}
+        />
+
+        {/* Version Info */}
+        <View style={styles.versionSection}>
+          <Text style={styles.versionText}>MediTracker v1.0.0</Text>
+          <Text style={styles.versionSubtext}>
+            {isCaregiver ? 'Professional healthcare management' : 'Personal medication companion'}
           </Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING[6],
-    paddingVertical: SPACING[4],
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[200],
-  },
-  backButton: {
-    padding: SPACING[2],
-  },
-  headerTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-  },
-  headerPlaceholder: {
-    width: 40,
+    backgroundColor: '#F8FAFC',
   },
   scrollView: {
     flex: 1,
+    marginTop: Platform.OS === 'ios' ? 114 : 70,
   },
   scrollContent: {
-    paddingHorizontal: SPACING[6],
-    paddingVertical: SPACING[4],
-    paddingBottom: SPACING[10],
+    paddingBottom: SPACING[8],
   },
-  userInfo: {
-    flexDirection: 'row',
+  headerSection: {
+    paddingHorizontal: SPACING[5],
+    paddingBottom: SPACING[6],
+    paddingTop: SPACING[8],
     alignItems: 'center',
-    backgroundColor: COLORS.primary[50],
-    borderRadius: RADIUS.xl,
-    padding: SPACING[5],
-    marginBottom: SPACING[8],
-    borderWidth: 1,
-    borderColor: COLORS.primary[100],
   },
-  userAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: COLORS.background,
+  headerContent: {
+    alignItems: 'center',
+  },
+  headerIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING[4],
-    ...SHADOWS.sm,
+    marginBottom: SPACING[4],
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  userDetails: {
-    flex: 1,
+  headerTitle: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: SPACING[2],
   },
-  userName: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-    marginBottom: SPACING[1],
+  headerSubtitle: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 22,
+    maxWidth: '85%',
   },
-  userRole: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.primary[600],
-    fontWeight: '500',
-    marginBottom: SPACING[1],
-  },
-  userEmail: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
-  },
-  settingsSection: {
-    marginBottom: SPACING[8],
+  settingSection: {
+    paddingHorizontal: SPACING[5],
+    paddingBottom: SPACING[6],
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-    marginBottom: SPACING[4],
-    marginLeft: SPACING[1],
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: SPACING[3],
   },
   sectionContent: {
-    backgroundColor: COLORS.background,
-    borderRadius: RADIUS.xl,
-    ...SHADOWS.sm,
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     overflow: 'hidden',
   },
-  settingsItem: {
+  settingItem: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  settingItemLast: {
+    borderBottomWidth: 0,
+  },
+  settingItemContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: SPACING[4],
-    paddingHorizontal: SPACING[5],
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray[100],
+    padding: SPACING[4],
   },
-  disabledItem: {
-    opacity: 0.5,
-  },
-  destructiveItem: {
-    backgroundColor: COLORS.error + '05',
-  },
-  settingsItemContent: {
+  settingItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  settingsIcon: {
+  settingItemIcon: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: COLORS.gray[100],
+    backgroundColor: '#F8FAFC',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING[3],
   },
   destructiveIcon: {
-    backgroundColor: COLORS.error + '20',
+    backgroundColor: '#FEF2F2',
   },
-  disabledIcon: {
-    backgroundColor: COLORS.gray[50],
-  },
-  settingsText: {
-    flex: 1,
-  },
-  settingsTitle: {
+  settingItemTitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '500',
-    color: COLORS.text.primary,
-    marginBottom: SPACING[1],
+    color: '#1E293B',
+    marginBottom: 2,
   },
   destructiveText: {
-    color: COLORS.error,
+    color: '#EF4444',
   },
-  disabledText: {
-    color: COLORS.gray[400],
-  },
-  settingsDescription: {
+  settingItemSubtitle: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    color: '#64748B',
     lineHeight: 18,
   },
-  settingsAction: {
-    marginLeft: SPACING[3],
-  },
-  appInfo: {
+  versionSection: {
     alignItems: 'center',
-    paddingVertical: SPACING[8],
-    marginTop: SPACING[4],
+    paddingHorizontal: SPACING[5],
+    paddingTop: SPACING[4],
   },
-  appName: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: 'bold',
-    color: COLORS.primary[500],
-    marginBottom: SPACING[2],
-  },
-  appVersion: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.text.secondary,
-    marginBottom: SPACING[2],
-  },
-  appCopyright: {
+  versionText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.hint,
+    color: '#94A3B8',
+    fontWeight: '500',
+    marginBottom: SPACING[1],
+  },
+  versionSubtext: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#CBD5E1',
     textAlign: 'center',
   },
 });

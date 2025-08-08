@@ -6,7 +6,7 @@ import { checkAuthStatus } from '../store/slices/authSlice';
 // Navigators
 import AuthNavigator from './AuthNavigator';
 import CaregiverNavigator from './CaregiverNavigator';
-//import PatientNavigator from './PatientNavigator';
+import PatientNavigator from './PatientNavigator';
 import SplashScreen from '../screens/auth/SplashScreen';
 import { RootStackParamList } from '../types/navigation.types';
 import { APP_CONFIG } from '../constants/app';
@@ -48,7 +48,7 @@ const MainNavigator: React.FC = () => {
         ) : (
           <Stack.Screen 
             name="PatientStack" 
-            component={CaregiverNavigator} 
+            component={PatientNavigator} 
           />
         )
       ) : (

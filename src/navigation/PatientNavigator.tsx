@@ -1,4 +1,5 @@
-/*import React from 'react';
+// src/navigation/PatientNavigator.tsx
+import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,15 +8,17 @@ import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/patient/HomeScreen';
 import MedicationListScreen from '../screens/patient/MedicationListScreen';
 import BarcodeScannerScreen from '../screens/patient/BarcodeScannerScreen';
-import MealSettingsScreen from '../screens/patient/MealSettingsScreen';
 import ProfileScreen from '../screens/patient/ProfileScreen';
+
+// Stack Screens
+import MealSettingsScreen from '../screens/patient/MealSettingsScreen';
 import SOSScreen from '../screens/patient/SOSScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import SettingsScreen from '../screens/shared/SettingsScreen';
 
 // Types
 import { PatientTabParamList, PatientStackParamList } from '../types/navigation.types';
-import { COLORS, TYPOGRAPHY } from '../constants/themes/theme';
+import { TYPOGRAPHY } from '../constants/themes/theme';
 
 const Tab = createBottomTabNavigator<PatientTabParamList>();
 const Stack = createStackNavigator<PatientStackParamList>();
@@ -49,14 +52,28 @@ const ProfileStack: React.FC = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Profile" component={ProfileScreen} />
     <Stack.Screen name="Settings" component={SettingsScreen} />
+    <Stack.Screen name="Notifications" component={NotificationsScreen} />
+    <Stack.Screen name="SOS" component={SOSScreen} />
   </Stack.Navigator>
 );
 
 const PatientNavigator: React.FC = () => {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
+      screenOptions={({
+        route,
+      }: {
+        route: { name: keyof PatientTabParamList };
+      }) => ({
+        tabBarIcon: ({
+          focused,
+          color,
+          size,
+        }: {
+          focused: boolean;
+          color: string;
+          size: number;
+        }) => {
           let iconName: keyof typeof Ionicons.glyphMap;
 
           if (route.name === 'Home') {
@@ -71,19 +88,24 @@ const PatientNavigator: React.FC = () => {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: COLORS.primary[500],
-        tabBarInactiveTintColor: COLORS.gray[500],
+        tabBarActiveTintColor: '#2563EB',
+        tabBarInactiveTintColor: '#6B7280',
         tabBarLabelStyle: {
           fontSize: TYPOGRAPHY.fontSize.xs,
           fontWeight: TYPOGRAPHY.fontWeight.medium,
         },
         tabBarStyle: {
-          backgroundColor: COLORS.background,
+          backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
-          borderTopColor: COLORS.gray[200],
+          borderTopColor: '#E2E8F0',
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
+          shadowColor: '#64748B',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
+          elevation: 8,
         },
         headerShown: false,
       })}
@@ -113,4 +135,3 @@ const PatientNavigator: React.FC = () => {
 };
 
 export default PatientNavigator;
-*/

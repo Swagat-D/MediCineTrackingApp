@@ -1,102 +1,135 @@
 // src/screens/patient/HomeScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   RefreshControl,
   Platform,
+  Alert,
+  ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAppSelector } from '../../store';
+import { useAppSelector, useAppDispatch } from '../../store';
+import { 
+  fetchDashboardData, 
+  logMedicationTaken,
+  fetchNotifications,
+  setConnectionStatus,
+  updateDashboardData,
+  clearError
+} from '../../store/slices/patientSlice';
+import { patientRealtimeService } from '../../services/api/patientAPI';
+import { useFocusEffect } from '@react-navigation/native';
+
 
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientNavbar from '../../components/common/PatientNavbar';
-
-interface TodayMedication {
-  id: string;
-  name: string;
-  dosage: string;
-  times: string[];
-  taken: boolean[];
-  nextDoseTime: string;
-  instructions: string;
-  color: string;
-}
-
-interface UpcomingReminder {
-  id: string;
-  medicationName: string;
-  time: string;
-  dosage: string;
-  isUrgent: boolean;
-}
 
 interface Props {
   navigation: any; 
 }
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
+  const dispatch = useAppDispatch();
+  const { 
+    dashboardStats,
+    todaysMedications,
+    upcomingReminders,
+    isDashboardLoading,
+    dashboardError,
+    isConnected,
+    unreadNotificationCount
+  } = useAppSelector(state => state.patient);
   const { user } = useAppSelector(state => state.auth);
-  const [refreshing, setRefreshing] = useState(false);
   
-  const [todaysMedications] = useState<TodayMedication[]>([
-    {
-      id: '1',
-      name: 'Metformin',
-      dosage: '500mg',
-      times: ['08:00', '20:00'],
-      taken: [true, false],
-      nextDoseTime: '20:00',
-      instructions: 'Take with food',
-      color: '#3B82F6',
-    },
-    {
-      id: '2',
-      name: 'Lisinopril',
-      dosage: '10mg',
-      times: ['08:00'],
-      taken: [true],
-      nextDoseTime: 'Tomorrow 08:00',
-      instructions: 'Take on empty stomach',
-      color: '#059669',
-    },
-    {
-      id: '3',
-      name: 'Atorvastatin',
-      dosage: '20mg',
-      times: ['22:00'],
-      taken: [false],
-      nextDoseTime: '22:00',
-      instructions: 'Take before bed',
-      color: '#8B5CF6',
-    },
-  ]);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [upcomingReminders] = useState<UpcomingReminder[]>([
-    {
-      id: '1',
-      medicationName: 'Atorvastatin',
-      time: '22:00',
-      dosage: '20mg',
-      isUrgent: false,
-    },
-    {
-      id: '2',
-      medicationName: 'Metformin',
-      time: '08:00 Tomorrow',
-      dosage: '500mg',
-      isUrgent: false,
-    },
-  ]);
+  // Initialize data and real-time connection
+  useFocusEffect(
+    useCallback(() => {
+      const initializeData = async () => {
+        try {
+          // Fetch initial data
+          await dispatch(fetchDashboardData()).unwrap();
+          await dispatch(fetchNotifications({})).unwrap();
+          
+          // Setup real-time connection
+          if (user?.id) {
+            patientRealtimeService.connect(user.id, (data) => {
+              dispatch(updateDashboardData(data));
+            });
+            dispatch(setConnectionStatus(true));
+          }
+        } catch (error) {
+          console.error('Failed to initialize dashboard:', error);
+        }
+      };
 
+      initializeData();
+
+      // Cleanup on unmount
+      return () => {
+        patientRealtimeService.disconnect();
+        dispatch(setConnectionStatus(false));
+      };
+    }, [dispatch, user?.id])
+  );
+
+  // Handle refresh
   const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    try {
+      await dispatch(fetchDashboardData()).unwrap();
+      await dispatch(fetchNotifications({})).unwrap();
+    } catch (error) {
+      console.error('Failed to refresh data:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
+
+  // Handle medication dose taken
+  const handleDoseTaken = async (medicationId: string) => {
+    try {
+      await dispatch(logMedicationTaken({
+        medicationId,
+        data: {
+          takenAt: new Date().toISOString(),
+          notes: 'Taken via home screen'
+        }
+      })).unwrap();
+      
+      Alert.alert(
+        'Dose Recorded',
+        'Your medication dose has been logged successfully.',
+        [{ text: 'OK' }]
+      );
+    } catch (error: any) {
+      Alert.alert(
+        'Error',
+        error || 'Failed to log medication dose',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  // Show error if needed
+  useEffect(() => {
+    if (dashboardError) {
+      Alert.alert(
+        'Error',
+        dashboardError,
+        [
+          { text: 'Retry', onPress: () => dispatch(fetchDashboardData()) },
+          { text: 'OK', onPress: () => dispatch(clearError()) }
+        ]
+      );
+    }
+  }, [dashboardError, dispatch]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -105,23 +138,44 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     return 'Good Evening';
   };
 
+  // Calculate stats from real data
   const getTodayStats = () => {
-    const totalDoses = todaysMedications.reduce((total, med) => total + med.times.length, 0);
-    const takenDoses = todaysMedications.reduce((total, med) => 
-      total + med.taken.filter(Boolean).length, 0);
-    const adherenceRate = totalDoses > 0 ? Math.round((takenDoses / totalDoses) * 100) : 0;
+    if (!dashboardStats) {
+      return { totalDoses: 0, takenDoses: 0, adherenceRate: 0 };
+    }
     
-    return { totalDoses, takenDoses, adherenceRate };
+    return {
+      totalDoses: dashboardStats.totalMedications,
+      takenDoses: dashboardStats.activeMedications,
+      adherenceRate: dashboardStats.adherenceRate
+    };
   };
 
   const { totalDoses, takenDoses, adherenceRate } = getTodayStats();
+
+  // Loading state
+  if (isDashboardLoading && !dashboardStats) {
+    return (
+      <View style={styles.container}>
+        <PatientNavbar
+          onNotificationPress={() => navigation.navigate('Notifications')}
+          onSOSPress={() => navigation.navigate('SOS')}
+          notificationCount={unreadNotificationCount}
+        />
+        <View style={[styles.scrollView, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color="#2563EB" />
+          <Text style={{ marginTop: 16, color: '#64748B' }}>Loading your dashboard...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <PatientNavbar
         onNotificationPress={() => navigation.navigate('Notifications')}
         onSOSPress={() => navigation.navigate('SOS')}
-        notificationCount={2}
+        notificationCount={unreadNotificationCount}
       />
       
       <ScrollView
@@ -147,6 +201,16 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.greeting}>{getGreeting()},</Text>
               <Text style={styles.userName}>{user?.name || 'Patient'}</Text>
               <Text style={styles.subtitle}>How are you feeling today?</Text>
+              {/* Connection status */}
+              <View style={styles.connectionStatus}>
+                <View style={[
+                  styles.connectionDot, 
+                  { backgroundColor: isConnected ? '#059669' : '#EF4444' }
+                ]} />
+                <Text style={styles.connectionText}>
+                  {isConnected ? 'Connected' : 'Offline'}
+                </Text>
+              </View>
             </View>
             <View style={styles.greetingIcon}>
               <View style={styles.iconContainer}>
@@ -178,7 +242,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                 style={[
                   styles.progressFill, 
                   { 
-                    width: `${(takenDoses / totalDoses) * 100}%`,
+                    width: `${totalDoses > 0 ? (takenDoses / totalDoses) * 100 : 0}%`,
                     backgroundColor: adherenceRate >= 80 ? '#059669' : '#F59E0B'
                   }
                 ]} 
@@ -197,52 +261,67 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           
           <View style={styles.medicationsList}>
-            {todaysMedications.map((medication) => (
-              <TouchableOpacity
-                key={medication.id}
-                style={styles.medicationCard}
-                onPress={() => navigation.navigate('MedicationList')}
-                activeOpacity={0.7}
-              >
-                <View style={styles.medicationHeader}>
-                  <View style={[styles.medicationIcon, { backgroundColor: medication.color + '20' }]}>
-                    <Ionicons name="medical" size={20} color={medication.color} />
-                  </View>
-                  <View style={styles.medicationInfo}>
-                    <Text style={styles.medicationName}>{medication.name}</Text>
-                    <Text style={styles.medicationDosage}>{medication.dosage}</Text>
-                  </View>
-                  <View style={styles.medicationStatus}>
-                    <Text style={styles.nextDoseText}>Next: {medication.nextDoseTime}</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.doseTimes}>
-                  {medication.times.map((time, index) => (
-                    <View key={index} style={styles.doseTime}>
-                      <View style={[
-                        styles.doseIndicator,
-                        { backgroundColor: medication.taken[index] ? '#059669' : '#E2E8F0' }
-                      ]}>
-                        <Ionicons 
-                          name={medication.taken[index] ? "checkmark" : "time-outline"} 
-                          size={12} 
-                          color={medication.taken[index] ? "#FFFFFF" : "#6B7280"} 
-                        />
-                      </View>
-                      <Text style={[
-                        styles.doseTimeText,
-                        { color: medication.taken[index] ? '#059669' : '#6B7280' }
-                      ]}>
-                        {time}
-                      </Text>
+            {todaysMedications && todaysMedications.length > 0 ? (
+              todaysMedications.map((medication) => (
+                <TouchableOpacity
+                  key={medication.id}
+                  style={styles.medicationCard}
+                  onPress={() => navigation.navigate('MedicationList')}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.medicationHeader}>
+                    <View style={[styles.medicationIcon, { backgroundColor: medication.color + '20' }]}>
+                      <Ionicons name="medical" size={20} color={medication.color} />
                     </View>
-                  ))}
-                </View>
-                
-                <Text style={styles.medicationInstructions}>{medication.instructions}</Text>
-              </TouchableOpacity>
-            ))}
+                    <View style={styles.medicationInfo}>
+                      <Text style={styles.medicationName}>{medication.name}</Text>
+                      <Text style={styles.medicationDosage}>{medication.dosage}</Text>
+                    </View>
+                    <View style={styles.medicationStatus}>
+                      <Text style={styles.nextDoseText}>Next: {medication.nextDoseTime}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.doseTimes}>
+                    {medication.times.map((time, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.doseTime}
+                        onPress={() => !medication.taken[index] && handleDoseTaken(medication.id)}
+                        disabled={medication.taken[index]}
+                      >
+                        <View style={[
+                          styles.doseIndicator,
+                          { backgroundColor: medication.taken[index] ? '#059669' : '#E2E8F0' }
+                        ]}>
+                          <Ionicons 
+                            name={medication.taken[index] ? "checkmark" : "time-outline"} 
+                            size={12} 
+                            color={medication.taken[index] ? "#FFFFFF" : "#6B7280"} 
+                          />
+                        </View>
+                        <Text style={[
+                          styles.doseTimeText,
+                          { color: medication.taken[index] ? '#059669' : '#6B7280' }
+                        ]}>
+                          {time}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  
+                  <Text style={styles.medicationInstructions}>{medication.instructions}</Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.emptyMedicationsCard}>
+                <Ionicons name="medical-outline" size={48} color="#D1D5DB" />
+                <Text style={styles.emptyMedicationsTitle}>No medications for today</Text>
+                <Text style={styles.emptyMedicationsText}>
+                  Your daily medications will appear here once your caregiver adds them
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -292,22 +371,29 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           
           <View style={styles.remindersList}>
-            {upcomingReminders.map((reminder) => (
-              <View key={reminder.id} style={styles.reminderCard}>
-                <View style={styles.reminderIcon}>
-                  <Ionicons name="alarm" size={18} color="#2563EB" />
-                </View>
-                <View style={styles.reminderContent}>
-                  <Text style={styles.reminderMedication}>{reminder.medicationName}</Text>
-                  <Text style={styles.reminderDetails}>{reminder.dosage} at {reminder.time}</Text>
-                </View>
-                {reminder.isUrgent && (
-                  <View style={styles.urgentBadge}>
-                    <Ionicons name="warning" size={14} color="#F59E0B" />
+            {upcomingReminders && upcomingReminders.length > 0 ? (
+              upcomingReminders.map((reminder) => (
+                <View key={reminder.id} style={styles.reminderCard}>
+                  <View style={styles.reminderIcon}>
+                    <Ionicons name="alarm" size={18} color="#2563EB" />
                   </View>
-                )}
+                  <View style={styles.reminderContent}>
+                    <Text style={styles.reminderMedication}>{reminder.medicationName}</Text>
+                    <Text style={styles.reminderDetails}>{reminder.dosage} at {reminder.time}</Text>
+                  </View>
+                  {reminder.isUrgent && (
+                    <View style={styles.urgentBadge}>
+                      <Ionicons name="warning" size={14} color="#F59E0B" />
+                    </View>
+                  )}
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyRemindersCard}>
+                <Ionicons name="alarm-outline" size={32} color="#D1D5DB" />
+                <Text style={styles.emptyRemindersText}>No upcoming reminders</Text>
               </View>
-            ))}
+            )}
           </View>
         </View>
 
@@ -370,6 +456,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+  },
+  // Added missing styles for connection status
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING[2],
+    marginBottom: SPACING[1],
+    gap: SPACING[2],
+  },
+  connectionDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: SPACING[1],
+  },
+  connectionText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#64748B',
+    fontWeight: '500',
   },
   greeting: {
     fontSize: TYPOGRAPHY.fontSize.lg,
@@ -666,6 +771,46 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: '#A16207',
     lineHeight: 20,
+  },
+  emptyMedicationsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    padding: SPACING[6],
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: SPACING[3],
+  },
+  emptyMedicationsTitle: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: SPACING[3],
+    marginBottom: SPACING[1],
+    textAlign: 'center',
+  },
+  emptyMedicationsText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginBottom: SPACING[1],
+  },
+  emptyRemindersCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    padding: SPACING[6],
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: SPACING[3],
+  },
+  emptyRemindersText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: SPACING[2],
   },
 });
 

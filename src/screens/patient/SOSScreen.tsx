@@ -1,24 +1,27 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+// src/screens/patient/SOSScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   Alert,
   Platform,
   Vibration,
   Animated,
-  Dimensions,
+  ActivityIndicator,
+  Linking,
+  StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StackScreenProps } from '@react-navigation/stack';
 import { PatientStackParamList } from '../../types/navigation.types';
-import { useAppSelector } from '../../store';
+import { useAppSelector, useAppDispatch } from '../../store';
+import { sendSOSAlert, clearError } from '../../store/slices/patientSlice';
+import { patientAPI } from '../../services/api/patientAPI';
+import * as Location from 'expo-location';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
-
-const { width } = Dimensions.get('window');
 
 type Props = StackScreenProps<PatientStackParamList, 'SOS'>;
 
@@ -31,36 +34,102 @@ interface EmergencyContact {
 }
 
 const SOSScreen: React.FC<Props> = ({ navigation }) => {
+  const dispatch = useAppDispatch();
   const { user } = useAppSelector(state => state.auth);
+  const { isLoading, error, isConnected } = useAppSelector(state => state.patient);
+  
   const [isEmergencyActive, setIsEmergencyActive] = useState(false);
   const [countdown, setCountdown] = useState(5);
   const [pulseAnim] = useState(new Animated.Value(1));
-  const [emergencyContacts] = useState<EmergencyContact[]>([
-    {
-      id: '1',
-      name: 'Dr. Sarah Johnson',
-      relationship: 'Primary Caregiver',
-      phone: '+1-555-0123',
-      isPrimary: true,
-    },
-    {
-      id: '2',
-      name: 'Emergency Services',
-      relationship: 'Emergency',
-      phone: '911',
-      isPrimary: false,
-    },
-    {
-      id: '3',
-      name: 'John Smith',
-      relationship: 'Emergency Contact',
-      phone: '+1-555-0456',
-      isPrimary: false,
-    },
-  ]);
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
+  const [currentLocation, setCurrentLocation] = useState<{
+    latitude: number;
+    longitude: number;
+    address?: string;
+  } | null>(null);
 
+  // Load emergency contacts
   useEffect(() => {
-    // Pulse animation for the SOS button
+    const loadEmergencyContacts = async () => {
+      try {
+        const contacts = await patientAPI.getEmergencyContacts();
+        setEmergencyContacts(contacts);
+      } catch (error) {
+        console.error('Failed to load emergency contacts:', error);
+        // Use default contacts
+        setEmergencyContacts([
+          {
+            id: '1',
+            name: 'Dr. Sarah Johnson',
+            relationship: 'Primary Caregiver',
+            phone: '+1-555-0123',
+            isPrimary: true,
+          },
+          {
+            id: '2',
+            name: 'Emergency Services',
+            relationship: 'Emergency',
+            phone: '911',
+            isPrimary: false,
+          },
+          {
+            id: '3',
+            name: 'John Smith',
+            relationship: 'Emergency Contact',
+            phone: '+1-555-0456',
+            isPrimary: false,
+          },
+        ]);
+      }
+    };
+
+    loadEmergencyContacts();
+  }, []);
+
+  // Get current location
+  useEffect(() => {
+    const getCurrentLocation = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({});
+          const address = await Location.reverseGeocodeAsync({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
+          
+          setCurrentLocation({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            address: address[0] ? 
+              `${address[0].street}, ${address[0].city}, ${address[0].region}` : 
+              undefined
+          });
+        }
+      } catch (error) {
+        console.error('Failed to get location:', error);
+      }
+    };
+
+    getCurrentLocation();
+  }, []);
+
+  // Handle errors
+  useEffect(() => {
+    if (error) {
+      Alert.alert(
+        'SOS Error',
+        error,
+        [
+          { text: 'Retry', onPress: () => dispatch(clearError()) },
+          { text: 'OK', onPress: () => dispatch(clearError()) }
+        ]
+      );
+    }
+  }, [error, dispatch]);
+
+  // Pulse animation
+  useEffect(() => {
     const pulseAnimation = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -80,6 +149,7 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
     return () => pulseAnimation.stop();
   }, [pulseAnim]);
 
+  // Countdown timer
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isEmergencyActive && countdown > 0) {
@@ -95,10 +165,11 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEmergencyActive, countdown]);
 
+  // Handle SOS button press
   const handleSOSPress = () => {
     Alert.alert(
       'Emergency Alert',
-      'This will send an emergency alert to your caregivers and emergency contacts. Are you sure?',
+      `This will send an emergency alert to your caregivers and emergency contacts.${!isConnected ? '\n\nNote: You are currently offline. The alert will be sent when connection is restored.' : ''}\n\nAre you sure?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -114,27 +185,51 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const sendEmergencyAlert = () => {
-    // Simulate sending emergency alert
-    setIsEmergencyActive(false);
-    Alert.alert(
-      'Emergency Alert Sent',
-      'Your emergency alert has been sent to all your caregivers and emergency contacts. Help is on the way.',
-      [
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
-      ]
-    );
+  // Send emergency alert
+  const sendEmergencyAlert = async () => {
+    try {
+      setIsEmergencyActive(false);
+      
+      const alertData = {
+        message: `Emergency alert from ${user?.name || 'Patient'}. Immediate assistance required.`,
+        location: currentLocation || undefined,
+        severity: 'critical' as const
+      };
+
+      const result = await dispatch(sendSOSAlert(alertData)).unwrap();
+      
+      Alert.alert(
+        'Emergency Alert Sent',
+        `Your emergency alert has been sent to all your caregivers and emergency contacts.${currentLocation ? '\n\nYour location has been shared.' : '\n\nLocation sharing was unavailable.'}\n\nHelp is on the way.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+    } catch (error: any) {
+      setIsEmergencyActive(false);
+      Alert.alert(
+        'Alert Failed',
+        error || 'Failed to send emergency alert. Please try calling emergency services directly.',
+        [
+          { text: 'Retry', onPress: () => setIsEmergencyActive(true) },
+          { text: 'Call 911', onPress: () => callContact({ phone: '911' } as EmergencyContact) },
+          { text: 'Cancel' }
+        ]
+      );
+    }
   };
 
+  // Cancel emergency
   const cancelEmergency = () => {
     setIsEmergencyActive(false);
     setCountdown(5);
     Alert.alert('Emergency Alert Cancelled', 'The emergency alert has been cancelled.');
   };
 
+  // Call contact
   const callContact = (contact: EmergencyContact) => {
     Alert.alert(
       `Call ${contact.name}`,
@@ -144,14 +239,51 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
         {
           text: 'Call',
           onPress: () => {
-            // In a real app, you would use Linking.openURL(`tel:${contact.phone}`)
-            Alert.alert('Calling...', `Calling ${contact.name} at ${contact.phone}`);
+            try {
+              Linking.openURL(`tel:${contact.phone}`);
+            } catch (error) {
+              console.error(error)
+              Alert.alert('Call Failed', `Failed to initiate call to ${contact.phone}`);
+            }
           },
         },
       ]
     );
   };
 
+  // Connection status warning
+  const ConnectionWarning = () => (
+    !isConnected && (
+      <View style={styles.connectionWarning}>
+        <Ionicons name="wifi-outline" size={20} color="#F59E0B" />
+        <Text style={styles.warningText}>
+          You are offline. Emergency alerts will be sent when connection is restored.
+        </Text>
+      </View>
+    )
+  );
+
+  // Location status
+  const LocationStatus = () => (
+    <View style={styles.locationStatus}>
+      <Ionicons 
+        name={currentLocation ? "location" : "location-outline"} 
+        size={16} 
+        color={currentLocation ? "#059669" : "#6B7280"} 
+      />
+      <Text style={[
+        styles.locationText,
+        { color: currentLocation ? "#059669" : "#6B7280" }
+      ]}>
+        {currentLocation ? 
+          (currentLocation.address || "Location available") : 
+          "Location unavailable"
+        }
+      </Text>
+    </View>
+  );
+
+  // Emergency contact card component
   const EmergencyContactCard = ({ contact }: { contact: EmergencyContact }) => (
     <TouchableOpacity
       style={[styles.contactCard, contact.isPrimary && styles.primaryContactCard]}
@@ -180,7 +312,10 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.contactPhone}>{contact.phone}</Text>
         </View>
       </View>
-      <View style={styles.callButton}>
+      <View style={[
+        styles.callButton,
+        { opacity: isConnected ? 1 : 0.6 }
+      ]}>
         <Ionicons name="call" size={18} color="#FFFFFF" />
       </View>
     </TouchableOpacity>
@@ -194,6 +329,9 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
       />
 
       <View style={styles.content}>
+        {/* Connection warning */}
+        <ConnectionWarning />
+        
         {!isEmergencyActive ? (
           <>
             {/* Header */}
@@ -205,23 +343,37 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.headerSubtitle}>
                 Get immediate help when you need it most
               </Text>
+              <LocationStatus />
             </View>
 
             {/* SOS Button */}
             <View style={styles.sosSection}>
               <Animated.View style={[styles.sosButtonContainer, { transform: [{ scale: pulseAnim }] }]}>
                 <TouchableOpacity
-                  style={styles.sosButton}
+                  style={[
+                    styles.sosButton,
+                    { opacity: isLoading ? 0.6 : 1 }
+                  ]}
                   onPress={handleSOSPress}
                   activeOpacity={0.8}
+                  disabled={isLoading}
                 >
-                  <Ionicons name="alert-circle" size={48} color="#FFFFFF" />
-                  <Text style={styles.sosButtonText}>EMERGENCY</Text>
-                  <Text style={styles.sosButtonSubtext}>Tap for help</Text>
+                  {isLoading ? (
+                    <ActivityIndicator size={48} color="#FFFFFF" />
+                  ) : (
+                    <Ionicons name="alert-circle" size={48} color="#FFFFFF" />
+                  )}
+                  <Text style={styles.sosButtonText}>
+                    {isLoading ? 'SENDING...' : 'EMERGENCY'}
+                  </Text>
+                  <Text style={styles.sosButtonSubtext}>
+                    {isLoading ? 'Please wait' : 'Tap for help'}
+                  </Text>
                 </TouchableOpacity>
               </Animated.View>
               <Text style={styles.sosDescription}>
                 This will immediately alert your caregivers and emergency contacts
+                {currentLocation && '\nYour location will be shared automatically'}
               </Text>
             </View>
 
@@ -229,13 +381,9 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.contactsSection}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Emergency Contacts</Text>
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => Alert.alert('Edit Contacts', 'This feature will allow you to manage emergency contacts')}
-                >
-                  <Ionicons name="pencil" size={16} color="#2563EB" />
-                  <Text style={styles.editButtonText}>Edit</Text>
-                </TouchableOpacity>
+                <Text style={styles.contactCount}>
+                  {emergencyContacts.length} contacts
+                </Text>
               </View>
 
               <View style={styles.contactsList}>
@@ -284,24 +432,33 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
 
             <View style={styles.emergencyActions}>
               <TouchableOpacity
-                style={styles.cancelButton}
+                style={[styles.cancelButton, { opacity: isLoading ? 0.6 : 1 }]}
                 onPress={cancelEmergency}
+                disabled={isLoading}
               >
                 <Ionicons name="close" size={20} color="#FFFFFF" />
                 <Text style={styles.cancelButtonText}>Cancel Alert</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={styles.sendNowButton}
+                style={[styles.sendNowButton, { opacity: isLoading ? 0.6 : 1 }]}
                 onPress={sendEmergencyAlert}
+                disabled={isLoading}
               >
-                <Ionicons name="send" size={20} color="#FFFFFF" />
-                <Text style={styles.sendNowButtonText}>Send Now</Text>
+                {isLoading ? (
+                  <ActivityIndicator size={20} color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="send" size={20} color="#FFFFFF" />
+                )}
+                <Text style={styles.sendNowButtonText}>
+                  {isLoading ? 'Sending...' : 'Send Now'}
+                </Text>
               </TouchableOpacity>
             </View>
 
             <Text style={styles.emergencyNote}>
               Your location and medical information will be shared with emergency contacts
+              {!isConnected && '\n\nAlert will be sent when connection is restored'}
             </Text>
           </View>
         )}
@@ -309,6 +466,7 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
@@ -320,6 +478,33 @@ const styles = StyleSheet.create({
     marginTop: Platform.OS === 'ios' ? 114 : 70,
     paddingHorizontal: SPACING[5],
     paddingTop: SPACING[6],
+  },
+  connectionWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    padding: SPACING[3],
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING[4],
+    gap: SPACING[2],
+  },
+  warningText: {
+    color: '#F59E0B',
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    marginLeft: SPACING[2],
+    flex: 1,
+    fontWeight: '500',
+  },
+  locationStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING[3],
+    gap: SPACING[2],
+  },
+  locationText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    marginLeft: SPACING[2],
+    fontWeight: '500',
   },
   header: {
     alignItems: 'center',
@@ -405,6 +590,11 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: '600',
     color: '#1E293B',
+  },
+  contactCount: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+    fontWeight: '500',
   },
   editButton: {
     flexDirection: 'row',

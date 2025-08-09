@@ -1,97 +1,199 @@
 // src/screens/patient/MedicationListScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   RefreshControl,
   TextInput,
   Platform,
-  Dimensions,
+  Alert,
+  ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { PatientTabParamList } from '../../types/navigation.types';
+import { useAppSelector, useAppDispatch } from '../../store';
+import { 
+  fetchMedications, 
+  fetchMedicationDetails,
+  logMedicationTaken,
+  clearError
+} from '../../store/slices/patientSlice';
+import { useFocusEffect } from '@react-navigation/native';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const { width } = Dimensions.get('window');
-
 type Props = BottomTabScreenProps<PatientTabParamList, 'Medications'>;
 
-interface Medication {
-  id: string;
-  name: string;
-  dosage: string;
-  frequency: string;
-  times: string[];
-  instructions: string;
-  remainingDoses: number;
-  totalDoses: number;
-  expiryDate: string;
-  color: string;
-  lastTaken?: string;
-  nextDose: string;
-  adherenceRate: number;
-  barcodeData: string;
-}
-
 const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
+  const dispatch = useAppDispatch();
+  const { 
+    medications,
+    isMedicationsLoading,
+    medicationsError,
+    isConnected
+  } = useAppSelector(state => state.patient);
+  
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'due' | 'low'>('all');
-  
-  const [medications] = useState<Medication[]>([]);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'paused' | 'completed' | 'due' | 'low'>('all');
 
+  // Initialize data
+  useFocusEffect(
+    useCallback(() => {
+      const loadMedications = async () => {
+        try {
+          await dispatch(fetchMedications()).unwrap();
+        } catch (error) {
+          console.error('Failed to load medications:', error);
+        }
+      };
+
+      loadMedications();
+    }, [dispatch])
+  );
+
+  // Handle refresh
   const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    try {
+      await dispatch(fetchMedications({
+        search: searchQuery || undefined,
+        status: ['all', 'active', 'paused', 'completed'].includes(filterStatus)
+          ? (filterStatus === 'all' ? undefined : filterStatus as 'active' | 'paused' | 'completed')
+          : undefined,
+      })).unwrap();
+    } catch (error) {
+      console.error('Failed to refresh medications:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
-  const getStatusColor = (medication: Medication) => {
-    if (medication.remainingDoses <= 3) return '#EF4444';
-    if (medication.adherenceRate < 80) return '#F59E0B';
-    return '#059669';
+  // Handle search and filter changes
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      dispatch(fetchMedications({
+        search: searchQuery || undefined,
+        status: ['all', 'active', 'paused', 'completed'].includes(filterStatus)
+          ? (filterStatus === 'all' ? undefined : filterStatus as 'active' | 'paused' | 'completed')
+          : undefined,
+      }));
+    }, 300);
+
+    return () => clearTimeout(delayedSearch);
+  }, [searchQuery, filterStatus, dispatch]);
+
+  // Handle medication action
+  const handleMedicationAction = async (action: string, medicationId: string) => {
+    try {
+      switch (action) {
+        case 'take_now':
+          await dispatch(logMedicationTaken({
+            medicationId,
+            data: {
+              takenAt: new Date().toISOString(),
+              notes: 'Taken from medication list'
+            }
+          })).unwrap();
+          
+          Alert.alert(
+            'Dose Recorded',
+            'Your medication dose has been logged successfully.',
+            [{ text: 'OK' }]
+          );
+          break;
+          
+        case 'details':
+          try {
+            await dispatch(fetchMedicationDetails(medicationId)).unwrap();
+            Alert.alert('Medication Details', 'Details would be shown here');
+          } catch (error) {
+            console.error(error)
+            Alert.alert('Error', 'Failed to load medication details');
+          }
+          break;
+          
+        case 'reminders':
+          Alert.alert('Reminders', 'Reminder settings would be shown here');
+          break;
+          
+        default:
+          break;
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Error',
+        error || 'Failed to perform action',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
-  const getStatusText = (medication: Medication) => {
-    if (medication.remainingDoses <= 3) return 'Running Low';
-    if (medication.adherenceRate < 80) return 'Poor Adherence';
-    return 'On Track';
-  };
+  // Show error if needed
+  useEffect(() => {
+    if (medicationsError) {
+      Alert.alert(
+        'Error',
+        medicationsError,
+        [
+          { text: 'Retry', onPress: () => dispatch(fetchMedications()) },
+          { text: 'OK', onPress: () => dispatch(clearError()) }
+        ]
+      );
+    }
+  }, [medicationsError, dispatch]);
 
+  // Filter medications based on search and filter
   const filteredMedications = medications.filter(medication => {
     const matchesSearch = medication.name.toLowerCase().includes(searchQuery.toLowerCase());
     let matchesFilter = true;
     
     switch (filterStatus) {
       case 'active':
-        matchesFilter = medication.remainingDoses > 0;
+        matchesFilter = medication.status === 'active';
         break;
       case 'due':
-        matchesFilter = medication.nextDose.includes('Today');
+        matchesFilter = medication.nextDose.includes('Today') || medication.nextDose.includes('Now');
         break;
       case 'low':
-        matchesFilter = medication.remainingDoses <= 5;
+        matchesFilter = medication.remainingQuantity <= 5;
         break;
     }
     
     return matchesSearch && matchesFilter;
   });
 
-  const FilterChip = ({ 
-    filterKey, 
-    label, 
-    isActive 
-  }: { 
-    filterKey: 'all' | 'active' | 'due' | 'low'; 
-    label: string; 
-    isActive: boolean; 
-  }) => (
+  // Get status color and text
+  const getStatusColor = (medication: any) => {
+    if (medication.remainingQuantity <= 3) return '#EF4444';
+    if (medication.adherenceRate < 80) return '#F59E0B';
+    return '#059669';
+  };
+
+  const getStatusText = (medication: any) => {
+    if (medication.remainingQuantity <= 3) return 'Running Low';
+    if (medication.adherenceRate < 80) return 'Poor Adherence';
+    return 'On Track';
+  };
+
+  // Calculate summary stats
+  const summaryStats = {
+    total: medications.length,
+    dueToday: medications.filter(med => med.nextDose.includes('Today') || med.nextDose.includes('Now')).length,
+    lowStock: medications.filter(med => med.remainingQuantity <= 5).length,
+  };
+
+  // FilterChip component
+  const FilterChip: React.FC<{
+    filterKey: 'all' | 'active' | 'due' | 'low';
+    label: string;
+    isActive: boolean;
+  }> = ({ filterKey, label, isActive }) => (
     <TouchableOpacity
       style={[styles.filterChip, isActive && styles.filterChipActive]}
       onPress={() => setFilterStatus(filterKey)}
@@ -103,18 +205,19 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
     </TouchableOpacity>
   );
 
-  const MedicationCard = ({ medication }: { medication: Medication }) => (
+  const MedicationCard = ({ medication }: { medication: any }) => (
     <TouchableOpacity
       style={styles.medicationCard}
       activeOpacity={0.7}
+      onPress={() => handleMedicationAction('details', medication.id)}
     >
       <View style={styles.medicationHeader}>
-        <View style={[styles.medicationIcon, { backgroundColor: medication.color + '20' }]}>
-          <Ionicons name="medical" size={24} color={medication.color} />
+        <View style={[styles.medicationIcon, { backgroundColor: getStatusColor(medication) + '20' }]}>
+          <Ionicons name="medical" size={24} color={getStatusColor(medication)} />
         </View>
         <View style={styles.medicationInfo}>
           <Text style={styles.medicationName}>{medication.name}</Text>
-          <Text style={styles.medicationDosage}>{medication.dosage} • {medication.frequency}</Text>
+          <Text style={styles.medicationDosage}>{medication.dosage}{medication.dosageUnit} • {medication.frequency}x daily</Text>
         </View>
         <View style={styles.statusBadge}>
           <View style={[styles.statusDot, { backgroundColor: getStatusColor(medication) }]} />
@@ -139,11 +242,11 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.detailRow}>
           <View style={styles.detailItem}>
             <Ionicons name="medkit-outline" size={16} color="#64748B" />
-            <Text style={styles.detailText}>{medication.remainingDoses} doses left</Text>
+            <Text style={styles.detailText}>{medication.remainingQuantity} doses left</Text>
           </View>
           <View style={styles.detailItem}>
             <Ionicons name="calendar-outline" size={16} color="#64748B" />
-            <Text style={styles.detailText}>Expires {medication.expiryDate}</Text>
+            <Text style={styles.detailText}>Expires {new Date(medication.expiryDate).toLocaleDateString()}</Text>
           </View>
         </View>
       </View>
@@ -152,7 +255,7 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.progressInfo}>
           <Text style={styles.progressLabel}>Doses Remaining</Text>
           <Text style={styles.progressValue}>
-            {medication.remainingDoses}/{medication.totalDoses}
+            {medication.remainingQuantity}/{medication.totalQuantity}
           </Text>
         </View>
         <View style={styles.progressBarContainer}>
@@ -161,7 +264,7 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
               style={[
                 styles.progressBarFill, 
                 { 
-                  width: `${(medication.remainingDoses / medication.totalDoses) * 100}%`,
+                  width: `${(medication.remainingQuantity / medication.totalQuantity) * 100}%`,
                   backgroundColor: getStatusColor(medication)
                 }
               ]} 
@@ -170,20 +273,69 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </View>
 
-      <Text style={styles.medicationInstructions}>{medication.instructions}</Text>
+      {medication.instructions && (
+        <Text style={styles.medicationInstructions}>{medication.instructions}</Text>
+      )}
 
       <View style={styles.medicationActions}>
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => handleMedicationAction('details', medication.id)}
+        >
           <Ionicons name="information-circle-outline" size={16} color="#2563EB" />
           <Text style={styles.actionButtonText}>Details</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
+        
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => handleMedicationAction('reminders', medication.id)}
+        >
           <Ionicons name="notifications-outline" size={16} color="#2563EB" />
           <Text style={styles.actionButtonText}>Reminders</Text>
         </TouchableOpacity>
+        
+        {medication.status === 'active' && (
+          <TouchableOpacity 
+            style={[styles.actionButton, { backgroundColor: '#059669' }]}
+            onPress={() => handleMedicationAction('take_now', medication.id)}
+          >
+            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+            <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>Take Now</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </TouchableOpacity>
   );
+
+  const ConnectionIndicator = () => (
+    <View style={styles.connectionIndicator}>
+      <View style={[
+        styles.connectionDot, 
+        { backgroundColor: isConnected ? '#059669' : '#EF4444' }
+      ]} />
+      <Text style={styles.connectionText}>
+        {isConnected ? 'Synced' : 'Offline'}
+      </Text>
+    </View>
+  );
+
+  // Loading state
+  if (isMedicationsLoading && medications.length === 0) {
+    return (
+      <View style={styles.container}>
+        <PatientSecondaryNavbar
+          title="My Medications"
+          subtitle="Loading medications..."
+          onBackPress={() => navigation.goBack()}
+          onSOSPress={() => navigation.navigate('SOS')}
+        />
+        <View style={[styles.scrollView, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color="#2563EB" />
+          <Text style={{ marginTop: 16, color: '#64748B' }}>Loading your medications...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -220,6 +372,7 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.headerSubtitle}>
               Track and manage your daily medications
             </Text>
+            <ConnectionIndicator />
           </View>
         </LinearGradient>
 
@@ -269,20 +422,20 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.summarySection}>
           <View style={styles.summaryGrid}>
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>{medications.length}</Text>
+              <Text style={styles.summaryNumber}>{summaryStats.total}</Text>
               <Text style={styles.summaryLabel}>Total Meds</Text>
               <View style={[styles.summaryIndicator, { backgroundColor: '#2563EB' }]} />
             </View>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryNumber, { color: '#F59E0B' }]}>
-                {medications.filter(m => m.nextDose.includes('Today')).length}
+                {summaryStats.dueToday}
               </Text>
               <Text style={styles.summaryLabel}>Due Today</Text>
               <View style={[styles.summaryIndicator, { backgroundColor: '#F59E0B' }]} />
             </View>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryNumber, { color: '#EF4444' }]}>
-                {medications.filter(m => m.remainingDoses <= 5).length}
+                {summaryStats.lowStock}
               </Text>
               <Text style={styles.summaryLabel}>Low Stock</Text>
               <View style={[styles.summaryIndicator, { backgroundColor: '#EF4444' }]} />
@@ -325,7 +478,6 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -346,6 +498,23 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     alignItems: 'center',
+  },
+  connectionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING[3],
+    gap: SPACING[2],
+  },
+  connectionDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: SPACING[2],
+  },
+  connectionText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '500',
+    color: '#64748B',
   },
   headerIcon: {
     width: 64,

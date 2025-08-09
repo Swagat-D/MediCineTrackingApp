@@ -1,18 +1,27 @@
 // src/screens/patient/MealSettingsScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   Alert,
   Platform,
+  ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StackScreenProps } from '@react-navigation/stack';
 import { PatientStackParamList } from '../../types/navigation.types';
+import { useAppSelector, useAppDispatch } from '../../store';
+import { 
+  fetchMealTimes, 
+  updateMealTimes,
+  clearError
+} from '../../store/slices/patientSlice';
+import { useFocusEffect } from '@react-navigation/native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import Button from '../../components/common/Button/Button';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
@@ -29,55 +38,131 @@ interface MealTime {
 }
 
 const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
-  const [mealTimes, setMealTimes] = useState<MealTime[]>([
-    {
-      id: 'breakfast',
-      name: 'Breakfast',
-      time: '08:00',
-      icon: 'sunny',
-      description: 'Morning meal time',
-      enabled: true,
-    },
-    {
-      id: 'lunch',
-      name: 'Lunch',
-      time: '12:30',
-      icon: 'partly-sunny',
-      description: 'Afternoon meal time',
-      enabled: true,
-    },
-    {
-      id: 'dinner',
-      name: 'Dinner',
-      time: '19:00',
-      icon: 'moon',
-      description: 'Evening meal time',
-      enabled: true,
-    },
-    {
-      id: 'snack',
-      name: 'Snack',
-      time: '15:30',
-      icon: 'cafe',
-      description: 'Optional snack time',
-      enabled: false,
-    },
-  ]);
-
+  const dispatch = useAppDispatch();
+  const { 
+    mealTimes: storedMealTimes,
+    isLoading,
+    error,
+    isConnected
+  } = useAppSelector(state => state.patient);
+  
+  const [mealTimes, setMealTimes] = useState<MealTime[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState<{
+    visible: boolean;
+    mealId: string;
+    currentTime: Date;
+  }>({ visible: false, mealId: '', currentTime: new Date() });
 
-  const showTimePicker = (mealId: string, currentTime: string) => {
-    // In a real app, you would use a proper time picker
-    Alert.alert(
-      'Set Time',
-      `Current time: ${currentTime}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Change Time', onPress: () => updateMealTime(mealId, '10:00') },
-      ]
-    );
+  // Initialize data
+  useFocusEffect(
+    useCallback(() => {
+      const loadMealTimes = async () => {
+        try {
+          await dispatch(fetchMealTimes()).unwrap();
+        } catch (error) {
+          console.error('Failed to load meal times:', error);
+        }
+      };
+
+      loadMealTimes();
+    }, [dispatch])
+  );
+
+  // Update local state when Redux state changes
+  useEffect(() => {
+    if (storedMealTimes && storedMealTimes.length > 0) {
+      // Map storedMealTimes to ensure icon and description are present
+      const defaultMealMeta: { [key: string]: { icon: keyof typeof Ionicons.glyphMap, description: string } } = {
+        breakfast: { icon: 'sunny', description: 'Morning meal time' },
+        lunch: { icon: 'partly-sunny', description: 'Afternoon meal time' },
+        dinner: { icon: 'moon', description: 'Evening meal time' },
+        snack: { icon: 'cafe', description: 'Optional snack time' },
+      };
+      setMealTimes(
+        storedMealTimes.map(meal => ({
+          ...meal,
+          icon: defaultMealMeta[meal.id]?.icon ?? 'restaurant',
+          description: defaultMealMeta[meal.id]?.description ?? '',
+        }))
+      );
+    } else {
+      // Set default meal times if none exist
+      setMealTimes([
+        {
+          id: 'breakfast',
+          name: 'Breakfast',
+          time: '08:00',
+          icon: 'sunny',
+          description: 'Morning meal time',
+          enabled: true,
+        },
+        {
+          id: 'lunch',
+          name: 'Lunch',
+          time: '12:30',
+          icon: 'partly-sunny',
+          description: 'Afternoon meal time',
+          enabled: true,
+        },
+        {
+          id: 'dinner',
+          name: 'Dinner',
+          time: '19:00',
+          icon: 'moon',
+          description: 'Evening meal time',
+          enabled: true,
+        },
+        {
+          id: 'snack',
+          name: 'Snack',
+          time: '15:30',
+          icon: 'cafe',
+          description: 'Optional snack time',
+          enabled: false,
+        },
+      ]);
+    }
+  }, [storedMealTimes]);
+
+  // Handle errors
+  useEffect(() => {
+    if (error) {
+      Alert.alert(
+        'Error',
+        error,
+        [
+          { text: 'Retry', onPress: () => dispatch(fetchMealTimes()) },
+          { text: 'OK', onPress: () => dispatch(clearError()) }
+        ]
+      );
+    }
+  }, [error, dispatch]);
+
+  // Show time picker
+  const showTimePickerModal = (mealId: string, currentTime: string) => {
+    const [hours, minutes] = currentTime.split(':').map(Number);
+    const time = new Date();
+    time.setHours(hours, minutes, 0, 0);
+    
+    setShowTimePicker({
+      visible: true,
+      mealId,
+      currentTime: time
+    });
   };
 
+  // Handle time change
+  const handleTimeChange = (event: any, selectedTime?: Date) => {
+    setShowTimePicker(prev => ({ ...prev, visible: false }));
+    
+    if (selectedTime) {
+      const timeString = selectedTime.toTimeString().slice(0, 5);
+      updateMealTime(showTimePicker.mealId, timeString);
+    }
+  };
+
+  // Update meal time
   const updateMealTime = (mealId: string, newTime: string) => {
     setMealTimes(prev => 
       prev.map(meal => 
@@ -87,6 +172,7 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
     setHasChanges(true);
   };
 
+  // Toggle meal enabled
   const toggleMealEnabled = (mealId: string) => {
     setMealTimes(prev => 
       prev.map(meal => 
@@ -96,23 +182,45 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
     setHasChanges(true);
   };
 
-  const saveMealSettings = () => {
-    // Save settings logic here
-    Alert.alert(
-      'Settings Saved',
-      'Your meal times have been updated successfully!',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            setHasChanges(false);
-            navigation.goBack();
+  // Save meal settings
+  const saveMealSettings = async () => {
+    if (!hasChanges) return;
+
+    try {
+      // Convert meal times to the format expected by the API
+      const mealTimesData = mealTimes.reduce((acc, meal) => {
+        acc[meal.id] = {
+          time: meal.time,
+          enabled: meal.enabled
+        };
+        return acc;
+      }, {} as any);
+
+      await dispatch(updateMealTimes(mealTimesData)).unwrap();
+      
+      Alert.alert(
+        'Settings Saved',
+        'Your meal times have been updated successfully!',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setHasChanges(false);
+              navigation.goBack();
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert(
+        'Save Failed',
+        error || 'Failed to save meal settings. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
+  // Reset to defaults
   const resetToDefaults = () => {
     Alert.alert(
       'Reset to Defaults',
@@ -136,76 +244,116 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const MealTimeCard = ({ meal }: { meal: MealTime }) => (
-    <View style={[styles.mealCard, !meal.enabled && styles.mealCardDisabled]}>
-      <View style={styles.mealHeader}>
-        <View style={styles.mealIconContainer}>
-          <Ionicons 
-            name={meal.icon} 
-            size={24} 
-            color={meal.enabled ? '#2563EB' : '#9CA3AF'} 
-          />
-        </View>
-        <View style={styles.mealInfo}>
-          <Text style={[styles.mealName, !meal.enabled && styles.mealNameDisabled]}>
-            {meal.name}
-          </Text>
-          <Text style={[styles.mealDescription, !meal.enabled && styles.mealDescriptionDisabled]}>
-            {meal.description}
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={[styles.enableToggle, meal.enabled && styles.enableToggleActive]}
-          onPress={() => toggleMealEnabled(meal.id)}
-        >
-          <Ionicons 
-            name={meal.enabled ? "checkmark" : "close"} 
-            size={16} 
-            color={meal.enabled ? "#FFFFFF" : "#9CA3AF"} 
-          />
-        </TouchableOpacity>
-      </View>
+  // Get medications related to meal
+  const getMedicationsForMeal = (mealId: string) => {
+    // This would be fetched from the medications list based on timing relation
+    const mealMedications: { [key: string]: string[] } = {
+      breakfast: ['Metformin', 'Lisinopril'],
+      dinner: ['Atorvastatin'],
+      lunch: [],
+      snack: []
+    };
+    
+    return mealMedications[mealId] || [];
+  };
 
-      {meal.enabled && (
-        <View style={styles.mealContent}>
-          <TouchableOpacity
-            style={styles.timeSelector}
-            onPress={() => showTimePicker(meal.id, meal.time)}
-          >
-            <View style={styles.timeDisplay}>
-              <Ionicons name="time-outline" size={20} color="#2563EB" />
-              <Text style={styles.timeText}>{meal.time}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
-          </TouchableOpacity>
-
-          <View style={styles.medicationHints}>
-            <Text style={styles.hintsTitle}>Medications related to this meal:</Text>
-            <View style={styles.medicationTags}>
-              {meal.id === 'breakfast' && (
-                <>
-                  <View style={styles.medicationTag}>
-                    <Text style={styles.medicationTagText}>Metformin</Text>
-                  </View>
-                  <View style={styles.medicationTag}>
-                    <Text style={styles.medicationTagText}>Lisinopril</Text>
-                  </View>
-                </>
-              )}
-              {meal.id === 'dinner' && (
-                <View style={styles.medicationTag}>
-                  <Text style={styles.medicationTagText}>Atorvastatin</Text>
-                </View>
-              )}
-              {(meal.id === 'lunch' || meal.id === 'snack') && (
-                <Text style={styles.noMedicationsText}>No medications scheduled</Text>
-              )}
-            </View>
-          </View>
-        </View>
-      )}
+  // Connection status component
+  const ConnectionStatus = () => (
+    <View style={styles.connectionStatus}>
+      <View style={[
+        styles.connectionDot, 
+        { backgroundColor: isConnected ? '#059669' : '#EF4444' }
+      ]} />
+      <Text style={styles.connectionText}>
+        {isConnected ? 'Settings will sync automatically' : 'Changes saved locally - will sync when online'}
+      </Text>
     </View>
   );
+
+  // Meal time card component
+  const MealTimeCard = ({ meal }: { meal: MealTime }) => {
+    const relatedMedications = getMedicationsForMeal(meal.id);
+    
+    return (
+      <View style={[styles.mealCard, !meal.enabled && styles.mealCardDisabled]}>
+        <View style={styles.mealHeader}>
+          <View style={styles.mealIconContainer}>
+            <Ionicons 
+              name={meal.icon} 
+              size={24} 
+              color={meal.enabled ? '#2563EB' : '#9CA3AF'} 
+            />
+          </View>
+          <View style={styles.mealInfo}>
+            <Text style={[styles.mealName, !meal.enabled && styles.mealNameDisabled]}>
+              {meal.name}
+            </Text>
+            <Text style={[styles.mealDescription, !meal.enabled && styles.mealDescriptionDisabled]}>
+              {meal.description}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.enableToggle, meal.enabled && styles.enableToggleActive]}
+            onPress={() => toggleMealEnabled(meal.id)}
+          >
+            <Ionicons 
+              name={meal.enabled ? "checkmark" : "close"} 
+              size={16} 
+              color={meal.enabled ? "#FFFFFF" : "#9CA3AF"} 
+            />
+          </TouchableOpacity>
+        </View>
+
+        {meal.enabled && (
+          <View style={styles.mealContent}>
+            <TouchableOpacity
+              style={styles.timeSelector}
+              onPress={() => showTimePickerModal(meal.id, meal.time)}
+            >
+              <View style={styles.timeDisplay}>
+                <Ionicons name="time-outline" size={20} color="#2563EB" />
+                <Text style={styles.timeText}>{meal.time}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+            </TouchableOpacity>
+
+            <View style={styles.medicationHints}>
+              <Text style={styles.hintsTitle}>Medications related to this meal:</Text>
+              <View style={styles.medicationTags}>
+                {relatedMedications.length > 0 ? (
+                  relatedMedications.map((medName, index) => (
+                    <View key={index} style={styles.medicationTag}>
+                      <Text style={styles.medicationTagText}>{medName}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.noMedicationsText}>No medications scheduled</Text>
+                )}
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  // Loading state
+  if (isLoading && mealTimes.length === 0) {
+    return (
+      <View style={styles.container}>
+        <PatientSecondaryNavbar
+          title="Meal Times"
+          subtitle="Loading meal settings..."
+          onBackPress={() => navigation.goBack()}
+          onSOSPress={() => navigation.navigate('SOS')}
+        />
+        <View style={[styles.scrollView, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color="#2563EB" />
+          <Text style={{ marginTop: 16, color: '#64748B' }}>Loading meal settings...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -234,6 +382,9 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Connection status */}
+        <ConnectionStatus />
+
         {/* Header Section */}
         <LinearGradient
           colors={['#EBF4FF', '#FFFFFF']}
@@ -320,22 +471,59 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
         {hasChanges && (
           <View style={styles.saveSection}>
             <Button
-              title="Save Meal Settings"
+              title={isLoading ? "Saving..." : "Save Meal Settings"}
               onPress={saveMealSettings}
               style={styles.saveButton}
-              icon={<Ionicons name="checkmark" size={18} color="#FFFFFF" />}
+              disabled={isLoading}
+              icon={isLoading ? 
+                <ActivityIndicator size={18} color="#FFFFFF" /> :
+                <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+              }
             />
           </View>
         )}
       </ScrollView>
+
+      {/* Time Picker Modal */}
+      {showTimePicker.visible && (
+        <DateTimePicker
+          value={showTimePicker.currentTime}
+          mode="time"
+          is24Hour={true}
+          onChange={handleTimeChange}
+        />
+      )}
     </View>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    gap: 8,
+  },
+  connectionDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  connectionText: {
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '500',
   },
   scrollView: {
     flex: 1,

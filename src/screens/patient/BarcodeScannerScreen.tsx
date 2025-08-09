@@ -9,67 +9,122 @@ import {
   Dimensions,
   Platform,
   Vibration,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { PatientTabParamList } from '../../types/navigation.types';
+import { useAppSelector, useAppDispatch } from '../../store';
+import { 
+  scanMedicationBarcode, 
+  logMedicationTaken,
+  clearBarcodeData,
+  clearError
+} from '../../store/slices/patientSlice';
+// Updated imports for expo-barcode-scanner
+import { BarCodeScanner } from 'expo-barcode-scanner';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { width, height } = Dimensions.get('window');
 
 type Props = BottomTabScreenProps<PatientTabParamList, 'Scanner'>;
 
-interface ScannedMedication {
-  id: string;
-  name: string;
-  dosage: string;
-  nextDoseTime: string;
-  instructions: string;
-  alreadyTaken: boolean;
-}
-
 const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
+  const dispatch = useAppDispatch();
+  const { 
+    scannedBarcodeData,
+    isScanningBarcode,
+    barcodeError,
+    isConnected
+  } = useAppSelector(state => state.patient);
+  
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
   const [flashOn, setFlashOn] = useState(false);
   const [isScanning, setIsScanning] = useState(true);
 
   useEffect(() => {
-    // In a real app, you would request camera permissions here
-    setHasPermission(true);
-  }, []);
-
-  // Mock barcode scanning result
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
-    setScanned(true);
-    setIsScanning(false);
-    Vibration.vibrate(200);
-
-    // Mock medication data based on scanned barcode
-    const mockMedication: ScannedMedication = {
-      id: '1',
-      name: 'Metformin',
-      dosage: '500mg',
-      nextDoseTime: '20:00',
-      instructions: 'Take with food',
-      alreadyTaken: Math.random() > 0.5, // Random for demo
+    // Request camera permissions
+    const getBarCodeScannerPermissions = async () => {
+      try {
+        const { status } = await BarCodeScanner.requestPermissionsAsync();
+        setHasPermission(status === 'granted');
+      } catch (error) {
+        console.error('Error requesting camera permissions:', error);
+        setHasPermission(false);
+      }
     };
 
-    setTimeout(() => {
-      if (mockMedication.alreadyTaken) {
-        showAlreadyTakenDialog(mockMedication);
-      } else {
-        showConfirmDoseDialog(mockMedication);
-      }
-    }, 500);
+    getBarCodeScannerPermissions();
+  }, []);
+
+  // Handle barcode scan
+  const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
+    if (scanned || isScanningBarcode) return;
+    
+    setScanned(true);
+    setIsScanning(false);
+    
+    // Add vibration if available
+    try {
+      Vibration.vibrate(200);
+    } catch (error) {
+      console.log('Vibration not available');
+    }
+
+    try {
+      // Scan the barcode using the API
+      await dispatch(scanMedicationBarcode(data)).unwrap();
+    } catch (error: any) {
+      Alert.alert(
+        'Scan Failed',
+        error || 'Failed to scan barcode. Please try again.',
+        [
+          { text: 'Retry', onPress: resetScanner },
+          { text: 'Cancel', onPress: () => navigation.goBack() }
+        ]
+      );
+    }
   };
 
-  const showConfirmDoseDialog = (medication: ScannedMedication) => {
+  // Handle scanned medication data
+  useEffect(() => {
+    if (scannedBarcodeData) {
+      const { medication, patient } = scannedBarcodeData;
+      
+      // Check if medication was already taken today
+      const lastTaken = medication.lastTaken ? new Date(medication.lastTaken) : null;
+      const today = new Date();
+      const isTakenToday = lastTaken && 
+        lastTaken.toDateString() === today.toDateString();
+      
+      if (isTakenToday) {
+        showAlreadyTakenDialog(medication);
+      } else {
+        showConfirmDoseDialog(medication);
+      }
+    }
+  }, [scannedBarcodeData]);
+
+  // Handle barcode errors
+  useEffect(() => {
+    if (barcodeError) {
+      Alert.alert(
+        'Scan Error',
+        barcodeError,
+        [
+          { text: 'Retry', onPress: resetScanner },
+          { text: 'Cancel', onPress: () => navigation.goBack() }
+        ]
+      );
+    }
+  }, [barcodeError]);
+
+  const showConfirmDoseDialog = (medication: any) => {
     Alert.alert(
       'Medication Confirmed',
-      `${medication.name} (${medication.dosage})\n\nNext dose: ${medication.nextDoseTime}\nInstructions: ${medication.instructions}\n\nTake this medication now?`,
+      `${medication.name} (${medication.dosage}${medication.dosageUnit})\n\nInstructions: ${medication.instructions}\n\nDays left: ${medication.daysLeft}\n\nTake this medication now?`,
       [
         {
           text: 'Not Now',
@@ -85,10 +140,10 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const showAlreadyTakenDialog = (medication: ScannedMedication) => {
+  const showAlreadyTakenDialog = (medication: any) => {
     Alert.alert(
       'Already Taken',
-      `${medication.name} (${medication.dosage})\n\nYou have already taken this medication for the scheduled time. Taking it again may cause an overdose.\n\nPlease wait for your next scheduled dose.`,
+      `${medication.name} (${medication.dosage}${medication.dosageUnit})\n\nYou have already taken this medication today. Taking it again may cause an overdose.\n\nPlease wait for your next scheduled dose.`,
       [
         {
           text: 'Understood',
@@ -100,7 +155,6 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
           style: 'default',
           onPress: () => {
             resetScanner();
-            // Navigate to emergency/contact
             navigation.navigate('SOS');
           },
         },
@@ -108,31 +162,70 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const confirmMedicationTaken = (medication: ScannedMedication) => {
-    Alert.alert(
-      'Dose Recorded',
-      `Your ${medication.name} dose has been logged successfully.\n\nNext dose: Tomorrow at ${medication.nextDoseTime}`,
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            resetScanner();
-            // Navigate back to home or medication list
-            navigation.navigate('Home');
+  const confirmMedicationTaken = async (medication: any) => {
+    try {
+      await dispatch(logMedicationTaken({
+        medicationId: medication.id,
+        data: {
+          takenAt: new Date().toISOString(),
+          notes: 'Taken via barcode scan'
+        }
+      })).unwrap();
+
+      Alert.alert(
+        'Dose Recorded',
+        `Your ${medication.name} dose has been logged successfully.\n\nNext dose: Check your medication schedule`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              resetScanner();
+              navigation.navigate('Home');
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert(
+        'Error',
+        error || 'Failed to log medication dose',
+        [{ text: 'OK', onPress: resetScanner }]
+      );
+    }
   };
 
   const resetScanner = () => {
     setScanned(false);
     setIsScanning(true);
+    dispatch(clearBarcodeData());
+    dispatch(clearError());
   };
 
   const toggleFlash = () => {
     setFlashOn(!flashOn);
   };
+
+  // Scanning indicator
+  const ScanningIndicator = () => (
+    isScanningBarcode && (
+      <View style={styles.scanningIndicator}>
+        <ActivityIndicator size="large" color="#2563EB" />
+        <Text style={styles.scanningText}>Processing barcode...</Text>
+      </View>
+    )
+  );
+
+  // Connection status warning
+  const ConnectionWarning = () => (
+    !isConnected && (
+      <View style={styles.connectionWarning}>
+        <Ionicons name="wifi-outline" size={20} color="#F59E0B" />
+        <Text style={styles.warningText}>
+          Offline mode: Scan results may not be real-time
+        </Text>
+      </View>
+    )
+  );
 
   if (hasPermission === null) {
     return (
@@ -143,6 +236,7 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
           onSOSPress={() => navigation.navigate('SOS')}
         />
         <View style={styles.permissionContainer}>
+          <ActivityIndicator size="large" color="#2563EB" />
           <Text style={styles.permissionText}>Requesting camera permission...</Text>
         </View>
       </View>
@@ -165,7 +259,13 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.permissionText}>
             Please allow camera access to scan medication barcodes
           </Text>
-          <TouchableOpacity style={styles.permissionButton} onPress={() => setHasPermission(true)}>
+          <TouchableOpacity 
+            style={styles.permissionButton} 
+            onPress={async () => {
+              const { status } = await BarCodeScanner.requestPermissionsAsync();
+              setHasPermission(status === 'granted');
+            }}
+          >
             <Text style={styles.permissionButtonText}>Grant Permission</Text>
           </TouchableOpacity>
         </View>
@@ -183,11 +283,19 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
       />
 
       <View style={styles.scannerContainer}>
-        {/* Mock Camera View */}
+        {/* Camera View */}
         <View style={styles.cameraView}>
+          <BarCodeScanner
+            onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+            style={StyleSheet.absoluteFillObject}
+            barCodeTypes={[BarCodeScanner.Constants.BarCodeType.qr, BarCodeScanner.Constants.BarCodeType.code128]}
+          />
+          
           <View style={styles.scannerOverlay}>
             {/* Top overlay */}
-            <View style={styles.overlayTop} />
+            <View style={styles.overlayTop}>
+              <ConnectionWarning />
+            </View>
             
             {/* Middle section with scanner frame */}
             <View style={styles.overlayMiddle}>
@@ -197,7 +305,7 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
                 <View style={styles.cornerTR} />
                 <View style={styles.cornerBL} />
                 <View style={styles.cornerBR} />
-                {isScanning && (
+                {isScanning && !scanned && (
                   <View style={styles.scanningLine} />
                 )}
               </View>
@@ -207,6 +315,9 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
             {/* Bottom overlay */}
             <View style={styles.overlayBottom} />
           </View>
+
+          {/* Scanning indicator */}
+          <ScanningIndicator />
         </View>
 
         {/* Scanner Instructions */}
@@ -215,14 +326,16 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
             <Ionicons name="qr-code" size={24} color="#2563EB" />
             <Text style={styles.instructionTitle}>Scan Medication Barcode</Text>
             <Text style={styles.instructionText}>
-              Position the barcode within the frame. The app will automatically detect and scan it.
+              Position the QR code or barcode within the frame. The app will automatically detect and process it.
             </Text>
           </View>
 
-          {scanned && (
+          {scannedBarcodeData && (
             <View style={styles.processingCard}>
               <Ionicons name="checkmark-circle" size={24} color="#059669" />
-              <Text style={styles.processingText}>Barcode scanned successfully!</Text>
+              <Text style={styles.processingText}>
+                {scannedBarcodeData.medication.name} found!
+              </Text>
             </View>
           )}
         </View>
@@ -231,24 +344,15 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.controlsContainer}>
           <TouchableOpacity
             style={styles.controlButton}
-            onPress={toggleFlash}
-          >
-            <Ionicons 
-              name={flashOn ? "flash" : "flash-off"} 
-              size={24} 
-              color={flashOn ? "#F59E0B" : "#FFFFFF"} 
-            />
-            <Text style={styles.controlButtonText}>Flash</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.controlButton, styles.scanButton]}
-            onPress={() => handleBarCodeScanned({ data: 'mock-barcode-123' })}
-            disabled={scanned}
+            onPress={() => {
+              // For testing purposes - simulate a scan
+              handleBarCodeScanned({ type: 'qr', data: 'MT_JS_MET500MG_12345678_ABC' });
+            }}
+            disabled={scanned || isScanningBarcode}
           >
             <Ionicons name="scan" size={28} color="#FFFFFF" />
             <Text style={styles.controlButtonText}>
-              {scanned ? 'Processing...' : 'Tap to Scan'}
+              {isScanningBarcode ? 'Processing...' : scanned ? 'Scanned!' : 'Test Scan'}
             </Text>
           </TouchableOpacity>
 
@@ -468,12 +572,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: SPACING[3],
     borderRadius: RADIUS.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    minWidth: 80,
-  },
-  scanButton: {
     backgroundColor: '#2563EB',
-    paddingHorizontal: SPACING[6],
+    minWidth: 100,
     shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -507,6 +607,37 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.xs,
     color: '#FFFFFF',
     opacity: 0.8,
+  },
+  scanningIndicator: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -50 }, { translateY: -50 }],
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    alignItems: 'center',
+  },
+  scanningText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#FFFFFF',
+    marginTop: SPACING[2],
+  },
+  connectionWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.9)',
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[2],
+    borderRadius: RADIUS.md,
+    margin: SPACING[4],
+    gap: SPACING[2],
+  },
+  warningText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#FFFFFF',
+    fontWeight: '500',
+    flex: 1,
   },
 });
 

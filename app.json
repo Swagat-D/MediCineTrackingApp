@@ -25,6 +25,7 @@
     },
     "plugins": [
       "expo-splash-screen",
+      "expo-barcode-scanner",
       {
         "image": "./assets/images/splash-icon.png",
         "imageWidth": 200,

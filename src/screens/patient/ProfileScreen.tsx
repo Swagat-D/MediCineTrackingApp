@@ -1,13 +1,13 @@
 // src/screens/patient/ProfileScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   Alert,
   Platform,
+  StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,6 +15,9 @@ import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { PatientTabParamList } from '../../types/navigation.types';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { logoutUser } from '../../store/slices/authSlice';
+import { fetchDashboardData, fetchNotifications } from '../../store/slices/patientSlice';
+import { patientAPI } from '../../services/api/patientAPI';
+import { useFocusEffect } from '@react-navigation/native';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientNavbar from '../../components/common/PatientNavbar';
 
@@ -30,14 +33,54 @@ interface ProfileStats {
 const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector(state => state.auth);
+  const { 
+    dashboardStats,
+    unreadNotificationCount,
+    isConnected
+  } = useAppSelector(state => state.patient);
   
-  const [profileStats] = useState<ProfileStats>({
-    totalMedications: 4,
-    adherenceRate: 89,
-    daysTracked: 45,
-    caregiverConnected: true,
+  const [profileStats, setProfileStats] = useState<ProfileStats>({
+    totalMedications: 0,
+    adherenceRate: 0,
+    daysTracked: 0,
+    caregiverConnected: false,
   });
+  const [caregivers, setCaregivers] = useState<any[]>([]);
 
+  // Load profile data
+  useFocusEffect(
+    useCallback(() => {
+      const loadProfileData = async () => {
+        try {
+          // Refresh dashboard data
+          await dispatch(fetchDashboardData()).unwrap();
+          await dispatch(fetchNotifications({})).unwrap();
+          
+          // Load caregivers
+          const caregiversData = await patientAPI.getCaregivers();
+          setCaregivers(caregiversData);
+        } catch (error) {
+          console.error('Failed to load profile data:', error);
+        }
+      };
+
+      loadProfileData();
+    }, [dispatch])
+  );
+
+  // Update profile stats when dashboard data changes
+  useEffect(() => {
+    if (dashboardStats) {
+      setProfileStats({
+        totalMedications: dashboardStats.totalMedications,
+        adherenceRate: dashboardStats.adherenceRate,
+        daysTracked: 45, // This would come from user data
+        caregiverConnected: caregivers.length > 0,
+      });
+    }
+  }, [dashboardStats, caregivers]);
+
+  // Handle logout
   const handleLogout = () => {
     Alert.alert(
       'Sign Out',
@@ -53,26 +96,126 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const handleEmergencyContacts = () => {
-    Alert.alert('Emergency Contacts', 'This feature will allow you to manage your emergency contacts');
+  // Handle export data
+  const handleExportData = async () => {
+    try {
+      Alert.alert(
+        'Export Health Data',
+        'Choose the format for your health data export:',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'PDF Report',
+            onPress: async () => {
+              try {
+                const result = await patientAPI.exportHealthData('pdf', {
+                  includePersonalInfo: true,
+                  includeMedications: true,
+                  includeLogs: true,
+                  includeAdherence: true
+                });
+                Alert.alert('Export Ready', `Your data has been exported. File: ${result.fileName}`);
+              } catch (error: any) {
+                Alert.alert('Export Failed', error || 'Failed to export data');
+              }
+            }
+          },
+          {
+            text: 'CSV Data',
+            onPress: async () => {
+              try {
+                const result = await patientAPI.exportHealthData('csv', {
+                  includePersonalInfo: false,
+                  includeMedications: true,
+                  includeLogs: true,
+                  includeAdherence: true
+                });
+                Alert.alert('Export Ready', `Your data has been exported. File: ${result.fileName}`);
+              } catch (error: any) {
+                Alert.alert('Export Failed', error || 'Failed to export data');
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
   };
 
-  const handleSettings = () => {
-    navigation.navigate('Settings');
+  // Handle notification settings
+  const handleNotificationSettings = async () => {
+    try {
+      const settings = await patientAPI.getNotificationSettings();
+      
+      Alert.alert(
+        'Notification Settings',
+        `Current Settings:\n• Medication Reminders: ${settings.medicationReminders ? 'On' : 'Off'}\n• Refill Reminders: ${settings.refillReminders ? 'On' : 'Off'}\n• Adherence Alerts: ${settings.adherenceAlerts ? 'On' : 'Off'}\n• SOS Alerts: ${settings.sosAlerts ? 'On' : 'Off'}`,
+        [
+          { text: 'OK' },
+          { text: 'Change Settings', onPress: () => navigation.navigate('Settings') }
+        ]
+      );
+    } catch (error) {
+      console.error(error)
+      Alert.alert('Error', 'Failed to load notification settings');
+    }
   };
 
-  const handleNotificationSettings = () => {
-    Alert.alert('Notification Settings', 'This feature will allow you to customize your medication reminders');
+  // Handle caregiver management
+  const handleCaregiverManagement = () => {
+    const caregiverNames = caregivers.map(c => c.name).join(', ');
+    
+    Alert.alert(
+      'Connected Caregivers',
+      caregivers.length > 0 ? 
+        `You are connected to: ${caregiverNames}` : 
+        'No caregivers connected',
+      [
+        { text: 'OK' },
+        ...(caregivers.length > 0 ? [{
+          text: 'Manage Connections',
+          onPress: () => {
+            Alert.alert('Caregiver Management', 'This feature allows you to manage your caregiver connections');
+          }
+        }] : [{
+          text: 'Connect Caregiver',
+          onPress: () => {
+            Alert.prompt(
+              'Connect to Caregiver',
+              'Enter your caregiver\'s email address:',
+              async (email) => {
+                if (email) {
+                  try {
+                    await patientAPI.requestCaregiverConnection(email, 'Connection request from patient');
+                    Alert.alert('Request Sent', 'Connection request sent to caregiver');
+                  } catch (error: any) {
+                    Alert.alert('Request Failed', error || 'Failed to send connection request');
+                  }
+                }
+              },
+              'plain-text'
+            );
+          }
+        }])
+      ]
+    );
   };
 
-  const handleMedicalHistory = () => {
-    Alert.alert('Medical History', 'This feature will show your medication history and logs');
-  };
+  // Connection status indicator
+  const ConnectionStatus = () => (
+    <View style={styles.connectionStatus}>
+      <View style={[
+        styles.connectionDot, 
+        { backgroundColor: isConnected ? '#059669' : '#EF4444' }
+      ]} />
+      <Text style={styles.connectionText}>
+        {isConnected ? 'All data synced' : 'Some data may be outdated'}
+      </Text>
+    </View>
+  );
 
-  const handlePrivacySettings = () => {
-    Alert.alert('Privacy Settings', 'This feature will allow you to manage your privacy preferences');
-  };
-
+  // Profile section component
   const ProfileSection = ({ 
     title, 
     items 
@@ -112,7 +255,14 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
                 />
               </View>
               <View style={styles.profileItemContent}>
-                <Text style={styles.profileItemTitle}>{item.title}</Text>
+                <View style={styles.profileItemTitleRow}>
+                  <Text style={styles.profileItemTitle}>{item.title}</Text>
+                  {item.showBadge && (
+                    <View style={[styles.badge, { backgroundColor: item.badgeColor }]}>
+                      <Text style={styles.badgeText}>•</Text>
+                    </View>
+                  )}
+                </View>
                 {item.subtitle && (
                   <Text style={styles.profileItemSubtitle}>{item.subtitle}</Text>
                 )}
@@ -125,12 +275,106 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 
+  // Health management items
+  const healthManagementItems = [
+    {
+      icon: 'medical-outline' as keyof typeof Ionicons.glyphMap,
+      title: 'My Medications',
+      subtitle: `${profileStats.totalMedications} active prescriptions`,
+      onPress: () => navigation.navigate('Medications'),
+    },
+    {
+      icon: 'restaurant-outline' as keyof typeof Ionicons.glyphMap,
+      title: 'Meal Settings',
+      subtitle: 'Configure meal times for medication timing',
+      onPress: () => navigation.navigate('MealSettings'),
+    },
+    {
+      icon: 'document-text-outline' as keyof typeof Ionicons.glyphMap,
+      title: 'Medical History',
+      subtitle: 'View medication logs and history',
+      onPress: handleExportData,
+    },
+    {
+      icon: 'stats-chart-outline' as keyof typeof Ionicons.glyphMap,
+      title: 'Adherence Report',
+      subtitle: `${profileStats.adherenceRate}% current adherence rate`,
+      onPress: () => Alert.alert('Adherence Report', 'Detailed adherence analytics would be shown here'),
+    },
+  ];
+
+  // Care team items
+  const careTeamItems = [
+    {
+      icon: 'people-outline' as keyof typeof Ionicons.glyphMap,
+      title: 'Connected Caregivers',
+      subtitle: caregivers.length > 0 ? 
+        `${caregivers.length} caregiver${caregivers.length > 1 ? 's' : ''} connected` : 
+        'No caregivers connected',
+      onPress: handleCaregiverManagement,
+      showBadge: caregivers.length > 0,
+      badgeColor: '#059669',
+    },
+    {
+      icon: 'call-outline' as keyof typeof Ionicons.glyphMap,
+      title: 'Emergency Contacts',
+      subtitle: 'Manage emergency contact information',
+      onPress: () => navigation.navigate('SOS'),
+    },
+  ];
+
+  // Settings items
+  const settingsItems = [
+    {
+      icon: 'notifications-outline' as keyof typeof Ionicons.glyphMap,
+      title: 'Notifications',
+      subtitle: `${unreadNotificationCount} unread notifications`,
+      onPress: handleNotificationSettings,
+      showBadge: unreadNotificationCount > 0,
+      badgeColor: '#F59E0B',
+    },
+    {
+      icon: 'shield-outline' as keyof typeof Ionicons.glyphMap,
+      title: 'Privacy & Security',
+      subtitle: 'Manage your privacy settings',
+      onPress: () => Alert.alert('Privacy Settings', 'Privacy and security settings would be managed here'),
+    },
+    {
+      icon: 'settings-outline' as keyof typeof Ionicons.glyphMap,
+      title: 'App Settings',
+      subtitle: 'General app preferences',
+      onPress: () => navigation.navigate('Settings'),
+    },
+    {
+      icon: 'download-outline' as keyof typeof Ionicons.glyphMap,
+      title: 'Export Health Data',
+      subtitle: 'Download your medical data',
+      onPress: handleExportData,
+    },
+  ];
+
+  // Support items
+  const supportItems = [
+    {
+      icon: 'help-circle-outline' as keyof typeof Ionicons.glyphMap,
+      title: 'Help & Support',
+      subtitle: 'Get help using the app',
+      onPress: () => Alert.alert('Help', 'Contact support or view FAQ'),
+    },
+    {
+      icon: 'information-circle-outline' as keyof typeof Ionicons.glyphMap,
+      title: 'About MediTracker',
+      subtitle: 'App version and information',
+      onPress: () => Alert.alert('About', 'MediTracker v1.0.0'),
+    },
+  ];
+
   return (
     <View style={styles.container}>
       <PatientNavbar
         onNotificationPress={() => navigation.navigate('Notifications')}
         onSOSPress={() => navigation.navigate('SOS')}
-        notificationCount={0}
+        notificationCount={unreadNotificationCount}
       />
       
       <ScrollView
@@ -148,6 +392,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
               <View style={styles.avatar}>
                 <Ionicons name="person" size={40} color="#2563EB" />
               </View>
+              <ConnectionStatus />
             </View>
             <View style={styles.userInfo}>
               <Text style={styles.userName}>{user?.name || 'Patient'}</Text>
@@ -200,91 +445,25 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         {/* Health Management */}
         <ProfileSection
           title="Health Management"
-          items={[
-            {
-              icon: 'medical-outline',
-              title: 'My Medications',
-              subtitle: `${profileStats.totalMedications} active prescriptions`,
-              onPress: () => navigation.navigate('Medications'),
-            },
-            {
-              icon: 'restaurant-outline',
-              title: 'Meal Settings',
-              subtitle: 'Configure meal times for medication timing',
-              onPress: () => navigation.navigate('MealSettings'),
-            },
-            {
-              icon: 'document-text-outline',
-              title: 'Medical History',
-              subtitle: 'View medication logs and history',
-              onPress: handleMedicalHistory,
-            },
-          ]}
+          items={healthManagementItems}
         />
 
-        {/* Caregiver Connection */}
+        {/* Care Team */}
         <ProfileSection
           title="Care Team"
-          items={[
-            {
-              icon: 'people-outline',
-              title: 'Connected Caregiver',
-              subtitle: profileStats.caregiverConnected ? 'Dr. Sarah Johnson' : 'No caregiver connected',
-              onPress: () => Alert.alert('Caregiver', 'View caregiver details'),
-              showBadge: profileStats.caregiverConnected,
-              badgeColor: '#059669',
-            },
-            {
-              icon: 'call-outline',
-              title: 'Emergency Contacts',
-              subtitle: 'Manage emergency contact information',
-              onPress: handleEmergencyContacts,
-            },
-          ]}
+          items={careTeamItems}
         />
 
-        {/* Settings */}
+        {/* Settings & Privacy */}
         <ProfileSection
           title="Settings & Privacy"
-          items={[
-            {
-              icon: 'notifications-outline',
-              title: 'Notifications',
-              subtitle: 'Manage medication reminders',
-              onPress: handleNotificationSettings,
-            },
-            {
-              icon: 'shield-outline',
-              title: 'Privacy & Security',
-              subtitle: 'Manage your privacy settings',
-              onPress: handlePrivacySettings,
-            },
-            {
-              icon: 'settings-outline',
-              title: 'App Settings',
-              subtitle: 'General app preferences',
-              onPress: handleSettings,
-            },
-          ]}
+          items={settingsItems}
         />
 
-        {/* Support */}
+        {/* Support & Information */}
         <ProfileSection
           title="Support & Information"
-          items={[
-            {
-              icon: 'help-circle-outline',
-              title: 'Help & Support',
-              subtitle: 'Get help using the app',
-              onPress: () => Alert.alert('Help', 'Contact support or view FAQ'),
-            },
-            {
-              icon: 'information-circle-outline',
-              title: 'About MediTracker',
-              subtitle: 'App version and information',
-              onPress: () => Alert.alert('About', 'MediTracker v1.0.0'),
-            },
-          ]}
+          items={supportItems}
         />
 
         {/* Quick Actions */}
@@ -329,6 +508,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
@@ -411,6 +591,23 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: '#059669',
+    fontWeight: '500',
+  },
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING[2],
+    gap: SPACING[2],
+  },
+  connectionDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: SPACING[1],
+  },
+  connectionText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#64748B',
     fontWeight: '500',
   },
   statsSection: {
@@ -506,6 +703,27 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#1E293B',
     marginBottom: 2,
+  },
+  profileItemTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+  },
+  badge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: SPACING[2],
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    lineHeight: 18,
+    textAlign: 'center',
   },
   profileItemSubtitle: {
     fontSize: TYPOGRAPHY.fontSize.sm,

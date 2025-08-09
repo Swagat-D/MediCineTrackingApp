@@ -8,6 +8,9 @@ export default {
     sdkVersion: "53.0.0",
     orientation: "portrait",
     userInterfaceStyle: "light",
+    plugins: [
+      "expo-barcode-scanner"
+    ],
     android: {
       "jsEngine": "jsc",
       package: "com.swagat1212.meditrackerapp",

@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Print from 'expo-print';
 import * as MediaLibrary from 'expo-media-library';
 
 // Components
@@ -23,6 +22,8 @@ import Button from '../../components/common/Button/Button';
 // Types and Constants
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
+import { caregiverAPI } from '../../services/api/caregiverAPI';
+import PrintableBarcode from '../../components/common/PrintableBarcode';
 
 type Props = CaregiverStackScreenProps<'BarcodeGenerator'>;
 
@@ -45,88 +46,26 @@ const BarcodeGeneratorScreen: React.FC<Props> = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedBarcodes, setSelectedBarcodes] = useState<string[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
-
-  const [recentBarcodes] = useState<BarcodeItem[]>([
-    {
-      id: '1',
-      patientId: 'p1',
-      patientName: 'John Smith',
-      medicationName: 'Metformin',
-      dosage: '500mg',
-      frequency: '2x daily',
-      timingRelation: 'After Food',
-      barcodeData: 'MEDI_MTF500_JS_001',
-      createdAt: '2024-08-08T10:30:00Z',
-      lastDownloaded: '2024-08-08T11:15:00Z',
-      downloadCount: 3,
-    },
-    {
-      id: '2',
-      patientId: 'p2',
-      patientName: 'Mary Johnson',
-      medicationName: 'Lisinopril',
-      dosage: '10mg',
-      frequency: '1x daily',
-      timingRelation: 'Anytime',
-      barcodeData: 'MEDI_LIS10_MJ_002',
-      createdAt: '2024-08-07T14:20:00Z',
-      downloadCount: 1,
-    },
-    {
-      id: '3',
-      patientId: 'p1',
-      patientName: 'John Smith',
-      medicationName: 'Atorvastatin',
-      dosage: '20mg',
-      frequency: '1x daily',
-      timingRelation: 'Before Food',
-      barcodeData: 'MEDI_ATO20_JS_003',
-      createdAt: '2024-08-07T09:45:00Z',
-      lastDownloaded: '2024-08-07T16:30:00Z',
-      downloadCount: 2,
-    },
-    {
-      id: '4',
-      patientId: 'p3',
-      patientName: 'Robert Davis',
-      medicationName: 'Aspirin',
-      dosage: '81mg',
-      frequency: '1x daily',
-      timingRelation: 'With Food',
-      barcodeData: 'MEDI_ASP81_RD_004',
-      createdAt: '2024-08-06T16:15:00Z',
-      downloadCount: 0,
-    },
-    {
-      id: '5',
-      patientId: 'p4',
-      patientName: 'Sarah Wilson',
-      medicationName: 'Vitamin D3',
-      dosage: '2000 IU',
-      frequency: '1x daily',
-      timingRelation: 'Anytime',
-      barcodeData: 'MEDI_VIT2000_SW_005',
-      createdAt: '2024-08-06T11:30:00Z',
-      downloadCount: 1,
-    },
-  ]);
+  const [recentBarcodes, setRecentBarcodes] = useState<BarcodeItem[]>([]);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+const [selectedBarcode, setSelectedBarcode] = useState<BarcodeItem | null>(null);
 
   useEffect(() => {
     loadBarcodes();
   }, []);
 
   const loadBarcodes = async () => {
-    try {
-      setIsLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Error loading barcodes:', error);
-      setIsLoading(false);
-      Alert.alert('Error', 'Failed to load barcodes.');
-    }
-  };
+  try {
+    setIsLoading(true);
+    const data = await caregiverAPI.getBarcodes();
+    setRecentBarcodes(data);
+  } catch (error: any) {
+    console.error('Error loading barcodes:', error);
+    Alert.alert('Error', error.message || 'Failed to load barcodes.');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -151,42 +90,9 @@ const BarcodeGeneratorScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handlePrintBarcode = async (barcode: BarcodeItem) => {
-    try {
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Medication Barcode - ${barcode.patientName}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
-            .barcode-container { border: 2px solid #000; padding: 20px; margin: 20px auto; max-width: 300px; background: white; }
-            .patient-name { font-size: 18px; font-weight: bold; color: #059669; margin-bottom: 10px; }
-            .medication-name { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
-            .dosage-info { font-size: 14px; color: #666; margin-bottom: 15px; }
-            .barcode { font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; 
-                      letter-spacing: 2px; margin: 20px 0; padding: 10px; background: #f0f0f0; border: 1px solid #ccc; }
-            .footer { font-size: 10px; color: #999; margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; }
-          </style>
-        </head>
-        <body>
-          <div class="barcode-container">
-            <div class="patient-name">${barcode.patientName}</div>
-            <div class="medication-name">${barcode.medicationName}</div>
-            <div class="dosage-info">${barcode.dosage} • ${barcode.frequency} • ${barcode.timingRelation}</div>
-            <div class="barcode">${barcode.barcodeData}</div>
-            <div class="footer">MediTracker • Generated on ${new Date().toLocaleDateString()}</div>
-          </div>
-        </body>
-        </html>
-      `;
-
-      await Print.printAsync({ html: htmlContent });
-    } catch (error) {
-      console.error('Error printing barcode:', error);
-      Alert.alert('Error', 'Failed to print barcode.');
-    }
-  };
+  setSelectedBarcode(barcode);
+  setShowPrintModal(true);
+};
 
   const handleShareBarcode = async (barcode: BarcodeItem) => {
     try {
@@ -510,6 +416,18 @@ Generated by MediTracker`;
           />
         </View>
       )}
+      {selectedBarcode && (
+  <PrintableBarcode
+    visible={showPrintModal}
+    onClose={() => {
+      setShowPrintModal(false);
+      setSelectedBarcode(null);
+    }}
+    patientName={selectedBarcode.patientName}
+    barcodeData={selectedBarcode.barcodeData}
+    medicationName={selectedBarcode.medicationName}
+  />
+)}
     </View>
   );
 };

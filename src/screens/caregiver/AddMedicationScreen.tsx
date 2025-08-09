@@ -8,7 +8,6 @@ import {
   Platform,
   TouchableOpacity,
   Alert,
-  Image,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -25,24 +24,27 @@ import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
 
 // Types and Constants
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
-import { MedicationFormData, DosageUnit, TimingRelation } from '../../types/medication.types';
+import { MedicationFormData } from '../../types/medication.types';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import { MEDICATION_CONSTANTS } from '../../constants/app';
+import { caregiverAPI } from '../../services/api/caregiverAPI';
+import PrintableBarcode from '@/components/common/PrintableBarcode';
 
 type Props = CaregiverStackScreenProps<'AddMedication'>;
 
-// Validation schema - Instructions field is now optional
+// Validation schema
 const medicationSchema: yup.ObjectSchema<MedicationFormData> = yup.object({
   name: yup
     .string()
     .required('Medication name is required')
-    .min(2, 'Name must be at least 2 characters'),
+    .min(2, 'Name must be at least 2 characters')
+    .max(100, 'Name cannot exceed 100 characters'),
   dosage: yup
     .string()
     .required('Dosage is required')
     .matches(/^\d+(\.\d+)?$/, 'Please enter a valid dosage (e.g., 500, 2.5)'),
   dosageUnit: yup
-    .mixed<DosageUnit>()
+    .mixed<'mg' | 'g' | 'ml' | 'tablets' | 'capsules' | 'drops' | 'puffs' | 'units'>()
     .oneOf(['mg', 'g', 'ml', 'tablets', 'capsules', 'drops', 'puffs', 'units'])
     .required('Dosage unit is required'),
   frequency: yup
@@ -51,26 +53,32 @@ const medicationSchema: yup.ObjectSchema<MedicationFormData> = yup.object({
     .min(1, 'Frequency must be at least 1')
     .max(6, 'Frequency cannot exceed 6 times daily'),
   timingRelation: yup
-    .mixed<TimingRelation>()
+    .mixed<'before_food' | 'after_food' | 'with_food' | 'empty_stomach' | 'anytime'>()
     .oneOf(['before_food', 'after_food', 'with_food', 'empty_stomach', 'anytime'])
     .required('Timing relation is required'),
   expiryDate: yup
     .string()
-    .required('Expiry date is required'),
+    .required('Expiry date is required')
+    .test('future-date', 'Expiry date must be in the future', function(value) {
+      return value ? new Date(value) > new Date() : false;
+    }),
   quantity: yup
     .number()
     .required('Quantity is required')
-    .min(1, 'Quantity must be at least 1'),
-  instructions: yup.string().optional(), // Made optional
+    .min(1, 'Quantity must be at least 1')
+    .max(1000, 'Quantity cannot exceed 1000'),
+  instructions: yup.string().optional().max(500, 'Instructions cannot exceed 500 characters'),
 });
 
 const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { patientId } = route.params;
   
   const [isLoading, setIsLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [barcodeData, setBarcodeData] = useState('');
+  const [patientName, setPatientName] = useState('');
 
   const {
     control,
@@ -90,57 +98,60 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
       timingRelation: 'anytime',
       expiryDate: '',
       quantity: 30,
-      instructions: '', // Can be empty now
+      instructions: '',
     },
   });
 
   const watchedDosage = watch('dosage');
   const watchedDosageUnit = watch('dosageUnit');
   const watchedFrequency = watch('frequency');
+  const watchedQuantity = watch('quantity');
 
   const onSubmit = async (data: MedicationFormData) => {
-    try {
-      setIsLoading(true);
-      
-      // TODO: Implement API call to add medication
-      // const result = await caregiverAPI.addMedication(patientId, data);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      Alert.alert(
-        'Success',
-        'Medication has been added successfully! A barcode has been generated for this medication.',
-        [
-          {
-            text: 'View Barcode',
-            onPress: () => {
-              reset();
-              navigation.navigate('BarcodeGenerator', { medicationId: 'new-med-id' });
-            },
+  try {
+    setIsLoading(true);
+    
+    const result = await caregiverAPI.addMedication(patientId, data);
+    
+    // Get patient name for barcode
+    const patientDetails = await caregiverAPI.getPatientDetails(patientId);
+    
+    setBarcodeData(result.barcodeData);
+    setPatientName(patientDetails.patient.name);
+    
+    Alert.alert(
+      'Success',
+      'Medication has been added successfully! A barcode has been generated.',
+      [
+        {
+          text: 'Print Barcode',
+          onPress: () => {
+            setShowBarcodeModal(true);
           },
-          {
-            text: 'Add Another',
-            onPress: () => {
-              reset();
-            },
+        },
+        {
+          text: 'Add Another',
+          onPress: () => {
+            reset();
+            setSelectedDate(new Date());
           },
-          {
-            text: 'Done',
-            onPress: () => {
-              navigation.goBack();
-            },
+        },
+        {
+          text: 'Done',
+          onPress: () => {
+            navigation.goBack();
           },
-        ]
-      );
-      
-    } catch (error) {
-      console.error('Error adding medication:', error);
-      Alert.alert('Error', 'Failed to add medication. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        },
+      ]
+    );
+    
+  } catch (error: any) {
+    console.error('Error adding medication:', error);
+    Alert.alert('Error', error.message || 'Failed to add medication. Please try again.');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleDateChange = (event: any, date?: Date) => {
     setShowDatePicker(false);
@@ -170,10 +181,17 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const calculateDaysSupply = () => {
-    const quantity = watch('quantity');
+    const quantity = watchedQuantity;
     const frequency = watchedFrequency || 1;
     if (!quantity || !frequency) return 0;
     return Math.floor(quantity / frequency);
+  };
+
+  const getExpiryWarningColor = (days: number | null) => {
+    if (!days) return '#64748B';
+    if (days < 30) return '#EF4444';
+    if (days < 90) return '#F59E0B';
+    return '#059669';
   };
 
   if (isLoading) {
@@ -212,11 +230,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Form Header */}
           <View style={styles.formHeader}>
             <View style={styles.iconContainer}>
-              <Image
-                source={require('../../../assets/images/medicine.png')}
-                style={styles.medicineIcon}
-                resizeMode="contain"
-              />
+              <Ionicons name="medical" size={40} color="#059669" />
             </View>
             <Text style={styles.formTitle}>Medication Details</Text>
             <Text style={styles.formSubtitle}>
@@ -300,6 +314,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
             {/* Dosage Preview */}
             {watchedDosage && watchedDosageUnit && (
               <View style={styles.dosagePreview}>
+                <Ionicons name="checkmark-circle" size={16} color="#059669" />
                 <Text style={styles.dosagePreviewText}>
                   Dosage: {watchedDosage} {watchedDosageUnit}
                 </Text>
@@ -439,7 +454,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
 
             {/* Supply Information */}
-            {watch('quantity') && watchedFrequency && (
+            {watchedQuantity && watchedFrequency && (
               <View style={styles.supplyInfo}>
                 <View style={styles.supplyItem}>
                   <Ionicons name="calendar-outline" size={16} color="#059669" />
@@ -453,11 +468,11 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
                     <Ionicons 
                       name="warning-outline" 
                       size={16} 
-                      color={getDaysUntilExpiry(watch('expiryDate'))! < 30 ? '#EF4444' : '#059669'} 
+                      color={getExpiryWarningColor(getDaysUntilExpiry(watch('expiryDate')))} 
                     />
                     <Text style={[
                       styles.supplyText,
-                      { color: getDaysUntilExpiry(watch('expiryDate'))! < 30 ? '#EF4444' : '#059669' }
+                      { color: getExpiryWarningColor(getDaysUntilExpiry(watch('expiryDate'))) }
                     ]}>
                       Expires in {getDaysUntilExpiry(watch('expiryDate'))} days
                     </Text>
@@ -467,7 +482,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
             )}
           </View>
 
-          {/* Instructions - Now Optional */}
+          {/* Instructions - Optional */}
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Additional Instructions</Text>
             <Text style={styles.optionalLabel}>(Optional)</Text>
@@ -500,7 +515,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
               <Text style={styles.summaryLabel}>Medication:</Text>
               <Text style={styles.summaryValue}>
                 {watch('name') || 'Not specified'} 
-                {watch('dosage') && watch('dosageUnit') && ` (${watch('dosage')} ${watch('dosageUnit')})`}
+                {watchedDosage && watchedDosageUnit && ` (${watchedDosage} ${watchedDosageUnit})`}
               </Text>
             </View>
             
@@ -514,9 +529,21 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Supply:</Text>
               <Text style={styles.summaryValue}>
-                {watch('quantity') || 0} units ({calculateDaysSupply()} days)
+                {watchedQuantity || 0} units ({calculateDaysSupply()} days)
               </Text>
             </View>
+            
+            {watch('expiryDate') && (
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Expires:</Text>
+                <Text style={[
+                  styles.summaryValue,
+                  { color: getExpiryWarningColor(getDaysUntilExpiry(watch('expiryDate'))) }
+                ]}>
+                  {formatDate(watch('expiryDate'))}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Submit Button */}
@@ -542,6 +569,13 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      <PrintableBarcode
+        visible={showBarcodeModal}
+        onClose={() => setShowBarcodeModal(false)}
+        patientName={patientName}
+        barcodeData={barcodeData}
+        medicationName={watch('name') || 'Medication'}
+      />
     </View>
   );
 };
@@ -589,10 +623,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING[4],
     borderWidth: 2,
     borderColor: '#BBF7D0',
-  },
-  medicineIcon: {
-    width: 60,
-    height: 60,
   },
   formTitle: {
     fontSize: TYPOGRAPHY.fontSize['2xl'],
@@ -670,9 +700,12 @@ const styles = StyleSheet.create({
     padding: SPACING[3],
     borderRadius: RADIUS.md,
     marginTop: SPACING[3],
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#BBF7D0',
+    gap: SPACING[2],
   },
   dosagePreviewText: {
     fontSize: TYPOGRAPHY.fontSize.sm,

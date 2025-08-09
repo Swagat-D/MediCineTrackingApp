@@ -20,41 +20,9 @@ import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
 // Types and Constants
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
+import { caregiverAPI, PatientDetails } from '../../services/api/caregiverAPI';
 
 type Props = CaregiverStackScreenProps<'PatientDetails'>;
-
-interface PatientDetails {
-  id: string;
-  name: string;
-  email: string;
-  phoneNumber: string;
-  age: number;
-  gender: string;
-  lastActivity: string;
-  status: 'active' | 'inactive' | 'critical';
-  adherenceRate: number;
-  emergencyContact?: {
-    name: string;
-    relationship: string;
-    phoneNumber: string;
-  };
-  medicalHistory?: string[];
-  allergies?: string[];
-}
-
-interface PatientMedication {
-  id: string;
-  name: string;
-  dosage: string;
-  frequency: number;
-  timingRelation: string;
-  remainingQuantity: number;
-  totalQuantity: number;
-  status: 'active' | 'paused' | 'completed';
-  adherenceRate: number;
-  lastTaken?: string;
-  daysLeft: number;
-}
 
 const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const { patientId } = route.params;
@@ -62,81 +30,23 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'medications'>('info');
-  
-  const [patientDetails] = useState<PatientDetails>({
-    id: patientId,
-    name: 'John Smith',
-    email: 'john.smith@email.com',
-    phoneNumber: '+1-555-0101',
-    age: 65,
-    gender: 'Male',
-    lastActivity: '2 hours ago',
-    status: 'active',
-    adherenceRate: 92,
-    emergencyContact: {
-      name: 'Jane Smith',
-      relationship: 'Spouse',
-      phoneNumber: '+1-555-0102',
-    },
-    medicalHistory: ['Hypertension', 'Type 2 Diabetes', 'High Cholesterol'],
-    allergies: ['Penicillin', 'Shellfish'],
-  });
-
-  const [medications] = useState<PatientMedication[]>([
-    {
-      id: '1',
-      name: 'Metformin',
-      dosage: '500mg',
-      frequency: 2,
-      timingRelation: 'after_food',
-      remainingQuantity: 15,
-      totalQuantity: 60,
-      status: 'active',
-      adherenceRate: 95,
-      lastTaken: '8 hours ago',
-      daysLeft: 7,
-    },
-    {
-      id: '2',
-      name: 'Lisinopril',
-      dosage: '10mg',
-      frequency: 1,
-      timingRelation: 'anytime',
-      remainingQuantity: 25,
-      totalQuantity: 30,
-      status: 'active',
-      adherenceRate: 88,
-      lastTaken: '12 hours ago',
-      daysLeft: 25,
-    },
-    {
-      id: '3',
-      name: 'Atorvastatin',
-      dosage: '20mg',
-      frequency: 1,
-      timingRelation: 'before_food',
-      remainingQuantity: 8,
-      totalQuantity: 30,
-      status: 'active',
-      adherenceRate: 92,
-      lastTaken: '1 day ago',
-      daysLeft: 8,
-    },
-  ]);
+  const [patientData, setPatientData] = useState<PatientDetails | null>(null);
 
   useEffect(() => {
     loadPatientDetails();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadPatientDetails = async () => {
     try {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setIsLoading(false);
-    } catch (error) {
+      const data = await caregiverAPI.getPatientDetails(patientId);
+      setPatientData(data);
+    } catch (error: any) {
       console.error('Error loading patient details:', error);
+      Alert.alert('Error', error.message || 'Failed to load patient details. Please try again.');
+    } finally {
       setIsLoading(false);
-      Alert.alert('Error', 'Failed to load patient details. Please try again.');
     }
   };
 
@@ -150,7 +60,30 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     navigation.navigate('AddMedication', { patientId });
   };
 
-  const getStatusColor = (status: PatientDetails['status']) => {
+  const handleDeleteMedication = async (medicationId: string, medicationName: string) => {
+    Alert.alert(
+      'Delete Medication',
+      `Are you sure you want to delete ${medicationName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await caregiverAPI.deleteMedication(medicationId);
+              Alert.alert('Success', 'Medication deleted successfully');
+              await loadPatientDetails();
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to delete medication');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return '#059669';
       case 'critical': return '#EF4444';
@@ -176,6 +109,24 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
+  const formatLastActivity = (lastActivity: string) => {
+    const date = new Date(lastActivity);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 24) {
+      return diffInHours < 1 ? 'Just now' : `${diffInHours}h ago`;
+    } else {
+      const diffInDays = Math.floor(diffInHours / 24);
+      return diffInDays === 1 ? '1 day ago' : `${diffInDays} days ago`;
+    }
+  };
+
+  const formatLastTaken = (lastTaken?: string) => {
+    if (!lastTaken) return 'Never';
+    return formatLastActivity(lastTaken);
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -191,12 +142,35 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   }
 
+  if (!patientData) {
+    return (
+      <View style={styles.container}>
+        <SecondaryNavbar
+          title="Patient Details"
+          onBackPress={() => navigation.goBack()}
+        />
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color="#EF4444" />
+          <Text style={styles.errorTitle}>Patient Not Found</Text>
+          <Text style={styles.errorText}>Unable to load patient details</Text>
+          <Button
+            title="Try Again"
+            onPress={loadPatientDetails}
+            style={styles.retryButton}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  const { patient, medications } = patientData;
+
   return (
     <View style={styles.container}>
       <SecondaryNavbar
-        title={patientDetails.name}
+        title={patient.name}
         onBackPress={() => navigation.goBack()}
-        subtitle={`${patientDetails.adherenceRate}% adherence`}
+        subtitle={`${patient.adherenceRate}% adherence`}
       />
 
       <ScrollView
@@ -220,21 +194,21 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={styles.patientInfo}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
-                {patientDetails.name.split(' ').map(n => n[0]).join('')}
+                {patient.name.split(' ').map(n => n[0]).join('')}
               </Text>
             </View>
             
             <View style={styles.patientDetails}>
               <View style={styles.statusRow}>
-                <View style={[styles.statusDot, { backgroundColor: getStatusColor(patientDetails.status) }]} />
+                <View style={[styles.statusDot, { backgroundColor: getStatusColor(patient.status) }]} />
                 <Text style={styles.statusText}>
-                  {patientDetails.status.charAt(0).toUpperCase() + patientDetails.status.slice(1)}
+                  {patient.status.charAt(0).toUpperCase() + patient.status.slice(1)}
                 </Text>
-                <Text style={styles.lastActivity}>• {patientDetails.lastActivity}</Text>
+                <Text style={styles.lastActivity}>• {formatLastActivity(patient.lastActivity)}</Text>
               </View>
               
               <Text style={styles.patientMeta}>
-                {patientDetails.age} years • {patientDetails.gender}
+                {patient.age} years • {patient.gender}
               </Text>
             </View>
           </View>
@@ -247,8 +221,8 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: getAdherenceColor(patientDetails.adherenceRate) }]}>
-                {patientDetails.adherenceRate}%
+              <Text style={[styles.statNumber, { color: getAdherenceColor(patient.adherenceRate) }]}>
+                {patient.adherenceRate}%
               </Text>
               <Text style={styles.statLabel}>Adherence</Text>
             </View>
@@ -303,45 +277,45 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 <View style={styles.infoRow}>
                   <Ionicons name="person-outline" size={20} color="#64748B" />
                   <Text style={styles.infoLabel}>Age & Gender</Text>
-                  <Text style={styles.infoValue}>{patientDetails.age} years, {patientDetails.gender}</Text>
+                  <Text style={styles.infoValue}>{patient.age} years, {patient.gender}</Text>
                 </View>
                 <View style={styles.infoRow}>
                   <Ionicons name="mail-outline" size={20} color="#64748B" />
                   <Text style={styles.infoLabel}>Email</Text>
-                  <Text style={styles.infoValue}>{patientDetails.email}</Text>
+                  <Text style={styles.infoValue}>{patient.email}</Text>
                 </View>
                 <View style={styles.infoRow}>
                   <Ionicons name="call-outline" size={20} color="#64748B" />
                   <Text style={styles.infoLabel}>Phone</Text>
-                  <Text style={styles.infoValue}>{patientDetails.phoneNumber}</Text>
+                  <Text style={styles.infoValue}>{patient.phoneNumber}</Text>
                 </View>
                 <View style={styles.infoRow}>
                   <Ionicons name="time-outline" size={20} color="#64748B" />
                   <Text style={styles.infoLabel}>Last Active</Text>
-                  <Text style={styles.infoValue}>{patientDetails.lastActivity}</Text>
+                  <Text style={styles.infoValue}>{formatLastActivity(patient.lastActivity)}</Text>
                 </View>
               </View>
             </View>
 
             {/* Emergency Contact */}
-            {patientDetails.emergencyContact && (
+            {patient.emergencyContact && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Emergency Contact</Text>
                 <View style={styles.infoCard}>
                   <View style={styles.infoRow}>
                     <Ionicons name="person-circle-outline" size={20} color="#64748B" />
                     <Text style={styles.infoLabel}>Name</Text>
-                    <Text style={styles.infoValue}>{patientDetails.emergencyContact.name}</Text>
+                    <Text style={styles.infoValue}>{patient.emergencyContact.name}</Text>
                   </View>
                   <View style={styles.infoRow}>
                     <Ionicons name="heart-outline" size={20} color="#64748B" />
                     <Text style={styles.infoLabel}>Relationship</Text>
-                    <Text style={styles.infoValue}>{patientDetails.emergencyContact.relationship}</Text>
+                    <Text style={styles.infoValue}>{patient.emergencyContact.relationship}</Text>
                   </View>
                   <View style={styles.infoRow}>
                     <Ionicons name="call-outline" size={20} color="#64748B" />
                     <Text style={styles.infoLabel}>Phone</Text>
-                    <Text style={styles.infoValue}>{patientDetails.emergencyContact.phoneNumber}</Text>
+                    <Text style={styles.infoValue}>{patient.emergencyContact.phoneNumber}</Text>
                   </View>
                 </View>
               </View>
@@ -351,10 +325,10 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Medical Information</Text>
               <View style={styles.infoCard}>
-                {patientDetails.medicalHistory && patientDetails.medicalHistory.length > 0 && (
+                {patient.medicalHistory && patient.medicalHistory.length > 0 && (
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoColumnTitle}>Medical History</Text>
-                    {patientDetails.medicalHistory.map((condition, index) => (
+                    {patient.medicalHistory.map((condition, index) => (
                       <View key={index} style={styles.conditionItem}>
                         <Ionicons name="medical-outline" size={16} color="#059669" />
                         <Text style={styles.conditionText}>{condition}</Text>
@@ -363,16 +337,21 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                   </View>
                 )}
                 
-                {patientDetails.allergies && patientDetails.allergies.length > 0 && (
+                {patient.allergies && patient.allergies.length > 0 && (
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoColumnTitle}>Allergies</Text>
-                    {patientDetails.allergies.map((allergy, index) => (
+                    {patient.allergies.map((allergy, index) => (
                       <View key={index} style={styles.conditionItem}>
                         <Ionicons name="warning-outline" size={16} color="#EF4444" />
                         <Text style={styles.conditionText}>{allergy}</Text>
                       </View>
                     ))}
                   </View>
+                )}
+                
+                {(!patient.medicalHistory || patient.medicalHistory.length === 0) && 
+                 (!patient.allergies || patient.allergies.length === 0) && (
+                  <Text style={styles.noDataText}>No medical history or allergies recorded</Text>
                 )}
               </View>
             </View>
@@ -392,95 +371,87 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             {/* Medications List */}
             <View style={styles.medicationsSection}>
               <Text style={styles.sectionTitle}>Current Medications</Text>
-              {medications.map((medication) => (
-                <View key={medication.id} style={styles.medicationCard}>
-                  <View style={styles.medicationHeader}>
-                    <View style={styles.medicationInfo}>
-                      <Text style={styles.medicationName}>{medication.name}</Text>
-                      <Text style={styles.medicationDetails}>
-                        {medication.dosage} • {medication.frequency}x daily • {formatTimingRelation(medication.timingRelation)}
-                      </Text>
-                      <Text style={styles.medicationStatus}>
-                        Last taken: {medication.lastTaken || 'Never'}
-                      </Text>
-                    </View>
-                    
-                    <View style={styles.adherenceIndicator}>
-                      <Text style={[styles.adherenceText, { color: getAdherenceColor(medication.adherenceRate) }]}>
-                        {medication.adherenceRate}%
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.medicationStats}>
-                    <View style={styles.medicationStat}>
-                      <Text style={styles.medicationStatLabel}>Remaining</Text>
-                      <Text style={[
-                        styles.medicationStatValue,
-                        { color: medication.daysLeft < 7 ? '#EF4444' : '#1E293B' }
-                      ]}>
-                        {medication.remainingQuantity}/{medication.totalQuantity}
-                      </Text>
-                    </View>
-
-                    <View style={styles.medicationStat}>
-                      <Text style={styles.medicationStatLabel}>Days Left</Text>
-                      <Text style={[
-                        styles.medicationStatValue,
-                        { color: medication.daysLeft < 7 ? '#EF4444' : '#1E293B' }
-                      ]}>
-                        {medication.daysLeft}
-                      </Text>
-                    </View>
-
-                    <View style={styles.medicationStat}>
-                      <Text style={styles.medicationStatLabel}>Adherence</Text>
-                      <Text style={[
-                        styles.medicationStatValue,
-                        { color: getAdherenceColor(medication.adherenceRate) }
-                      ]}>
-                        {medication.adherenceRate}%
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.medicationActions}>
-                    <TouchableOpacity
-                      style={styles.medicationAction}
-                      onPress={() => {
-                        Alert.alert('Edit Medication', `Edit ${medication.name} settings`);
-                      }}
-                    >
-                      <Ionicons name="create-outline" size={16} color="#059669" />
-                      <Text style={styles.medicationActionText}>Edit</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.medicationAction}
-                      onPress={() => navigation.navigate('BarcodeGenerator', { medicationId: medication.id })}
-                    >
-                      <Ionicons name="qr-code-outline" size={16} color="#059669" />
-                      <Text style={styles.medicationActionText}>Barcode</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.medicationAction, styles.deleteAction]}
-                      onPress={() => {
-                        Alert.alert(
-                          'Delete Medication',
-                          `Are you sure you want to delete ${medication.name}?`,
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            { text: 'Delete', style: 'destructive' },
-                          ]
-                        );
-                      }}
-                    >
-                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                    </TouchableOpacity>
-                  </View>
+              {medications.length === 0 ? (
+                <View style={styles.emptyMedicationsContainer}>
+                  <Ionicons name="medical-outline" size={64} color="#D1D5DB" />
+                  <Text style={styles.emptyMedicationsTitle}>No Medications Yet</Text>
+                  <Text style={styles.emptyMedicationsText}>
+                    Add the first medication for this patient
+                  </Text>
                 </View>
-              ))}
+              ) : (
+                medications.map((medication) => (
+                  <View key={medication.id} style={styles.medicationCard}>
+                    <View style={styles.medicationHeader}>
+                      <View style={styles.medicationInfo}>
+                        <Text style={styles.medicationName}>{medication.name}</Text>
+                        <Text style={styles.medicationDetails}>
+                          {medication.dosage} {medication.dosageUnit} • {medication.frequency}x daily • {formatTimingRelation(medication.timingRelation)}
+                        </Text>
+                        <Text style={styles.medicationStatus}>
+                          Last taken: {formatLastTaken(medication.lastTaken)}
+                        </Text>
+                      </View>
+                      
+                      <View style={styles.adherenceIndicator}>
+                        <Text style={[styles.adherenceText, { color: getAdherenceColor(medication.adherenceRate) }]}>
+                          {medication.adherenceRate}%
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.medicationStats}>
+                      <View style={styles.medicationStat}>
+                        <Text style={styles.medicationStatLabel}>Remaining</Text>
+                        <Text style={[
+                          styles.medicationStatValue,
+                          { color: medication.daysLeft < 7 ? '#EF4444' : '#1E293B' }
+                        ]}>
+                          {medication.remainingQuantity}/{medication.totalQuantity}
+                        </Text>
+                      </View>
+
+                      <View style={styles.medicationStat}>
+                        <Text style={styles.medicationStatLabel}>Days Left</Text>
+                        <Text style={[
+                          styles.medicationStatValue,
+                          { color: medication.daysLeft < 7 ? '#EF4444' : '#1E293B' }
+                        ]}>
+                          {medication.daysLeft}
+                        </Text>
+                      </View>
+
+                      <View style={styles.medicationStat}>
+                        <Text style={styles.medicationStatLabel}>Status</Text>
+                        <Text style={[
+                          styles.medicationStatValue,
+                          { color: medication.status === 'active' ? '#059669' : '#F59E0B' }
+                        ]}>
+                          {medication.status}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.medicationActions}>
+                      <TouchableOpacity
+                        style={styles.medicationAction}
+                        onPress={() => navigation.navigate('BarcodeGenerator', { medicationId: medication.id })}
+                      >
+                        <Ionicons name="qr-code-outline" size={16} color="#059669" />
+                        <Text style={styles.medicationActionText}>Barcode</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.medicationAction, styles.deleteAction]}
+                        onPress={() => handleDeleteMedication(medication.id, medication.name)}
+                      >
+                        <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                        <Text style={[styles.medicationActionText, { color: '#EF4444' }]}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
             </View>
           </View>
         )}
@@ -508,6 +479,29 @@ const styles = StyleSheet.create({
     marginTop: SPACING[4],
     fontSize: TYPOGRAPHY.fontSize.md,
     color: '#64748B',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING[5],
+    marginTop: Platform.OS === 'ios' ? 100 : 56,
+  },
+  errorTitle: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginTop: SPACING[4],
+    marginBottom: SPACING[2],
+  },
+  errorText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: SPACING[6],
+  },
+  retryButton: {
+    minWidth: 120,
   },
   scrollView: {
     flex: 1,
@@ -670,6 +664,8 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '500',
     color: '#1E293B',
+    maxWidth: '60%',
+    textAlign: 'right',
   },
   infoColumn: {
     marginBottom: SPACING[4],
@@ -690,6 +686,13 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: '#1E293B',
   },
+  noDataText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#94A3B8',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingVertical: SPACING[4],
+  },
   addMedicationSection: {
     marginBottom: SPACING[6],
   },
@@ -698,6 +701,26 @@ const styles = StyleSheet.create({
   },
   medicationsSection: {
     marginBottom: SPACING[6],
+  },
+  emptyMedicationsContainer: {
+    alignItems: 'center',
+    paddingVertical: SPACING[12],
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.xl,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emptyMedicationsTitle: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginTop: SPACING[4],
+    marginBottom: SPACING[2],
+  },
+  emptyMedicationsText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#64748B',
+    textAlign: 'center',
   },
   medicationCard: {
     backgroundColor: '#FFFFFF',
@@ -769,15 +792,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: SPACING[3],
   },
   medicationAction: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[2],
-    borderRadius: RADIUS.md,
+    justifyContent: 'center',
     backgroundColor: '#F8FAFC',
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING[3],
     gap: SPACING[1],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   medicationActionText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
@@ -786,72 +813,7 @@ const styles = StyleSheet.create({
   },
   deleteAction: {
     backgroundColor: '#FEF2F2',
-    paddingHorizontal: SPACING[3],
-  },
-  infoList: {
-    gap: SPACING[3],
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[3],
-    paddingVertical: SPACING[2],
-  },
-  infoText: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: '#475569',
-    flex: 1,
-  },
-  medicalSection: {
-    marginBottom: SPACING[4],
-  },
-  medicalTitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: '500',
-    color: '#1E293B',
-    marginBottom: SPACING[3],
-  },
-  medicalItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SPACING[1],
-    gap: SPACING[2],
-  },
-  medicalDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#059669',
-  },
-  medicalText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#475569',
-  },
-  medicationFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: SPACING[3],
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  stockInfo: {
-    flex: 1,
-  },
-  stockText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: '#64748B',
-    marginBottom: 2,
-  },
-  actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F8FAFC',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#FECACA',
   },
 });
 

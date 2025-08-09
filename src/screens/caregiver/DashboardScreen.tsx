@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { useAppSelector } from '../../store';
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import CaregiverNavbar from '../../components/common/CaregiverNavbar';
+import { caregiverAPI } from '@/services/api/caregiverAPI';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { width } = Dimensions.get('window');
@@ -41,52 +42,36 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAppSelector(state => state.auth);
   const [refreshing, setRefreshing] = useState(false);
   
-  const [dashboardStats] = useState<DashboardStats>({
-    totalPatients: 8,
-    activeMedications: 24,
-    todayReminders: 6,
-    criticalAlerts: 1,
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
+    totalPatients: 0,
+    activeMedications: 0,
+    todayReminders: 0,
+    criticalAlerts: 0,
   });
   
-  const [recentActivities] = useState<RecentActivity[]>([
-    {
-      id: '1',
-      type: 'dose_taken',
-      patientName: 'John Smith',
-      message: 'Took morning medication (Metformin 500mg)',
-      timestamp: '5 min ago',
-      priority: 'low',
-    },
-    {
-      id: '2',
-      type: 'sos_alert',
-      patientName: 'Mary Johnson',
-      message: 'Emergency alert - needs assistance',
-      timestamp: '12 min ago',
-      priority: 'critical',
-    },
-    {
-      id: '3',
-      type: 'dose_missed',
-      patientName: 'Robert Davis',
-      message: 'Missed evening dose (Lisinopril 10mg)',
-      timestamp: '1 hour ago',
-      priority: 'high',
-    },
-    {
-      id: '4',
-      type: 'low_stock',
-      patientName: 'Sarah Wilson',
-      message: 'Medication running low (3 days remaining)',
-      timestamp: '2 hours ago',
-      priority: 'medium',
-    },
-  ]);
+  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
 
   const onRefresh = async () => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  };
+  setRefreshing(true);
+  try {
+    const data = await caregiverAPI.getDashboardStats();
+    setDashboardStats(data.stats);
+    setRecentActivities(
+      data.recentActivities.map((activity: any) => ({
+        ...activity,
+        type: activity.type as 'dose_taken' | 'dose_missed' | 'low_stock' | 'sos_alert',
+      }))
+    );
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error);
+  } finally {
+    setRefreshing(false);
+  }
+};
+
+  useEffect(() => {
+    onRefresh();
+  }, []);
 
   const getGreeting = () => {
     const hour = new Date().getHours();

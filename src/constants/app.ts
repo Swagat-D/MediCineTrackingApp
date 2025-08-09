@@ -1,5 +1,4 @@
 import { UserRole } from '../types/auth.types';
-import { DosageUnit, TimingRelation } from '../types/medication.types';
 
 // User Roles
 export const USER_ROLES: Record<string, UserRole> = {
@@ -73,25 +72,22 @@ export interface MedicationOption {
 }
 
 export const MEDICATION_CONSTANTS = {
-  TIMING_RELATIONS: [
-    { label: 'Before Food', value: 'before_food' as TimingRelation },
-    { label: 'After Food', value: 'after_food' as TimingRelation },
-    { label: 'With Food', value: 'with_food' as TimingRelation },
-    { label: 'Empty Stomach', value: 'empty_stomach' as TimingRelation },
-    { label: 'Anytime', value: 'anytime' as TimingRelation },
-  ],
-  
+  DOSAGE_UNITS: ['mg', 'g', 'ml', 'tablets', 'capsules', 'drops', 'puffs', 'units'],
   FREQUENCIES: [
-    { label: 'Once Daily', value: 1 },
-    { label: 'Twice Daily', value: 2 },
-    { label: 'Three Times Daily', value: 3 },
-    { label: 'Four Times Daily', value: 4 },
-    { label: 'As Needed', value: 0 },
+    { value: 1, label: '1 time daily' },
+    { value: 2, label: '2 times daily' },
+    { value: 3, label: '3 times daily' },
+    { value: 4, label: '4 times daily' },
+    { value: 5, label: '5 times daily' },
+    { value: 6, label: '6 times daily' },
   ],
-  
-  DOSAGE_UNITS: [
-    'mg', 'g', 'ml', 'tablets', 'capsules', 'drops', 'puffs', 'units'
-  ] as DosageUnit[],
+  TIMING_RELATIONS: [
+    { value: 'before_food', label: 'Before Food' },
+    { value: 'after_food', label: 'After Food' },
+    { value: 'with_food', label: 'With Food' },
+    { value: 'empty_stomach', label: 'Empty Stomach' },
+    { value: 'anytime', label: 'Anytime' },
+  ],
 };
 
 // Notification Types

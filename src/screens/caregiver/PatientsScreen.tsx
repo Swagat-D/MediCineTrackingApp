@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
 import CaregiverNavbar from '../../components/common/CaregiverNavbar';
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../constants/themes/theme';
+import { caregiverAPI, Patient as PatientType } from '../../services/api/caregiverAPI';
 
 const { width } = Dimensions.get('window');
 
@@ -44,99 +45,56 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'critical'>('all');
   
-  const [patients] = useState<Patient[]>([
-    {
-      id: '1',
-      name: 'John Smith',
-      email: 'john.smith@email.com',
-      age: 65,
-      gender: 'Male',
-      phoneNumber: '+1-555-0101',
-      medicationsCount: 4,
-      adherenceRate: 92,
-      lastActivity: '2 hours ago',
-      status: 'active',
-      alerts: 0,
-    },
-    {
-      id: '2',
-      name: 'Mary Johnson',
-      email: 'mary.johnson@email.com',
-      age: 58,
-      gender: 'Female',
-      phoneNumber: '+1-555-0102',
-      medicationsCount: 6,
-      adherenceRate: 78,
-      lastActivity: '1 day ago',
-      status: 'critical',
-      alerts: 2,
-    },
-    {
-      id: '3',
-      name: 'Robert Davis',
-      email: 'robert.davis@email.com',
-      age: 72,
-      gender: 'Male',
-      phoneNumber: '+1-555-0103',
-      medicationsCount: 3,
-      adherenceRate: 95,
-      lastActivity: '30 minutes ago',
-      status: 'active',
-      alerts: 1,
-    },
-    {
-      id: '4',
-      name: 'Sarah Wilson',
-      email: 'sarah.wilson@email.com',
-      age: 45,
-      gender: 'Female',
-      phoneNumber: '+1-555-0104',
-      medicationsCount: 2,
-      adherenceRate: 85,
-      lastActivity: '3 days ago',
-      status: 'inactive',
-      alerts: 0,
-    },
-    {
-      id: '5',
-      name: 'Michael Brown',
-      email: 'michael.brown@email.com',
-      age: 55,
-      gender: 'Male',
-      phoneNumber: '+1-555-0105',
-      medicationsCount: 5,
-      adherenceRate: 88,
-      lastActivity: '4 hours ago',
-      status: 'active',
-      alerts: 0,
-    },
-  ]);
+  const [patients, setPatients] = useState<Patient[]>([]);
 
   const onRefresh = async () => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  };
+  setRefreshing(true);
+  try {
+    const data = await caregiverAPI.getPatients({
+      search: searchQuery,
+      status: filterStatus,
+      sortBy: 'name',
+      sortOrder: 'asc'
+    });
+    setPatients(data);
+  } catch (error) {
+    console.error('Error fetching patients:', error);
+  } finally {
+    setRefreshing(false);
+  }
+};
+
+  useEffect(() => {
+    onRefresh();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, filterStatus]);
 
   const handlePatientPress = (patient: Patient) => {
     navigation.navigate('PatientDetails', { patientId: patient.id });
   };
 
-  const handleDeletePatient = (patientId: string, patientName: string) => {
-    Alert.alert(
-      'Remove Patient',
-      `Are you sure you want to remove ${patientName} from your patient list?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => {
+  const handleDeletePatient = async (patientId: string, patientName: string) => {
+  Alert.alert(
+    'Remove Patient',
+    `Are you sure you want to remove ${patientName} from your patient list?`,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await caregiverAPI.removePatient(patientId);
             Alert.alert('Success', `${patientName} has been removed from your patient list`);
-          },
+            onRefresh();
+          } catch (error) {
+            Alert.alert('Error', 'Failed to remove patient');
+          }
         },
-      ]
-    );
-  };
+      },
+    ]
+  );
+};
 
   const getStatusColor = (status: Patient['status']) => {
     switch (status) {
@@ -171,7 +129,7 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
 
   const filterCounts = getFilterCounts();
 
-  const PatientCard = ({ patient }: { patient: Patient }) => (
+  const PatientCard = ({ patient }: { patient: PatientType }) => (
     <TouchableOpacity
       style={styles.patientCard}
       onPress={() => handlePatientPress(patient)}

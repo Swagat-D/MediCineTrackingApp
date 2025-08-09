@@ -52,6 +52,9 @@ export type CaregiverStackParamList = {
   Profile: undefined;
   Settings: undefined;
   Notifications: undefined;
+  HelpSupport: undefined;
+  About:undefined;
+  Privacy: undefined;
 };
 
 // Caregiver Tab Navigator
@@ -73,6 +76,9 @@ export type PatientStackParamList = {
   Settings: undefined;
   SOS: undefined;
   Notifications: undefined;
+  HelpSupport: undefined;
+  About:undefined;
+  Privacy: undefined;
 };
 
 // Patient Tab Navigator

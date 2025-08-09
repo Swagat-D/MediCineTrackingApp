@@ -37,6 +37,7 @@ interface Medication {
   lastTaken?: string;
   nextDose: string;
   adherenceRate: number;
+  barcodeData: string;
 }
 
 const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
@@ -44,68 +45,7 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'due' | 'low'>('all');
   
-  const [medications] = useState<Medication[]>([
-    {
-      id: '1',
-      name: 'Metformin',
-      dosage: '500mg',
-      frequency: 'Twice daily',
-      times: ['08:00', '20:00'],
-      instructions: 'Take with food',
-      remainingDoses: 28,
-      totalDoses: 30,
-      expiryDate: '2025-06-15',
-      color: '#3B82F6',
-      lastTaken: '08:00 Today',
-      nextDose: '20:00 Today',
-      adherenceRate: 95,
-    },
-    {
-      id: '2',
-      name: 'Lisinopril',
-      dosage: '10mg',
-      frequency: 'Once daily',
-      times: ['08:00'],
-      instructions: 'Take on empty stomach',
-      remainingDoses: 22,
-      totalDoses: 30,
-      expiryDate: '2025-08-20',
-      color: '#059669',
-      lastTaken: '08:00 Today',
-      nextDose: '08:00 Tomorrow',
-      adherenceRate: 88,
-    },
-    {
-      id: '3',
-      name: 'Atorvastatin',
-      dosage: '20mg',
-      frequency: 'Once daily',
-      times: ['22:00'],
-      instructions: 'Take before bed',
-      remainingDoses: 15,
-      totalDoses: 30,
-      expiryDate: '2025-09-10',
-      color: '#8B5CF6',
-      lastTaken: '22:00 Yesterday',
-      nextDose: '22:00 Today',
-      adherenceRate: 92,
-    },
-    {
-      id: '4',
-      name: 'Aspirin',
-      dosage: '81mg',
-      frequency: 'Once daily',
-      times: ['08:00'],
-      instructions: 'Take with breakfast',
-      remainingDoses: 3,
-      totalDoses: 30,
-      expiryDate: '2025-05-30',
-      color: '#F59E0B',
-      lastTaken: '08:00 Today',
-      nextDose: '08:00 Tomorrow',
-      adherenceRate: 78,
-    },
-  ]);
+  const [medications] = useState<Medication[]>([]);
 
   const onRefresh = async () => {
     setRefreshing(true);

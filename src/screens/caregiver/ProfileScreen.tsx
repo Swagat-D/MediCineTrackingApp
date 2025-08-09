@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,9 +19,10 @@ import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 
-// Redux
+// Redux and API
 import { useAppDispatch, useAppSelector } from '../../store';
 import { logoutUser, updateUser } from '../../store/slices/authSlice';
+import { authAPI } from '../../services/api/authAPI';
 
 type Props = CaregiverStackScreenProps<'Profile'>;
 
@@ -31,31 +32,93 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: '',
+    email: '',
+    phoneNumber: '',
+    age: 0,
+    gender: '',
+  });
   const [formData, setFormData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    phoneNumber: user?.phoneNumber || '',
+    name: '',
+    phoneNumber: '',
   });
 
   // Essential settings only
   const [notifications, setNotifications] = useState(true);
 
+  useEffect(() => {
+    loadProfile();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      setIsLoading(true);
+      // Get current user profile from API
+      const profile = await authAPI.getCurrentUser();
+      setProfileData({
+        name: profile.name,
+        email: profile.email,
+        phoneNumber: profile.phoneNumber || '',
+        age: profile.age || 0,
+        gender: profile.gender || '',
+      });
+      setFormData({
+        name: profile.name,
+        phoneNumber: profile.phoneNumber || '',
+      });
+    } catch (error) {
+      console.error('Error loading profile:', error);
+      // Fallback to Redux state if API fails
+      if (user) {
+        setProfileData({
+          name: user.name,
+          email: user.email,
+          phoneNumber: user.phoneNumber || '',
+          age: user.age || 0,
+          gender: user.gender || '',
+        });
+        setFormData({
+          name: user.name,
+          phoneNumber: user.phoneNumber || '',
+        });
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     try {
       setIsLoading(true);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Call actual API
+      await authAPI.updateProfile({
+        name: formData.name,
+        phoneNumber: formData.phoneNumber,
+      });
       
-      // Update user in Redux store
-      dispatch(updateUser(formData));
+      // Update local state
+      setProfileData(prev => ({
+        ...prev,
+        name: formData.name,
+        phoneNumber: formData.phoneNumber,
+      }));
+      
+      // Update Redux store
+      dispatch(updateUser({
+        ...user,
+        name: formData.name,
+        phoneNumber: formData.phoneNumber,
+      }));
       
       setIsEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      Alert.alert('Error', error.message || 'Failed to update profile. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -78,11 +141,27 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  if (isLoading) {
+  const handleNavigation = (screen: string) => {
+    switch (screen) {
+      case 'help':
+        navigation.navigate('HelpSupport');
+        break;
+      case 'about':
+        navigation.navigate('About');
+        break;
+      case 'privacy':
+        navigation.navigate('Privacy');
+        break;
+      default:
+        break;
+    }
+  };
+
+  if (isLoading && !profileData.name) {
     return (
       <View style={styles.loadingContainer}>
         <LoadingSpinner size="large" />
-        <Text style={styles.loadingText}>Updating profile...</Text>
+        <Text style={styles.loadingText}>Loading profile...</Text>
       </View>
     );
   }
@@ -108,29 +187,22 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
               <View style={styles.avatar}>
-                <Ionicons name="person" size={40} color="#059669" />
+                <Text style={styles.avatarText}>
+                  {profileData.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                </Text>
               </View>
             </View>
             
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{user?.name || 'User'}</Text>
+              <Text style={styles.profileName}>{profileData.name}</Text>
               <Text style={styles.profileRole}>Healthcare Caregiver</Text>
-              <View style={styles.profileStats}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>12</Text>
-                  <Text style={styles.statLabel}>Patients</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>94%</Text>
-                  <Text style={styles.statLabel}>Adherence</Text>
-                </View>
-              </View>
+              <Text style={styles.profileEmail}>{profileData.email}</Text>
             </View>
 
             <TouchableOpacity
               style={styles.editButton}
               onPress={() => setIsEditing(!isEditing)}
+              disabled={isLoading}
             >
               <Ionicons
                 name={isEditing ? "checkmark" : "create-outline"}
@@ -155,7 +227,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
                   </View>
                   <View style={styles.fieldContent}>
                     <Text style={styles.fieldLabel}>Full Name</Text>
-                    <Text style={styles.fieldValue}>{user?.name || 'Not provided'}</Text>
+                    <Text style={styles.fieldValue}>{profileData.name || 'Not provided'}</Text>
                   </View>
                 </View>
 
@@ -165,7 +237,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
                   </View>
                   <View style={styles.fieldContent}>
                     <Text style={styles.fieldLabel}>Email Address</Text>
-                    <Text style={styles.fieldValue}>{user?.email || 'Not provided'}</Text>
+                    <Text style={styles.fieldValue}>{profileData.email || 'Not provided'}</Text>
                   </View>
                 </View>
 
@@ -175,9 +247,33 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
                   </View>
                   <View style={styles.fieldContent}>
                     <Text style={styles.fieldLabel}>Phone Number</Text>
-                    <Text style={styles.fieldValue}>{user?.phoneNumber || 'Not provided'}</Text>
+                    <Text style={styles.fieldValue}>{profileData.phoneNumber || 'Not provided'}</Text>
                   </View>
                 </View>
+
+                {profileData.age > 0 && (
+                  <View style={styles.profileField}>
+                    <View style={styles.fieldIcon}>
+                      <Ionicons name="calendar-outline" size={18} color="#059669" />
+                    </View>
+                    <View style={styles.fieldContent}>
+                      <Text style={styles.fieldLabel}>Age</Text>
+                      <Text style={styles.fieldValue}>{profileData.age} years</Text>
+                    </View>
+                  </View>
+                )}
+
+                {profileData.gender && (
+                  <View style={styles.profileField}>
+                    <View style={styles.fieldIcon}>
+                      <Ionicons name="person-outline" size={18} color="#059669" />
+                    </View>
+                    <View style={styles.fieldContent}>
+                      <Text style={styles.fieldLabel}>Gender</Text>
+                      <Text style={styles.fieldValue}>{profileData.gender}</Text>
+                    </View>
+                  </View>
+                )}
               </>
             ) : (
               // Edit Mode
@@ -193,7 +289,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
                   <Text style={styles.disabledFieldLabel}>Email Address</Text>
                   <View style={styles.disabledField}>
                     <Ionicons name="mail-outline" size={18} color="#94A3B8" />
-                    <Text style={styles.disabledFieldText}>{user?.email}</Text>
+                    <Text style={styles.disabledFieldText}>{profileData.email}</Text>
                     <Ionicons name="lock-closed" size={16} color="#94A3B8" />
                   </View>
                   <Text style={styles.disabledFieldNote}>Email cannot be changed</Text>
@@ -213,9 +309,8 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
                     onPress={() => {
                       setIsEditing(false);
                       setFormData({
-                        name: user?.name || '',
-                        email: user?.email || '',
-                        phoneNumber: user?.phoneNumber || '',
+                        name: profileData.name,
+                        phoneNumber: profileData.phoneNumber,
                       });
                     }}
                   >
@@ -226,8 +321,13 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
                   <TouchableOpacity
                     style={styles.saveButton}
                     onPress={handleSaveProfile}
+                    disabled={isLoading}
                   >
-                    <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                    {isLoading ? (
+                      <LoadingSpinner size="small" color="#FFFFFF" />
+                    ) : (
+                      <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                    )}
                     <Text style={styles.saveButtonText}>Save Changes</Text>
                   </TouchableOpacity>
                 </View>
@@ -271,9 +371,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.actionsList}>
             <TouchableOpacity
               style={styles.actionItem}
-              onPress={() => {
-                Alert.alert('Help & Support', 'Contact us at support@meditracker.com for assistance.');
-              }}
+              onPress={() => handleNavigation('help')}
             >
               <View style={styles.actionIcon}>
                 <Ionicons name="help-circle-outline" size={20} color="#059669" />
@@ -284,9 +382,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 
             <TouchableOpacity
               style={styles.actionItem}
-              onPress={() => {
-                Alert.alert('About', 'MediTracker v1.0.0\nBuilt with care for healthcare professionals.');
-              }}
+              onPress={() => handleNavigation('about')}
             >
               <View style={styles.actionIcon}>
                 <Ionicons name="information-circle-outline" size={20} color="#059669" />
@@ -297,9 +393,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 
             <TouchableOpacity
               style={styles.actionItem}
-              onPress={() => {
-                Alert.alert('Privacy Policy', 'Your privacy is important to us. View our privacy policy at meditracker.com/privacy');
-              }}
+              onPress={() => handleNavigation('privacy')}
             >
               <View style={styles.actionIcon}>
                 <Ionicons name="shield-checkmark-outline" size={20} color="#059669" />
@@ -329,6 +423,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  avatarText: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#059669',
   },
   scrollView: {
     flex: 1,
@@ -388,6 +487,12 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: '#64748B',
     marginBottom: SPACING[3],
+  },
+  profileEmail: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+    marginTop: 2,
+    fontWeight: '400',
   },
   profileStats: {
     flexDirection: 'row',

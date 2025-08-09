@@ -124,7 +124,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
       'Medication has been added successfully! A barcode has been generated.',
       [
         {
-          text: 'Print Barcode',
+          text: 'View Barcode',
           onPress: () => {
             setShowBarcodeModal(true);
           },
@@ -572,9 +572,12 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
       <PrintableBarcode
         visible={showBarcodeModal}
         onClose={() => setShowBarcodeModal(false)}
-        patientName={patientName}
-        barcodeData={barcodeData}
-        medicationName={watch('name') || 'Medication'}
+        barcodes = {[{
+        patientName:patientName,
+        barcodeData: barcodeData,
+        medicationName: watch('name') || 'Medication',
+        }]}
+        isBulkPrint={false}
       />
     </View>
   );

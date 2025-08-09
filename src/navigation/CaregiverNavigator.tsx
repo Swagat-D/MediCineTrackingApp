@@ -13,6 +13,9 @@ import BarcodeGeneratorScreen from '../screens/caregiver/BarcodeGeneratorScreen'
 import ProfileScreen from '../screens/caregiver/ProfileScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import SettingsScreen from '../screens/shared/SettingsScreen';
+import HelpSupportScreen from '@/screens/shared/HelpSupportScreen';
+import AboutScreen from '@/screens/shared/AboutScree';
+import PrivacyPolicyScreen from '@/screens/shared/PrivacyPolicyScree';
 
 // Types
 import { CaregiverTabParamList, CaregiverStackParamList } from '../types/navigation.types';
@@ -52,6 +55,9 @@ const ProfileStack: React.FC = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Profile" component={ProfileScreen} />
     <Stack.Screen name="Settings" component={SettingsScreen} />
+    <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+    <Stack.Screen name="About" component={AboutScreen} />
+    <Stack.Screen name="Privacy" component={PrivacyPolicyScreen} />
   </Stack.Navigator>
 );
 

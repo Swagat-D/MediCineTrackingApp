@@ -78,7 +78,7 @@ const AddPatientScreen: React.FC<Props> = ({ navigation }) => {
         phoneNumber: patient.phoneNumber,
         lastSeen: patient.lastSeen,
         age: patient.age ?? 0,
-        gender: patient.gender ?? 'Unknown',
+        gender: patient.gender ?? 'Not specified',
       }));
       setSearchResults(mappedResults);
       

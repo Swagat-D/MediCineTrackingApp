@@ -109,18 +109,20 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
-  const formatLastActivity = (lastActivity: string) => {
-    const date = new Date(lastActivity);
-    const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
-    if (diffInHours < 24) {
-      return diffInHours < 1 ? 'Just now' : `${diffInHours}h ago`;
-    } else {
-      const diffInDays = Math.floor(diffInHours / 24);
-      return diffInDays === 1 ? '1 day ago' : `${diffInDays} days ago`;
-    }
-  };
+  const formatLastActivity = (lastActivity?: string) => {
+  if (!lastActivity) return 'No recent activity';
+  
+  const date = new Date(lastActivity);
+  const now = new Date();
+  const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+  
+  if (diffInHours < 24) {
+    return diffInHours < 1 ? 'Just now' : `${diffInHours}h ago`;
+  } else {
+    const diffInDays = Math.floor(diffInHours / 24);
+    return diffInDays === 1 ? '1 day ago' : `${diffInDays} days ago`;
+  }
+};
 
   const formatLastTaken = (lastTaken?: string) => {
     if (!lastTaken) return 'Never';
@@ -435,10 +437,23 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                     <View style={styles.medicationActions}>
                       <TouchableOpacity
                         style={styles.medicationAction}
-                        onPress={() => navigation.navigate('BarcodeGenerator', { medicationId: medication.id })}
-                      >
+                          onPress={() => {
+                            // Show barcode modal or navigate to barcode screen
+                            Alert.alert(
+                              'Medication Barcode',
+                              `Medication ID: ${medication.id}`,
+                              [
+                                { text: 'OK' },
+                                { 
+                                  text: 'View Full Barcode', 
+                                  onPress: () => navigation.navigate('BarcodeGenerator') 
+                                }
+                              ]
+                            );
+                          }}
+                        >
                         <Ionicons name="qr-code-outline" size={16} color="#059669" />
-                        <Text style={styles.medicationActionText}>Barcode</Text>
+                        <Text style={styles.medicationActionText}>View Barcode</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity

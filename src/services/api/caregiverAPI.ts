@@ -153,6 +153,8 @@ async verifyPatientOTP(patientId: string, otp: string): Promise<Patient> {
     name: string;
     email: string;
     phoneNumber: string;
+    age?: number; // Make age optional
+    gender?: string; // Make gender optional
     lastSeen: string;
   }[]> {
     const response = await apiClient.get('/caregiver/patients/search', {

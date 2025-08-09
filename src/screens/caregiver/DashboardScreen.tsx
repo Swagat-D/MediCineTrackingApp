@@ -15,7 +15,7 @@ import { useAppSelector } from '../../store';
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import CaregiverNavbar from '../../components/common/CaregiverNavbar';
-import { caregiverAPI } from '@/services/api/caregiverAPI';
+import { caregiverAPI } from '../../services/api/caregiverAPI';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { width } = Dimensions.get('window');

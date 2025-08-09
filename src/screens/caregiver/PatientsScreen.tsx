@@ -129,86 +129,6 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
 
   const filterCounts = getFilterCounts();
 
-  const PatientCard = ({ patient }: { patient: PatientType }) => (
-    <TouchableOpacity
-      style={styles.patientCard}
-      onPress={() => handlePatientPress(patient)}
-      activeOpacity={0.9}
-    >
-      <View style={styles.patientHeader}>
-        <View style={styles.patientInfo}>
-          <View style={styles.patientNameRow}>
-            <Text style={styles.patientName}>{patient.name}</Text>
-            <View style={[
-              styles.statusBadge,
-              { backgroundColor: getStatusColor(patient.status) + '22' }
-            ]}>
-              <View style={[
-                styles.statusDot,
-                { backgroundColor: getStatusColor(patient.status) }
-              ]} />
-              <Text style={[
-                styles.statusText,
-                { color: getStatusColor(patient.status) }
-              ]}>
-                {patient.status.charAt(0).toUpperCase() + patient.status.slice(1)}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.patientMeta}>
-            <Text style={styles.patientDetails}>{patient.email} • {patient.gender}, {patient.age}</Text>
-            <Text style={styles.patientActivity}>Last activity: {patient.lastActivity}</Text>
-          </View>
-        </View>
-        {patient.alerts > 0 && (
-          <View style={styles.alertBadge}>
-            <Ionicons name="alert-circle" size={16} color="#EF4444" />
-            <Text style={styles.alertCount}>{patient.alerts}</Text>
-          </View>
-        )}
-      </View>
-      <View style={styles.patientStats}>
-        <View style={styles.statItem}>
-          <View style={styles.statIconContainer}>
-            <Ionicons name="medkit" size={16} color="#059669" />
-          </View>
-          <View style={styles.statContent}>
-            <Text style={styles.statValue}>{patient.medicationsCount}</Text>
-            <Text style={styles.statLabel}>Medications</Text>
-          </View>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <View style={styles.statIconContainer}>
-            <Ionicons name="checkmark-circle" size={16} color={getAdherenceColor(patient.adherenceRate)} />
-          </View>
-          <View style={styles.statContent}>
-            <Text style={[styles.statValue, { color: getAdherenceColor(patient.adherenceRate) }]}>
-              {patient.adherenceRate}%
-            </Text>
-            <Text style={styles.statLabel}>Adherence</Text>
-          </View>
-        </View>
-      </View>
-      <View style={styles.patientActions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => navigation.navigate('PatientDetails', { patientId: patient.id })}
-        >
-          <Ionicons name="information-circle-outline" size={16} color="#059669" />
-          <Text style={styles.actionButtonText}>Details</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => handleDeletePatient(patient.id, patient.name)}
-        >
-          <Ionicons name="trash-outline" size={16} color="#EF4444" />
-          <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Remove</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
-
   const FilterChip = ({
     filterKey,
     label,
@@ -400,8 +320,85 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
           ) : (
             <View style={styles.patientsList}>
               {filteredPatients.map(patient => (
-                <PatientCard key={patient.id} patient={patient} />
-              ))}
+  <TouchableOpacity
+    key={patient.id}
+    style={styles.patientCard}
+    onPress={() => handlePatientPress(patient)}
+    activeOpacity={0.9}
+  >
+    <View style={styles.patientHeader}>
+      <View style={styles.patientInfo}>
+        <View style={styles.patientNameRow}>
+          <Text style={styles.patientName}>{patient.name}</Text>
+          <View style={[
+            styles.statusBadge,
+            { backgroundColor: getStatusColor(patient.status) + '22' }
+          ]}>
+            <View style={[
+              styles.statusDot,
+              { backgroundColor: getStatusColor(patient.status) }
+            ]} />
+            <Text style={[
+              styles.statusText,
+              { color: getStatusColor(patient.status) }
+            ]}>
+              {patient.status.charAt(0).toUpperCase() + patient.status.slice(1)}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.patientMeta}>
+          <Text style={styles.patientDetails}>{patient.email} • {patient.gender}, {patient.age}</Text>
+          <Text style={styles.patientActivity}>Last activity: {patient.lastActivity}</Text>
+        </View>
+      </View>
+      {patient.alerts > 0 && (
+        <View style={styles.alertBadge}>
+          <Ionicons name="alert-circle" size={16} color="#EF4444" />
+          <Text style={styles.alertCount}>{patient.alerts}</Text>
+        </View>
+      )}
+    </View>
+    <View style={styles.patientStats}>
+      <View style={styles.statItem}>
+        <View style={styles.statIconContainer}>
+          <Ionicons name="medkit" size={16} color="#059669" />
+        </View>
+        <View style={styles.statContent}>
+          <Text style={styles.statValue}>{patient.medicationsCount}</Text>
+          <Text style={styles.statLabel}>Medications</Text>
+        </View>
+      </View>
+      <View style={styles.statDivider} />
+      <View style={styles.statItem}>
+        <View style={styles.statIconContainer}>
+          <Ionicons name="checkmark-circle" size={16} color={getAdherenceColor(patient.adherenceRate)} />
+        </View>
+        <View style={styles.statContent}>
+          <Text style={[styles.statValue, { color: getAdherenceColor(patient.adherenceRate) }]}>
+            {patient.adherenceRate}%
+          </Text>
+          <Text style={styles.statLabel}>Adherence</Text>
+        </View>
+      </View>
+    </View>
+    <View style={styles.patientActions}>
+      <TouchableOpacity
+        style={styles.actionButton}
+        onPress={() => navigation.navigate('PatientDetails', { patientId: patient.id })}
+      >
+        <Ionicons name="information-circle-outline" size={16} color="#059669" />
+        <Text style={styles.actionButtonText}>Details</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.actionButton, styles.deleteButton]}
+        onPress={() => handleDeletePatient(patient.id, patient.name)}
+      >
+        <Ionicons name="trash-outline" size={16} color="#EF4444" />
+        <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Remove</Text>
+      </TouchableOpacity>
+    </View>
+  </TouchableOpacity>
+))}
             </View>
           )}
         </View>

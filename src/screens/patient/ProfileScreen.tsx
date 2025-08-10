@@ -1,4 +1,3 @@
-// src/screens/patient/ProfileScreen.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -11,17 +10,24 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { PatientTabParamList } from '../../types/navigation.types';
 import { useAppSelector, useAppDispatch } from '../../store';
+import { 
+  setLoading, 
+  setDashboardData, 
+  setNotifications,
+  setConnectionStatus,
+  setError,
+  resetPatientData 
+} from '../../store/slices/patientSlice';
 import { logoutUser } from '../../store/slices/authSlice';
-import { fetchDashboardData, fetchNotifications } from '../../store/slices/patientSlice';
 import { patientAPI } from '../../services/api/patientAPI';
 import { useFocusEffect } from '@react-navigation/native';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientNavbar from '../../components/common/PatientNavbar';
 
-type Props = BottomTabScreenProps<PatientTabParamList, 'Profile'>;
+interface Props {
+  navigation: any;
+}
 
 interface ProfileStats {
   totalMedications: number;
@@ -36,7 +42,8 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const { 
     dashboardStats,
     unreadNotificationCount,
-    isConnected
+    isConnected,
+    isLoading
   } = useAppSelector(state => state.patient);
   
   const [profileStats, setProfileStats] = useState<ProfileStats>({
@@ -47,40 +54,45 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   });
   const [caregivers, setCaregivers] = useState<any[]>([]);
 
-  // Load profile data
   useFocusEffect(
     useCallback(() => {
-      const loadProfileData = async () => {
-        try {
-          // Refresh dashboard data
-          await dispatch(fetchDashboardData()).unwrap();
-          await dispatch(fetchNotifications({})).unwrap();
-          
-          // Load caregivers
-          const caregiversData = await patientAPI.getCaregivers();
-          setCaregivers(caregiversData);
-        } catch (error) {
-          console.error('Failed to load profile data:', error);
-        }
-      };
-
       loadProfileData();
-    }, [dispatch])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
   );
 
-  // Update profile stats when dashboard data changes
+  const loadProfileData = async () => {
+    dispatch(setLoading(true));
+    try {
+      const [dashboardData, notificationsData, caregiversData] = await Promise.all([
+        patientAPI.getDashboardData(),
+        patientAPI.getNotifications(),
+        patientAPI.getCaregivers()
+      ]);
+      
+      dispatch(setDashboardData(dashboardData));
+      dispatch(setNotifications(notificationsData));
+      setCaregivers(caregiversData);
+      dispatch(setConnectionStatus(true));
+    } catch (error: any) {
+      dispatch(setError(error.message));
+      dispatch(setConnectionStatus(false));
+    } finally {
+      dispatch(setLoading(false));
+    }
+  };
+
   useEffect(() => {
     if (dashboardStats) {
       setProfileStats({
         totalMedications: dashboardStats.totalMedications,
         adherenceRate: dashboardStats.adherenceRate,
-        daysTracked: 45, // This would come from user data
+        daysTracked: 45, // This would come from user data in real implementation
         caregiverConnected: caregivers.length > 0,
       });
     }
   }, [dashboardStats, caregivers]);
 
-  // Handle logout
   const handleLogout = () => {
     Alert.alert(
       'Sign Out',
@@ -90,60 +102,57 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         {
           text: 'Sign Out',
           style: 'destructive',
-          onPress: () => dispatch(logoutUser()),
+          onPress: () => {
+            dispatch(resetPatientData());
+            dispatch(logoutUser());
+          },
         },
       ]
     );
   };
 
-  // Handle export data
   const handleExportData = async () => {
-    try {
-      Alert.alert(
-        'Export Health Data',
-        'Choose the format for your health data export:',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'PDF Report',
-            onPress: async () => {
-              try {
-                const result = await patientAPI.exportHealthData('pdf', {
-                  includePersonalInfo: true,
-                  includeMedications: true,
-                  includeLogs: true,
-                  includeAdherence: true
-                });
-                Alert.alert('Export Ready', `Your data has been exported. File: ${result.fileName}`);
-              } catch (error: any) {
-                Alert.alert('Export Failed', error || 'Failed to export data');
-              }
-            }
-          },
-          {
-            text: 'CSV Data',
-            onPress: async () => {
-              try {
-                const result = await patientAPI.exportHealthData('csv', {
-                  includePersonalInfo: false,
-                  includeMedications: true,
-                  includeLogs: true,
-                  includeAdherence: true
-                });
-                Alert.alert('Export Ready', `Your data has been exported. File: ${result.fileName}`);
-              } catch (error: any) {
-                Alert.alert('Export Failed', error || 'Failed to export data');
-              }
+    Alert.alert(
+      'Export Health Data',
+      'Choose the format for your health data export:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'PDF Report',
+          onPress: async () => {
+            try {
+              const result = await patientAPI.exportHealthData('pdf', {
+                includePersonalInfo: true,
+                includeMedications: true,
+                includeLogs: true,
+                includeAdherence: true
+              });
+              Alert.alert('Export Ready', `Your data has been exported. File: ${result.fileName}`);
+            } catch (error: any) {
+              Alert.alert('Export Failed', error.message);
             }
           }
-        ]
-      );
-    } catch (error) {
-      console.error('Export failed:', error);
-    }
+        },
+        {
+          text: 'CSV Data',
+          onPress: async () => {
+            try {
+              const result = await patientAPI.exportHealthData('csv', {
+                includePersonalInfo: false,
+                includeMedications: true,
+                includeLogs: true,
+                includeAdherence: true
+              });
+              Alert.alert('Export Ready', `Your data has been exported. File: ${result.fileName}`);
+            } catch (error: any) {
+              Alert.alert('Export Failed', error.message);
+            }
+          }
+        }
+      ]
+    );
   };
 
-  // Handle notification settings
   const handleNotificationSettings = async () => {
     try {
       const settings = await patientAPI.getNotificationSettings();
@@ -151,18 +160,13 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
       Alert.alert(
         'Notification Settings',
         `Current Settings:\n• Medication Reminders: ${settings.medicationReminders ? 'On' : 'Off'}\n• Refill Reminders: ${settings.refillReminders ? 'On' : 'Off'}\n• Adherence Alerts: ${settings.adherenceAlerts ? 'On' : 'Off'}\n• SOS Alerts: ${settings.sosAlerts ? 'On' : 'Off'}`,
-        [
-          { text: 'OK' },
-          { text: 'Change Settings', onPress: () => navigation.navigate('Settings') }
-        ]
+        [{ text: 'OK' }]
       );
-    } catch (error) {
-      console.error(error)
-      Alert.alert('Error', 'Failed to load notification settings');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
     }
   };
 
-  // Handle caregiver management
   const handleCaregiverManagement = () => {
     const caregiverNames = caregivers.map(c => c.name).join(', ');
     
@@ -173,12 +177,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         'No caregivers connected',
       [
         { text: 'OK' },
-        ...(caregivers.length > 0 ? [{
-          text: 'Manage Connections',
-          onPress: () => {
-            Alert.alert('Caregiver Management', 'This feature allows you to manage your caregiver connections');
-          }
-        }] : [{
+        ...(caregivers.length === 0 ? [{
           text: 'Connect Caregiver',
           onPress: () => {
             Alert.prompt(
@@ -190,32 +189,18 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
                     await patientAPI.requestCaregiverConnection(email, 'Connection request from patient');
                     Alert.alert('Request Sent', 'Connection request sent to caregiver');
                   } catch (error: any) {
-                    Alert.alert('Request Failed', error || 'Failed to send connection request');
+                    Alert.alert('Request Failed', error.message);
                   }
                 }
               },
               'plain-text'
             );
           }
-        }])
+        }] : [])
       ]
     );
   };
 
-  // Connection status indicator
-  const ConnectionStatus = () => (
-    <View style={styles.connectionStatus}>
-      <View style={[
-        styles.connectionDot, 
-        { backgroundColor: isConnected ? '#059669' : '#EF4444' }
-      ]} />
-      <Text style={styles.connectionText}>
-        {isConnected ? 'All data synced' : 'Some data may be outdated'}
-      </Text>
-    </View>
-  );
-
-  // Profile section component
   const ProfileSection = ({ 
     title, 
     items 
@@ -275,7 +260,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 
-  // Health management items
   const healthManagementItems = [
     {
       icon: 'medical-outline' as keyof typeof Ionicons.glyphMap,
@@ -303,7 +287,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     },
   ];
 
-  // Care team items
   const careTeamItems = [
     {
       icon: 'people-outline' as keyof typeof Ionicons.glyphMap,
@@ -323,7 +306,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     },
   ];
 
-  // Settings items
   const settingsItems = [
     {
       icon: 'notifications-outline' as keyof typeof Ionicons.glyphMap,
@@ -340,12 +322,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
       onPress: () => Alert.alert('Privacy Settings', 'Privacy and security settings would be managed here'),
     },
     {
-      icon: 'settings-outline' as keyof typeof Ionicons.glyphMap,
-      title: 'App Settings',
-      subtitle: 'General app preferences',
-      onPress: () => navigation.navigate('Settings'),
-    },
-    {
       icon: 'download-outline' as keyof typeof Ionicons.glyphMap,
       title: 'Export Health Data',
       subtitle: 'Download your medical data',
@@ -353,7 +329,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     },
   ];
 
-  // Support items
   const supportItems = [
     {
       icon: 'help-circle-outline' as keyof typeof Ionicons.glyphMap,
@@ -383,16 +358,18 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Header */}
-        <LinearGradient
-          colors={['#EBF4FF', '#FFFFFF']}
-          style={styles.headerSection}
-        >
+        <LinearGradient colors={['#EBF4FF', '#FFFFFF']} style={styles.headerSection}>
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
               <View style={styles.avatar}>
                 <Ionicons name="person" size={40} color="#2563EB" />
               </View>
-              <ConnectionStatus />
+              <View style={styles.connectionStatus}>
+                <View style={[styles.connectionDot, { backgroundColor: isConnected ? '#059669' : '#EF4444' }]} />
+                <Text style={styles.connectionText}>
+                  {isConnected ? 'All data synced' : 'Some data may be outdated'}
+                </Text>
+              </View>
             </View>
             <View style={styles.userInfo}>
               <Text style={styles.userName}>{user?.name || 'Patient'}</Text>
@@ -442,29 +419,11 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Health Management */}
-        <ProfileSection
-          title="Health Management"
-          items={healthManagementItems}
-        />
-
-        {/* Care Team */}
-        <ProfileSection
-          title="Care Team"
-          items={careTeamItems}
-        />
-
-        {/* Settings & Privacy */}
-        <ProfileSection
-          title="Settings & Privacy"
-          items={settingsItems}
-        />
-
-        {/* Support & Information */}
-        <ProfileSection
-          title="Support & Information"
-          items={supportItems}
-        />
+        {/* Profile Sections */}
+        <ProfileSection title="Health Management" items={healthManagementItems} />
+        <ProfileSection title="Care Team" items={careTeamItems} />
+        <ProfileSection title="Settings & Privacy" items={settingsItems} />
+        <ProfileSection title="Support & Information" items={supportItems} />
 
         {/* Quick Actions */}
         <View style={styles.quickActionsSection}>
@@ -493,6 +452,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           <TouchableOpacity
             style={styles.signOutButton}
             onPress={handleLogout}
+            disabled={isLoading}
           >
             <Ionicons name="log-out-outline" size={20} color="#EF4444" />
             <Text style={styles.signOutText}>Sign Out</Text>
@@ -508,7 +468,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 };
-
 
 const styles = StyleSheet.create({
   container: {
@@ -548,6 +507,23 @@ const styles = StyleSheet.create({
     elevation: 8,
     borderWidth: 3,
     borderColor: '#EBF4FF',
+  },
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING[2],
+    gap: SPACING[1],
+  },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: SPACING[1],
+  },
+  connectionText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#64748B',
+    fontWeight: '500',
   },
   userInfo: {
     flex: 1,
@@ -593,23 +569,6 @@ const styles = StyleSheet.create({
     color: '#059669',
     fontWeight: '500',
   },
-  connectionStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING[2],
-    gap: SPACING[2],
-  },
-  connectionDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: SPACING[1],
-  },
-  connectionText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: '#64748B',
-    fontWeight: '500',
-  },
   statsSection: {
     paddingHorizontal: SPACING[5],
     paddingBottom: SPACING[6],
@@ -632,11 +591,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   statIcon: {
     width: 36,
@@ -698,16 +652,16 @@ const styles = StyleSheet.create({
   profileItemContent: {
     flex: 1,
   },
+  profileItemTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+  },
   profileItemTitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '500',
     color: '#1E293B',
     marginBottom: 2,
-  },
-  profileItemTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
   },
   badge: {
     minWidth: 18,
@@ -715,7 +669,6 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: SPACING[2],
     paddingHorizontal: 4,
   },
   badgeText: {

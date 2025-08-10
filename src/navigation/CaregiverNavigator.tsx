@@ -30,6 +30,7 @@ const DashboardStack: React.FC = () => (
     <Stack.Screen name="Dashboard" component={DashboardScreen} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} />
     <Stack.Screen name="Settings" component={SettingsScreen} />
+    <Stack.Screen name="PatientDetails" component={PatientDetailsScreen} />
   </Stack.Navigator>
 );
 

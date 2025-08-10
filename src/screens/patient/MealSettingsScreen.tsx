@@ -1,5 +1,4 @@
-// src/screens/patient/MealSettingsScreen.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,41 +11,36 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StackScreenProps } from '@react-navigation/stack';
-import { PatientStackParamList } from '../../types/navigation.types';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { 
-  fetchMealTimes, 
-  updateMealTimes,
-  clearError
+  setLoading, 
+  setMealTimes, 
+  setConnectionStatus,
+  setError 
 } from '../../store/slices/patientSlice';
+import { patientAPI } from '../../services/api/patientAPI';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
-import Button from '../../components/common/Button/Button';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
 
-type Props = StackScreenProps<PatientStackParamList, 'MealSettings'>;
+interface Props {
+  navigation: any;
+}
 
 interface MealTime {
   id: string;
   name: string;
   time: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  description: string;
   enabled: boolean;
+  icon: keyof typeof Ionicons.glyphMap;
 }
 
 const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const dispatch = useAppDispatch();
-  const { 
-    mealTimes: storedMealTimes,
-    isLoading,
-    error,
-    isConnected
-  } = useAppSelector(state => state.patient);
+  const { isLoading, isConnected } = useAppSelector(state => state.patient);
   
-  const [mealTimes, setMealTimes] = useState<MealTime[]>([]);
+  const [localMealTimes, setLocalMealTimes] = useState<MealTime[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState<{
     visible: boolean;
@@ -54,92 +48,49 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
     currentTime: Date;
   }>({ visible: false, mealId: '', currentTime: new Date() });
 
-  // Initialize data
   useFocusEffect(
     useCallback(() => {
-      const loadMealTimes = async () => {
-        try {
-          await dispatch(fetchMealTimes()).unwrap();
-        } catch (error) {
-          console.error('Failed to load meal times:', error);
-        }
-      };
-
       loadMealTimes();
-    }, [dispatch])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
   );
 
-  // Update local state when Redux state changes
-  useEffect(() => {
-    if (storedMealTimes && storedMealTimes.length > 0) {
-      // Map storedMealTimes to ensure icon and description are present
-      const defaultMealMeta: { [key: string]: { icon: keyof typeof Ionicons.glyphMap, description: string } } = {
-        breakfast: { icon: 'sunny', description: 'Morning meal time' },
-        lunch: { icon: 'partly-sunny', description: 'Afternoon meal time' },
-        dinner: { icon: 'moon', description: 'Evening meal time' },
-        snack: { icon: 'cafe', description: 'Optional snack time' },
-      };
-      setMealTimes(
-        storedMealTimes.map(meal => ({
-          ...meal,
-          icon: defaultMealMeta[meal.id]?.icon ?? 'restaurant',
-          description: defaultMealMeta[meal.id]?.description ?? '',
-        }))
-      );
-    } else {
-      // Set default meal times if none exist
-      setMealTimes([
-        {
-          id: 'breakfast',
-          name: 'Breakfast',
-          time: '08:00',
-          icon: 'sunny',
-          description: 'Morning meal time',
-          enabled: true,
-        },
-        {
-          id: 'lunch',
-          name: 'Lunch',
-          time: '12:30',
-          icon: 'partly-sunny',
-          description: 'Afternoon meal time',
-          enabled: true,
-        },
-        {
-          id: 'dinner',
-          name: 'Dinner',
-          time: '19:00',
-          icon: 'moon',
-          description: 'Evening meal time',
-          enabled: true,
-        },
-        {
-          id: 'snack',
-          name: 'Snack',
-          time: '15:30',
-          icon: 'cafe',
-          description: 'Optional snack time',
-          enabled: false,
-        },
-      ]);
+  const loadMealTimes = async () => {
+    dispatch(setLoading(true));
+    try {
+      const data = await patientAPI.getMealTimes();
+      dispatch(setMealTimes(data));
+      setLocalMealTimes(data.map(meal => ({
+        ...meal,
+        icon: getIconForMeal(meal.id),
+      })));
+      dispatch(setConnectionStatus(true));
+    } catch (error: any) {
+      dispatch(setError(error.message));
+      dispatch(setConnectionStatus(false));
+      // Set default meal times
+      const defaultMeals = [
+        { id: 'breakfast', name: 'Breakfast', time: '08:00', enabled: true, icon: 'sunny' as keyof typeof Ionicons.glyphMap },
+        { id: 'lunch', name: 'Lunch', time: '12:30', enabled: true, icon: 'partly-sunny' as keyof typeof Ionicons.glyphMap },
+        { id: 'dinner', name: 'Dinner', time: '19:00', enabled: true, icon: 'moon' as keyof typeof Ionicons.glyphMap },
+        { id: 'snack', name: 'Snack', time: '15:30', enabled: false, icon: 'cafe' as keyof typeof Ionicons.glyphMap },
+      ];
+      setLocalMealTimes(defaultMeals);
+    } finally {
+      dispatch(setLoading(false));
     }
-  }, [storedMealTimes]);
+  };
 
-  // Handle errors
-  useEffect(() => {
-    if (error) {
-      Alert.alert(
-        'Error',
-        error,
-        [
-          { text: 'Retry', onPress: () => dispatch(fetchMealTimes()) },
-          { text: 'OK', onPress: () => dispatch(clearError()) }
-        ]
-      );
+  const getIconForMeal = (mealId: string): keyof typeof Ionicons.glyphMap => {
+    switch (mealId) {
+      case 'breakfast': return 'sunny';
+      case 'lunch': return 'partly-sunny';
+      case 'dinner': return 'moon';
+      case 'snack': return 'cafe';
+      default: return 'restaurant';
     }
-  }, [error, dispatch]);
+  };
 
-  // Show time picker
   const showTimePickerModal = (mealId: string, currentTime: string) => {
     const [hours, minutes] = currentTime.split(':').map(Number);
     const time = new Date();
@@ -152,7 +103,6 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
     });
   };
 
-  // Handle time change
   const handleTimeChange = (event: any, selectedTime?: Date) => {
     setShowTimePicker(prev => ({ ...prev, visible: false }));
     
@@ -162,9 +112,8 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  // Update meal time
   const updateMealTime = (mealId: string, newTime: string) => {
-    setMealTimes(prev => 
+    setLocalMealTimes(prev => 
       prev.map(meal => 
         meal.id === mealId ? { ...meal, time: newTime } : meal
       )
@@ -172,9 +121,8 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
     setHasChanges(true);
   };
 
-  // Toggle meal enabled
   const toggleMealEnabled = (mealId: string) => {
-    setMealTimes(prev => 
+    setLocalMealTimes(prev => 
       prev.map(meal => 
         meal.id === mealId ? { ...meal, enabled: !meal.enabled } : meal
       )
@@ -182,13 +130,12 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
     setHasChanges(true);
   };
 
-  // Save meal settings
   const saveMealSettings = async () => {
     if (!hasChanges) return;
 
+    dispatch(setLoading(true));
     try {
-      // Convert meal times to the format expected by the API
-      const mealTimesData = mealTimes.reduce((acc, meal) => {
+      const mealTimesData = localMealTimes.reduce((acc, meal) => {
         acc[meal.id] = {
           time: meal.time,
           enabled: meal.enabled
@@ -196,31 +143,25 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
         return acc;
       }, {} as any);
 
-      await dispatch(updateMealTimes(mealTimesData)).unwrap();
+      await patientAPI.updateMealTimes(mealTimesData);
+      dispatch(setMealTimes(localMealTimes));
       
       Alert.alert(
         'Settings Saved',
         'Your meal times have been updated successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setHasChanges(false);
-              navigation.goBack();
-            },
-          },
-        ]
+        [{ text: 'OK', onPress: () => {
+          setHasChanges(false);
+          navigation.goBack();
+        }}]
       );
     } catch (error: any) {
-      Alert.alert(
-        'Save Failed',
-        error || 'Failed to save meal settings. Please try again.',
-        [{ text: 'OK' }]
-      );
+      dispatch(setError(error.message));
+      Alert.alert('Save Failed', error.message);
+    } finally {
+      dispatch(setLoading(false));
     }
   };
 
-  // Reset to defaults
   const resetToDefaults = () => {
     Alert.alert(
       'Reset to Defaults',
@@ -231,12 +172,13 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
           text: 'Reset',
           style: 'destructive',
           onPress: () => {
-            setMealTimes([
-              { id: 'breakfast', name: 'Breakfast', time: '08:00', icon: 'sunny', description: 'Morning meal time', enabled: true },
-              { id: 'lunch', name: 'Lunch', time: '12:30', icon: 'partly-sunny', description: 'Afternoon meal time', enabled: true },
-              { id: 'dinner', name: 'Dinner', time: '19:00', icon: 'moon', description: 'Evening meal time', enabled: true },
-              { id: 'snack', name: 'Snack', time: '15:30', icon: 'cafe', description: 'Optional snack time', enabled: false },
-            ]);
+            const defaults = [
+              { id: 'breakfast', name: 'Breakfast', time: '08:00', enabled: true, icon: 'sunny' as keyof typeof Ionicons.glyphMap },
+              { id: 'lunch', name: 'Lunch', time: '12:30', enabled: true, icon: 'partly-sunny' as keyof typeof Ionicons.glyphMap },
+              { id: 'dinner', name: 'Dinner', time: '19:00', enabled: true, icon: 'moon' as keyof typeof Ionicons.glyphMap },
+              { id: 'snack', name: 'Snack', time: '15:30', enabled: false, icon: 'cafe' as keyof typeof Ionicons.glyphMap },
+            ];
+            setLocalMealTimes(defaults);
             setHasChanges(true);
           },
         },
@@ -244,112 +186,17 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  // Get medications related to meal
-  const getMedicationsForMeal = (mealId: string) => {
-    // This would be fetched from the medications list based on timing relation
-    const mealMedications: { [key: string]: string[] } = {
-      breakfast: ['Metformin', 'Lisinopril'],
-      dinner: ['Atorvastatin'],
-      lunch: [],
-      snack: []
-    };
-    
-    return mealMedications[mealId] || [];
-  };
-
-  // Connection status component
-  const ConnectionStatus = () => (
-    <View style={styles.connectionStatus}>
-      <View style={[
-        styles.connectionDot, 
-        { backgroundColor: isConnected ? '#059669' : '#EF4444' }
-      ]} />
-      <Text style={styles.connectionText}>
-        {isConnected ? 'Settings will sync automatically' : 'Changes saved locally - will sync when online'}
-      </Text>
-    </View>
-  );
-
-  // Meal time card component
-  const MealTimeCard = ({ meal }: { meal: MealTime }) => {
-    const relatedMedications = getMedicationsForMeal(meal.id);
-    
-    return (
-      <View style={[styles.mealCard, !meal.enabled && styles.mealCardDisabled]}>
-        <View style={styles.mealHeader}>
-          <View style={styles.mealIconContainer}>
-            <Ionicons 
-              name={meal.icon} 
-              size={24} 
-              color={meal.enabled ? '#2563EB' : '#9CA3AF'} 
-            />
-          </View>
-          <View style={styles.mealInfo}>
-            <Text style={[styles.mealName, !meal.enabled && styles.mealNameDisabled]}>
-              {meal.name}
-            </Text>
-            <Text style={[styles.mealDescription, !meal.enabled && styles.mealDescriptionDisabled]}>
-              {meal.description}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.enableToggle, meal.enabled && styles.enableToggleActive]}
-            onPress={() => toggleMealEnabled(meal.id)}
-          >
-            <Ionicons 
-              name={meal.enabled ? "checkmark" : "close"} 
-              size={16} 
-              color={meal.enabled ? "#FFFFFF" : "#9CA3AF"} 
-            />
-          </TouchableOpacity>
-        </View>
-
-        {meal.enabled && (
-          <View style={styles.mealContent}>
-            <TouchableOpacity
-              style={styles.timeSelector}
-              onPress={() => showTimePickerModal(meal.id, meal.time)}
-            >
-              <View style={styles.timeDisplay}>
-                <Ionicons name="time-outline" size={20} color="#2563EB" />
-                <Text style={styles.timeText}>{meal.time}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
-            </TouchableOpacity>
-
-            <View style={styles.medicationHints}>
-              <Text style={styles.hintsTitle}>Medications related to this meal:</Text>
-              <View style={styles.medicationTags}>
-                {relatedMedications.length > 0 ? (
-                  relatedMedications.map((medName, index) => (
-                    <View key={index} style={styles.medicationTag}>
-                      <Text style={styles.medicationTagText}>{medName}</Text>
-                    </View>
-                  ))
-                ) : (
-                  <Text style={styles.noMedicationsText}>No medications scheduled</Text>
-                )}
-              </View>
-            </View>
-          </View>
-        )}
-      </View>
-    );
-  };
-
-  // Loading state
-  if (isLoading && mealTimes.length === 0) {
+  if (isLoading && localMealTimes.length === 0) {
     return (
       <View style={styles.container}>
         <PatientSecondaryNavbar
           title="Meal Times"
-          subtitle="Loading meal settings..."
           onBackPress={() => navigation.goBack()}
           onSOSPress={() => navigation.navigate('SOS')}
         />
-        <View style={[styles.scrollView, { justifyContent: 'center', alignItems: 'center' }]}>
+        <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2563EB" />
-          <Text style={{ marginTop: 16, color: '#64748B' }}>Loading meal settings...</Text>
+          <Text style={styles.loadingText}>Loading meal settings...</Text>
         </View>
       </View>
     );
@@ -377,114 +224,93 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
         onSOSPress={() => navigation.navigate('SOS')}
       />
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Connection status */}
-        <ConnectionStatus />
-
-        {/* Header Section */}
-        <LinearGradient
-          colors={['#EBF4FF', '#FFFFFF']}
-          style={styles.headerSection}
-        >
-          <View style={styles.headerContent}>
-            <View style={styles.headerIcon}>
-              <Ionicons name="restaurant" size={32} color="#2563EB" />
-            </View>
-            <Text style={styles.headerTitle}>Meal Time Settings</Text>
-            <Text style={styles.headerSubtitle}>
-              Set your meal times to help schedule medication reminders accurately
-            </Text>
-          </View>
-        </LinearGradient>
-
-        {/* Info Card */}
-        <View style={styles.infoSection}>
-          <View style={styles.infoCard}>
-            <View style={styles.infoIcon}>
-              <Ionicons name="information-circle" size={20} color="#2563EB" />
-            </View>
-            <View style={styles.infoContent}>
-              <Text style={styles.infoTitle}>Why set meal times?</Text>
-              <Text style={styles.infoText}>
-                Many medications need to be taken with or without food. Setting your meal times helps us send you reminders at the right time.
-              </Text>
-            </View>
-          </View>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Connection Status */}
+        <View style={styles.connectionStatus}>
+          <View style={[styles.connectionDot, { backgroundColor: isConnected ? '#059669' : '#EF4444' }]} />
+          <Text style={styles.connectionText}>
+            {isConnected ? 'Settings will sync automatically' : 'Changes saved locally - will sync when online'}
+          </Text>
         </View>
+
+        {/* Header */}
+        <LinearGradient colors={['#EBF4FF', '#FFFFFF']} style={styles.headerSection}>
+          <View style={styles.headerIcon}>
+            <Ionicons name="restaurant" size={32} color="#2563EB" />
+          </View>
+          <Text style={styles.headerTitle}>Meal Time Settings</Text>
+          <Text style={styles.headerSubtitle}>
+            Set your meal times to help schedule medication reminders accurately
+          </Text>
+        </LinearGradient>
 
         {/* Meal Times */}
         <View style={styles.mealTimesSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Your Meal Schedule</Text>
-            <TouchableOpacity
-              style={styles.resetButton}
-              onPress={resetToDefaults}
-            >
+            <TouchableOpacity style={styles.resetButton} onPress={resetToDefaults}>
               <Ionicons name="refresh" size={16} color="#64748B" />
               <Text style={styles.resetButtonText}>Reset</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.mealsList}>
-            {mealTimes.map((meal) => (
-              <MealTimeCard key={meal.id} meal={meal} />
-            ))}
-          </View>
-        </View>
+          {localMealTimes.map((meal) => (
+            <View key={meal.id} style={[styles.mealCard, !meal.enabled && styles.mealCardDisabled]}>
+              <View style={styles.mealHeader}>
+                <View style={styles.mealIconContainer}>
+                  <Ionicons name={meal.icon} size={24} color={meal.enabled ? '#2563EB' : '#9CA3AF'} />
+                </View>
+                <View style={styles.mealInfo}>
+                  <Text style={[styles.mealName, !meal.enabled && styles.mealNameDisabled]}>
+                    {meal.name}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.enableToggle, meal.enabled && styles.enableToggleActive]}
+                  onPress={() => toggleMealEnabled(meal.id)}
+                >
+                  <Ionicons name={meal.enabled ? "checkmark" : "close"} size={16} color={meal.enabled ? "#FFFFFF" : "#9CA3AF"} />
+                </TouchableOpacity>
+              </View>
 
-        {/* Tips Section */}
-        <View style={styles.tipsSection}>
-          <Text style={styles.sectionTitle}>Tips for Better Medication Timing</Text>
-          <View style={styles.tipsList}>
-            <View style={styles.tipItem}>
-              <View style={styles.tipIcon}>
-                <Ionicons name="checkmark-circle" size={16} color="#059669" />
-              </View>
-              <Text style={styles.tipText}>
-                Eat meals at consistent times each day
-              </Text>
+              {meal.enabled && (
+                <TouchableOpacity
+                  style={styles.timeSelector}
+                  onPress={() => showTimePickerModal(meal.id, meal.time)}
+                >
+                  <View style={styles.timeDisplay}>
+                    <Ionicons name="time-outline" size={20} color="#2563EB" />
+                    <Text style={styles.timeText}>{meal.time}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
             </View>
-            <View style={styles.tipItem}>
-              <View style={styles.tipIcon}>
-                <Ionicons name="checkmark-circle" size={16} color="#059669" />
-              </View>
-              <Text style={styles.tipText}>
-                Take medications as prescribed relative to meals
-              </Text>
-            </View>
-            <View style={styles.tipItem}>
-              <View style={styles.tipIcon}>
-                <Ionicons name="checkmark-circle" size={16} color="#059669" />
-              </View>
-              <Text style={styles.tipText}>
-                Update meal times if your schedule changes
-              </Text>
-            </View>
-          </View>
+          ))}
         </View>
 
         {/* Save Button */}
         {hasChanges && (
           <View style={styles.saveSection}>
-            <Button
-              title={isLoading ? "Saving..." : "Save Meal Settings"}
+            <TouchableOpacity
+              style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
               onPress={saveMealSettings}
-              style={styles.saveButton}
               disabled={isLoading}
-              icon={isLoading ? 
-                <ActivityIndicator size={18} color="#FFFFFF" /> :
+            >
+              {isLoading ? (
+                <ActivityIndicator size={18} color="#FFFFFF" />
+              ) : (
                 <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-              }
-            />
+              )}
+              <Text style={styles.saveButtonText}>
+                {isLoading ? "Saving..." : "Save Meal Settings"}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
 
-      {/* Time Picker Modal */}
+      {/* Time Picker */}
       {showTimePicker.visible && (
         <DateTimePicker
           value={showTimePicker.currentTime}
@@ -497,33 +323,10 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
-  },
-  connectionStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    gap: 8,
-  },
-  connectionDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
-  },
-  connectionText: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '500',
   },
   scrollView: {
     flex: 1,
@@ -532,14 +335,46 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: SPACING[8],
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: Platform.OS === 'ios' ? 114 : 70,
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#64748B',
+  },
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingHorizontal: SPACING[5],
+    paddingVertical: 6,
+    backgroundColor: '#F1F5F9',
+    marginHorizontal: SPACING[5],
+    borderRadius: 12,
+    marginTop: SPACING[4],
+  },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: SPACING[2],
+  },
+  connectionText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#64748B',
+    fontWeight: '500',
+    flex: 1,
+  },
   headerSection: {
     paddingHorizontal: SPACING[5],
-    paddingBottom: SPACING[6],
-    paddingTop: SPACING[10],
+    paddingVertical: SPACING[6],
     alignItems: 'center',
-  },
-  headerContent: {
-    alignItems: 'center',
+    marginHorizontal: SPACING[5],
+    borderRadius: RADIUS.lg,
+    marginBottom: SPACING[6],
   },
   headerIcon: {
     width: 64,
@@ -549,11 +384,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING[4],
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
   },
   headerTitle: {
     fontSize: TYPOGRAPHY.fontSize['2xl'],
@@ -565,38 +395,6 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: '#64748B',
     textAlign: 'center',
-    lineHeight: 22,
-    maxWidth: '90%',
-  },
-  infoSection: {
-    paddingHorizontal: SPACING[5],
-    paddingBottom: SPACING[6],
-  },
-  infoCard: {
-    flexDirection: 'row',
-    backgroundColor: '#EBF4FF',
-    borderRadius: RADIUS.lg,
-    padding: SPACING[4],
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  infoIcon: {
-    marginRight: SPACING[3],
-    marginTop: 2,
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoTitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: '600',
-    color: '#1E40AF',
-    marginBottom: SPACING[1],
-  },
-  infoText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#1D4ED8',
-    lineHeight: 20,
   },
   mealTimesSection: {
     paddingHorizontal: SPACING[5],
@@ -629,169 +427,98 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontWeight: '500',
   },
-  mealsList: {
-    gap: SPACING[4],
-  },
   mealCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.xl,
-    padding: SPACING[5],
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    marginBottom: SPACING[4],
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
   },
   mealCardDisabled: {
-    backgroundColor: '#F8FAFC',
-    opacity: 0.7,
-  },
-  mealHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING[4],
-  },
-  mealIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#EBF4FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING[4],
-  },
-  mealInfo: {
-    flex: 1,
-  },
-  mealName: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: SPACING[1],
-  },
-  mealNameDisabled: {
-    color: '#9CA3AF',
-  },
-  mealDescription: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#64748B',
-  },
-  mealDescriptionDisabled: {
-    color: '#9CA3AF',
-  },
-  enableToggle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  enableToggleActive: {
-    backgroundColor: '#2563EB',
-    borderColor: '#2563EB',
-  },
-  mealContent: {
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: SPACING[4],
-  },
-  timeSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
-    borderRadius: RADIUS.lg,
-    padding: SPACING[4],
-    marginBottom: SPACING[4],
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  timeDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
-  },
-  timeText: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  medicationHints: {
-    marginTop: SPACING[2],
-  },
-  hintsTitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: '500',
-    color: '#64748B',
-    marginBottom: SPACING[2],
-  },
-  medicationTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING[2],
-  },
-  medicationTag: {
-    backgroundColor: '#EBF4FF',
-    paddingHorizontal: SPACING[2],
-    paddingVertical: SPACING[1],
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  medicationTagText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: '#1D4ED8',
-    fontWeight: '500',
-  },
-  noMedicationsText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: '#9CA3AF',
-    fontStyle: 'italic',
-  },
-  tipsSection: {
-    paddingHorizontal: SPACING[5],
-    paddingBottom: SPACING[6],
-  },
-  tipsList: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.lg,
-    padding: SPACING[4],
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  tipItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: SPACING[3],
-    paddingRight: SPACING[2],
-  },
-  tipIcon: {
-    marginRight: SPACING[3],
-    marginTop: 2,
-  },
-  tipText: {
-    flex: 1,
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#475569',
-    lineHeight: 20,
-  },
-  saveSection: {
-    paddingHorizontal: SPACING[5],
-    paddingTop: SPACING[4],
-  },
-  saveButton: {
-    backgroundColor: '#2563EB',
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
+   backgroundColor: '#F8FAFC',
+   opacity: 0.7,
+ },
+ mealHeader: {
+   flexDirection: 'row',
+   alignItems: 'center',
+   marginBottom: SPACING[3],
+ },
+ mealIconContainer: {
+   width: 48,
+   height: 48,
+   borderRadius: 24,
+   backgroundColor: '#EBF4FF',
+   justifyContent: 'center',
+   alignItems: 'center',
+   marginRight: SPACING[4],
+ },
+ mealInfo: {
+   flex: 1,
+ },
+ mealName: {
+   fontSize: TYPOGRAPHY.fontSize.lg,
+   fontWeight: '600',
+   color: '#1E293B',
+ },
+ mealNameDisabled: {
+   color: '#9CA3AF',
+ },
+ enableToggle: {
+   width: 32,
+   height: 32,
+   borderRadius: 16,
+   backgroundColor: '#F1F5F9',
+   justifyContent: 'center',
+   alignItems: 'center',
+   borderWidth: 1,
+   borderColor: '#E2E8F0',
+ },
+ enableToggleActive: {
+   backgroundColor: '#2563EB',
+   borderColor: '#2563EB',
+ },
+ timeSelector: {
+   flexDirection: 'row',
+   alignItems: 'center',
+   justifyContent: 'space-between',
+   backgroundColor: '#F8FAFC',
+   borderRadius: RADIUS.lg,
+   padding: SPACING[4],
+   borderWidth: 1,
+   borderColor: '#E2E8F0',
+ },
+ timeDisplay: {
+   flexDirection: 'row',
+   alignItems: 'center',
+   gap: SPACING[2],
+ },
+ timeText: {
+   fontSize: TYPOGRAPHY.fontSize.lg,
+   fontWeight: '600',
+   color: '#1E293B',
+ },
+ saveSection: {
+   paddingHorizontal: SPACING[5],
+   paddingTop: SPACING[4],
+ },
+ saveButton: {
+   flexDirection: 'row',
+   alignItems: 'center',
+   justifyContent: 'center',
+   backgroundColor: '#2563EB',
+   paddingVertical: SPACING[4],
+   borderRadius: RADIUS.lg,
+   gap: SPACING[2],
+ },
+ saveButtonDisabled: {
+   opacity: 0.6,
+ },
+ saveButtonText: {
+   fontSize: TYPOGRAPHY.fontSize.md,
+   fontWeight: '600',
+   color: '#FFFFFF',
+ },
 });
 
 export default MealSettingsScreen;

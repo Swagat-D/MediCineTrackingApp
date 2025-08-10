@@ -5,6 +5,8 @@ export interface PatientDashboardStats {
   activeMedications: number;
   todayReminders: number;
   adherenceRate: number;
+  upcomingDoses: number;
+  missedDoses: number;
 }
 
 export interface TodayMedication {
@@ -126,26 +128,35 @@ class PatientAPI {
   }
 
   async updateMealTimes(mealTimes: {
-    breakfast?: { time: string; enabled: boolean };
-    lunch?: { time: string; enabled: boolean };
-    dinner?: { time: string; enabled: boolean };
-    snack?: { time: string; enabled: boolean };
-  }): Promise<{ message: string; success: boolean }> {
-    const response = await apiClient.put('/patient/meal-times', mealTimes);
-    return response.data;
-  }
+  breakfast?: { time: string; enabled: boolean };
+  lunch?: { time: string; enabled: boolean };
+  dinner?: { time: string; enabled: boolean };
+  snack?: { time: string; enabled: boolean };
+}): Promise<{ message: string; success: boolean }> {
+  const response = await apiClient.put('/patient/meal-times', mealTimes);
+  return response.data;
+}
+
+async getRecentActivities(): Promise<{
+  id: string;
+  type: 'dose_taken' | 'dose_missed' | 'reminder_sent' | 'medication_added';
+  medicationName: string;
+  message: string;
+  timestamp: string;
+  priority: 'low' | 'medium' | 'high';
+}[]> {
+  const response = await apiClient.get('/patient/activities');
+  return response.data.data;
+}
 
   // Notifications
   async getNotifications(params?: {
-    type?: 'reminder' | 'alert' | 'system';
-    read?: boolean;
-  }): Promise<{
-    notifications: Notification[];
-    unreadCount: number;
-  }> {
-    const response = await apiClient.get('/patient/notifications', { params });
-    return response.data.data;
-  }
+  type?: 'reminder' | 'alert' | 'system';
+  read?: boolean;
+}): Promise<Notification[]> {
+  const response = await apiClient.get('/patient/notifications', { params });
+  return response.data.data.notifications; // Return just the notifications array
+}
 
   async markNotificationAsRead(notificationId: string): Promise<{ success: boolean }> {
     const response = await apiClient.patch(`/patient/notifications/${notificationId}/read`);
@@ -167,15 +178,15 @@ class PatientAPI {
   }
 
   async getEmergencyContacts(): Promise<{
-    id: string;
-    name: string;
-    relationship: string;
-    phone: string;
-    isPrimary: boolean;
-  }[]> {
-    const response = await apiClient.get('/patient/emergency-contacts');
-    return response.data.data;
-  }
+  id: string;
+  name: string;
+  relationship: string;
+  phone: string;
+  isPrimary: boolean;
+}[]> {
+  const response = await apiClient.get('/patient/emergency-contacts');
+  return response.data.data;
+}
 
   // Settings
   async getNotificationSettings(): Promise<{
@@ -190,15 +201,17 @@ class PatientAPI {
 
   // Caregivers
   async getCaregivers(): Promise<{
-    id: string;
-    name: string;
-    email: string;
-    phoneNumber: string;
-    isActive: boolean;
-  }[]> {
-    const response = await apiClient.get('/patient/caregivers');
-    return response.data.data;
-  }
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber: string;
+  specialization: string;
+  connectedDate: string;
+  status: 'active' | 'pending';
+}[]> {
+  const response = await apiClient.get('/patient/caregivers');
+  return response.data.data;
+}
 
   async requestCaregiverConnection(caregiverEmail: string, message?: string): Promise<{ message: string; success: boolean }> {
     const response = await apiClient.post('/patient/caregiver-request', {
@@ -218,6 +231,51 @@ class PatientAPI {
     const response = await apiClient.post('/patient/export-data', { format, ...params });
     return response.data.data;
   }
+
+  async getCurrentUser(): Promise<{
+  name: string;
+  email: string;
+  phoneNumber: string;
+  age: number;
+  gender: string;
+}> {
+  const response = await apiClient.get('/patient/profile');
+  return response.data.data;
+}
+
+async updateProfile(data: {
+  name: string;
+  phoneNumber: string;
+}): Promise<{ message: string; success: boolean }> {
+  const response = await apiClient.put('/patient/profile', data);
+  return response.data;
+}
+
+async addEmergencyContact(contactData: {
+  name: string;
+  relationship: string;
+  phoneNumber: string;
+  isPrimary: boolean;
+}): Promise<{
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    name: string;
+    relationship: string;
+    phone: string;
+    isPrimary: boolean;
+  };
+}> {
+  const response = await apiClient.post('/patient/emergency-contacts', contactData);
+  return response.data;
+}
+
+async removeEmergencyContact(contactId: string): Promise<{ message: string; success: boolean }> {
+  const response = await apiClient.delete(`/patient/emergency-contacts/${contactId}`);
+  return response.data;
+}
+
 }
 
 export const patientAPI = new PatientAPI();

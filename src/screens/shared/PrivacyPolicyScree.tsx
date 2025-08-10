@@ -1,10 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Platform,
+  TouchableOpacity,
+  Animated,
+  LayoutAnimation,
+  Linking,
+  Clipboard,
+  Alert,
+  ColorValue
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,9 +20,140 @@ import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 
 interface PrivacyPolicyScreenProps {
   navigation: any;
+  userRole?: 'caregiver' | 'patient';
 }
 
-const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = ({ navigation }) => {
+const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = ({ 
+  navigation, 
+  userRole = 'caregiver' 
+}) => {
+  const [expandedSections, setExpandedSections] = useState<{ [key: number]: boolean }>({});
+  const [animatedValues] = useState(
+    Array(10).fill(0).map(() => new Animated.Value(0))
+  );
+
+  const theme = {
+    primary: userRole === 'caregiver' ? '#059669' : '#2196F3',
+    primaryLight: userRole === 'caregiver' ? '#F0FDF4' : '#E3F2FD',
+    primaryDark: userRole === 'caregiver' ? '#047857' : '#1976D2',
+    gradient: userRole === 'caregiver'
+      ? ['#F0FDF4', '#FFFFFF'] as [ColorValue, ColorValue]
+      : ['#E3F2FD', '#FFFFFF'] as [ColorValue, ColorValue],
+    accent: userRole === 'caregiver' ? '#10B981' : '#42A5F5',
+  };
+
+  const toggleSection = (index: number) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    
+    const isExpanded = expandedSections[index];
+    setExpandedSections(prev => ({
+      ...prev,
+      [index]: !isExpanded
+    }));
+
+    Animated.timing(animatedValues[index], {
+      toValue: isExpanded ? 0 : 1,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const handleContactPress = (type: 'email' | 'phone') => {
+    switch (type) {
+      case 'email':
+        Linking.openURL('mailto:privacy@meditracker.com');
+        break;
+      case 'phone':
+        Linking.openURL('tel:+1-800-MEDITRACK');
+        break;
+    }
+  };
+
+  const handleCopyEmail = () => {
+    Clipboard.setString('privacy@meditracker.com');
+    Alert.alert('Email Copied', 'Privacy email address has been copied to clipboard');
+  };
+
+  const collapsibleSections = [
+    {
+      title: "Information We Collect",
+      icon: "information-circle",
+      content: {
+        intro: "We collect different types of information to provide you with the best medication management experience:",
+        subsections: [
+          {
+            title: "Personal Information",
+            items: [
+              "Name, age, gender, and contact information",
+              "Email address and phone number", 
+              "Account credentials and authentication data"
+            ]
+          },
+          {
+            title: "Health Information", 
+            items: [
+              "Medication names, dosages, and schedules",
+              "Medication adherence and intake records",
+              "Medical history and allergy information (when provided)",
+              "Emergency contact information"
+            ]
+          },
+          {
+            title: "Usage Information",
+            items: [
+              "App usage patterns and preferences",
+              "Device information and technical data",
+              "Log files and error reports (anonymized)"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      title: "How We Use Your Information",
+      icon: "construct",
+      content: {
+        intro: "We use your information solely to provide and improve our medication management services:",
+        items: [
+          "Send medication reminders and alerts",
+          "Enable caregiver-patient connections",
+          "Track medication adherence and generate reports",
+          "Provide technical support and customer service",
+          "Improve app functionality and user experience",
+          "Ensure medication safety and prevent errors"
+        ]
+      }
+    },
+    {
+      title: "Information Sharing and Disclosure", 
+      icon: "share",
+      content: {
+        intro: "We do not sell, trade, or rent your personal health information. We may share your information only in the following circumstances:",
+        items: [
+          "With your designated caregivers (with your explicit consent)",
+          "When required by law or legal process", 
+          "To protect health and safety in emergency situations",
+          "With service providers who assist in app functionality (under strict confidentiality agreements)"
+        ]
+      }
+    },
+    {
+      title: "Your Privacy Rights",
+      icon: "shield-checkmark",
+      content: {
+        intro: "Under HIPAA and applicable privacy laws, you have the right to:",
+        rights: [
+          { icon: "eye", text: "Access your health information" },
+          { icon: "create", text: "Request corrections to your data" },
+          { icon: "download", text: "Export your data" },
+          { icon: "trash", text: "Request deletion of your account" },
+          { icon: "ban", text: "Restrict certain uses of your information" },
+          { icon: "document-text", text: "Receive an accounting of disclosures" }
+        ]
+      }
+    }
+  ];
+
   return (
     <View style={styles.container}>
       <SecondaryNavbar
@@ -30,151 +168,164 @@ const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = ({ navigation })
       >
         {/* Header */}
         <LinearGradient
-          colors={['#F0FDF4', '#FFFFFF']}
+          colors={theme.gradient}
           style={styles.headerSection}
         >
           <View style={styles.headerContent}>
-            <View style={styles.headerIcon}>
-              <Ionicons name="shield-checkmark" size={48} color="#059669" />
+            <View style={[styles.headerIcon, { shadowColor: theme.primary }]}>
+              <Ionicons name="shield-checkmark" size={48} color={theme.primary} />
             </View>
             <Text style={styles.headerTitle}>Privacy Policy</Text>
             <Text style={styles.headerSubtitle}>
               Your privacy and data security are our top priorities
             </Text>
-            <Text style={styles.lastUpdated}>Last updated: December 15, 2024</Text>
+            <View style={[styles.lastUpdatedBadge, { backgroundColor: theme.primaryLight }]}>
+              <Text style={[styles.lastUpdated, { color: theme.primary }]}>
+                Last updated: December 15, 2024
+              </Text>
+            </View>
           </View>
         </LinearGradient>
 
         {/* Introduction */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Introduction</Text>
-          <Text style={styles.bodyText}>
-            MediTracker Technologies (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is committed to protecting your privacy and 
-            ensuring the security of your personal health information. This Privacy Policy explains how 
-            we collect, use, disclose, and safeguard your information when you use our MediTracker mobile 
-            application and related services.
-          </Text>
-        </View>
-
-        {/* HIPAA Compliance */}
-        <View style={styles.section}>
-          <View style={styles.highlightBox}>
-            <View style={styles.highlightHeader}>
-              <Ionicons name="shield-checkmark" size={24} color="#059669" />
-              <Text style={styles.highlightTitle}>HIPAA Compliance</Text>
-            </View>
-            <Text style={styles.highlightText}>
-              MediTracker is fully HIPAA compliant. We implement administrative, physical, and technical 
-              safeguards to protect your Protected Health Information (PHI) in accordance with federal 
-              health information privacy laws.
+          <View style={styles.introCard}>
+            <Text style={styles.bodyText}>
+              MediTracker Technologies (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is committed to protecting your privacy and 
+              ensuring the security of your personal health information. This Privacy Policy explains how 
+              we collect, use, disclose, and safeguard your information when you use our MediTracker mobile 
+              application and related services.
             </Text>
           </View>
         </View>
 
-        {/* Information We Collect */}
+        {/* HIPAA Compliance Highlight */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Information We Collect</Text>
-          
-          <View style={styles.subsection}>
-            <Text style={styles.subsectionTitle}>Personal Information</Text>
-            <View style={styles.bulletList}>
-              <View style={styles.bulletItem}>
-                <View style={styles.bullet} />
-                <Text style={styles.bulletText}>Name, age, gender, and contact information</Text>
+          <View style={[styles.highlightBox, { 
+            backgroundColor: theme.primaryLight,
+            borderColor: theme.primary + '30'
+          }]}>
+            <LinearGradient
+              colors={[theme.primaryLight, theme.primaryLight + '80']}
+              style={styles.highlightGradient}
+            >
+              <View style={styles.highlightHeader}>
+                <View style={[styles.highlightIconContainer, { backgroundColor: theme.primary + '20' }]}>
+                  <Ionicons name="shield-checkmark" size={24} color={theme.primary} />
+                </View>
+                <Text style={[styles.highlightTitle, { color: theme.primaryDark }]}>
+                  HIPAA Compliance Guarantee
+                </Text>
               </View>
-              <View style={styles.bulletItem}>
-                <View style={styles.bullet} />
-                <Text style={styles.bulletText}>Email address and phone number</Text>
-              </View>
-              <View style={styles.bulletItem}>
-                <View style={styles.bullet} />
-                <Text style={styles.bulletText}>Account credentials and authentication data</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.subsection}>
-            <Text style={styles.subsectionTitle}>Health Information</Text>
-            <View style={styles.bulletList}>
-              <View style={styles.bulletItem}>
-                <View style={styles.bullet} />
-                <Text style={styles.bulletText}>Medication names, dosages, and schedules</Text>
-              </View>
-              <View style={styles.bulletItem}>
-                <View style={styles.bullet} />
-                <Text style={styles.bulletText}>Medication adherence and intake records</Text>
-              </View>
-              <View style={styles.bulletItem}>
-                <View style={styles.bullet} />
-                <Text style={styles.bulletText}>Medical history and allergy information (when provided)</Text>
-              </View>
-              <View style={styles.bulletItem}>
-                <View style={styles.bullet} />
-                <Text style={styles.bulletText}>Emergency contact information</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.subsection}>
-            <Text style={styles.subsectionTitle}>Usage Information</Text>
-            <View style={styles.bulletList}>
-              <View style={styles.bulletItem}>
-                <View style={styles.bullet} />
-                <Text style={styles.bulletText}>App usage patterns and preferences</Text>
-              </View>
-              <View style={styles.bulletItem}>
-                <View style={styles.bullet} />
-                <Text style={styles.bulletText}>Device information and technical data</Text>
-              </View>
-              <View style={styles.bulletItem}>
-                <View style={styles.bullet} />
-                <Text style={styles.bulletText}>Log files and error reports (anonymized)</Text>
-              </View>
-            </View>
+              <Text style={[styles.highlightText, { color: theme.primaryDark }]}>
+                MediTracker is fully HIPAA compliant. We implement administrative, physical, and technical 
+                safeguards to protect your Protected Health Information (PHI) in accordance with federal 
+                health information privacy laws.
+              </Text>
+            </LinearGradient>
           </View>
         </View>
 
-        {/* How We Use Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>How We Use Your Information</Text>
-          <Text style={styles.bodyText}>
-            We use your information solely to provide and improve our medication management services:
-          </Text>
-          
-          <View style={styles.bulletList}>
-            <View style={styles.bulletItem}>
-              <View style={styles.bullet} />
-              <Text style={styles.bulletText}>Provide technical support and customer service</Text>
-            </View>
-          </View>
-        </View>
+        {/* Collapsible Sections */}
+        {collapsibleSections.map((section, index) => (
+          <View key={index} style={styles.section}>
+            <TouchableOpacity
+              style={[
+                styles.collapsibleHeader,
+                expandedSections[index] && { backgroundColor: theme.primaryLight }
+              ]}
+              onPress={() => toggleSection(index)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.collapsibleHeaderContent}>
+                <View style={[
+                  styles.collapsibleIcon,
+                  { backgroundColor: expandedSections[index] ? theme.primary : theme.primaryLight }
+                ]}>
+                  <Ionicons 
+                    name={section.icon as any} 
+                    size={20} 
+                    color={expandedSections[index] ? '#FFFFFF' : theme.primary} 
+                  />
+                </View>
+                <Text style={[
+                  styles.collapsibleTitle,
+                  expandedSections[index] && { color: theme.primary }
+                ]}>
+                  {section.title}
+                </Text>
+                <Animated.View style={{
+                  transform: [{
+                    rotate: animatedValues[index].interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '180deg'],
+                    })
+                  }]
+                }}>
+                  <Ionicons 
+                    name="chevron-down" 
+                    size={20} 
+                    color={expandedSections[index] ? theme.primary : '#94A3B8'} 
+                  />
+                </Animated.View>
+              </View>
+            </TouchableOpacity>
 
-        {/* Information Sharing */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Information Sharing and Disclosure</Text>
-          <Text style={styles.bodyText}>
-            We do not sell, trade, or rent your personal health information. We may share your information only in the following circumstances:
-          </Text>
-          
-          <View style={styles.bulletList}>
-            <View style={styles.bulletItem}>
-              <View style={styles.bullet} />
-              <Text style={styles.bulletText}>With your designated caregivers (with your explicit consent)</Text>
-            </View>
-            <View style={styles.bulletItem}>
-              <View style={styles.bullet} />
-              <Text style={styles.bulletText}>When required by law or legal process</Text>
-            </View>
-            <View style={styles.bulletItem}>
-              <View style={styles.bullet} />
-              <Text style={styles.bulletText}>To protect health and safety in emergency situations</Text>
-            </View>
-            <View style={styles.bulletItem}>
-              <View style={styles.bullet} />
-              <Text style={styles.bulletText}>With service providers who assist in app functionality (under strict confidentiality agreements)</Text>
-            </View>
+            {expandedSections[index] && (
+              <Animated.View style={[
+                styles.collapsibleContent,
+                {
+                  opacity: animatedValues[index],
+                  transform: [{
+                    scale: animatedValues[index].interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.95, 1],
+                    })
+                  }]
+                }
+              ]}>
+                <Text style={styles.contentIntro}>{section.content.intro}</Text>
+                
+                {section.content.subsections ? (
+                  section.content.subsections.map((subsection, subIndex) => (
+                    <View key={subIndex} style={styles.subsection}>
+                      <Text style={styles.subsectionTitle}>{subsection.title}</Text>
+                      <View style={styles.bulletList}>
+                        {subsection.items.map((item, itemIndex) => (
+                          <View key={itemIndex} style={styles.bulletItem}>
+                            <View style={[styles.bullet, { backgroundColor: theme.primary }]} />
+                            <Text style={styles.bulletText}>{item}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  ))
+                ) : section.content.rights ? (
+                  <View style={styles.rightsGrid}>
+                    {section.content.rights.map((right, rightIndex) => (
+                      <View key={rightIndex} style={styles.rightItem}>
+                        <View style={[styles.rightIcon, { backgroundColor: theme.primaryLight }]}>
+                          <Ionicons name={right.icon as any} size={16} color={theme.primary} />
+                        </View>
+                        <Text style={styles.rightText}>{right.text}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.bulletList}>
+                    {section.content.items?.map((item, itemIndex) => (
+                      <View key={itemIndex} style={styles.bulletItem}>
+                        <View style={[styles.bullet, { backgroundColor: theme.primary }]} />
+                        <Text style={styles.bulletText}>{item}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </Animated.View>
+            )}
           </View>
-        </View>
+        ))}
 
         {/* Data Security */}
         <View style={styles.section}>
@@ -185,130 +336,153 @@ const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = ({ navigation })
           
           <View style={styles.securityGrid}>
             <View style={styles.securityItem}>
-              <View style={styles.securityIcon}>
-                <Ionicons name="lock-closed" size={20} color="#2196F3" />
-              </View>
-              <Text style={styles.securityTitle}>Encryption</Text>
-              <Text style={styles.securityDescription}>End-to-end encryption for all data transmission</Text>
+              <LinearGradient
+                colors={[theme.primaryLight, '#FFFFFF']}
+                style={styles.securityGradient}
+              >
+                <View style={[styles.securityIcon, { backgroundColor: theme.primary + '20' }]}>
+                  <Ionicons name="lock-closed" size={20} color={theme.primary} />
+                </View>
+                <Text style={styles.securityTitle}>Encryption</Text>
+                <Text style={styles.securityDescription}>End-to-end encryption for all data transmission</Text>
+              </LinearGradient>
             </View>
             
             <View style={styles.securityItem}>
-              <View style={styles.securityIcon}>
-                <Ionicons name="server" size={20} color="#2196F3" />
-              </View>
-              <Text style={styles.securityTitle}>Secure Storage</Text>
-              <Text style={styles.securityDescription}>HIPAA-compliant cloud infrastructure</Text>
+              <LinearGradient
+                colors={[theme.primaryLight, '#FFFFFF']}
+                style={styles.securityGradient}
+              >
+                <View style={[styles.securityIcon, { backgroundColor: theme.primary + '20' }]}>
+                  <Ionicons name="server" size={20} color={theme.primary} />
+                </View>
+                <Text style={styles.securityTitle}>Secure Storage</Text>
+                <Text style={styles.securityDescription}>HIPAA-compliant cloud infrastructure</Text>
+              </LinearGradient>
             </View>
             
             <View style={styles.securityItem}>
-              <View style={styles.securityIcon}>
-                <Ionicons name="shield-checkmark" size={20} color="#2196F3" />
+              <LinearGradient
+                colors={[theme.primaryLight, '#FFFFFF']}
+                style={styles.securityGradient}
+              >
+                <View style={[styles.securityIcon, { backgroundColor: theme.primary + '20' }]}>
+                  <Ionicons name="shield-checkmark" size={20} color={theme.primary} />
+                </View>
+                <Text style={styles.securityTitle}>Access Control</Text>
+                <Text style={styles.securityDescription}>Multi-factor authentication and role-based access</Text>
+              </LinearGradient>
+            </View>
+          </View>
+        </View>
+
+        {/* Additional Policies */}
+        <View style={styles.section}>
+          <View style={styles.additionalPolicies}>
+            <View style={styles.policyCard}>
+              <View style={[styles.policyIcon, { backgroundColor: theme.primaryLight }]}>
+                <Ionicons name="time" size={20} color={theme.primary} />
               </View>
-              <Text style={styles.securityTitle}>Access Control</Text>
-              <Text style={styles.securityDescription}>Multi-factor authentication and role-based access</Text>
+              <View style={styles.policyContent}>
+                <Text style={styles.policyTitle}>Data Retention</Text>
+                <Text style={styles.policyText}>
+                  We retain your information only as long as necessary. Medication logs older than 1 year are automatically archived.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.policyCard}>
+              <View style={[styles.policyIcon, { backgroundColor: theme.primaryLight }]}>
+                <Ionicons name="people" size={20} color={theme.primary} />
+              </View>
+              <View style={styles.policyContent}>
+                <Text style={styles.policyTitle}>Children&apos;s Privacy</Text>
+                <Text style={styles.policyText}>
+                  MediTracker is not intended for children under 13. We do not knowingly collect personal information from children.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.policyCard}>
+              <View style={[styles.policyIcon, { backgroundColor: theme.primaryLight }]}>
+                <Ionicons name="globe" size={20} color={theme.primary} />
+              </View>
+              <View style={styles.policyContent}>
+                <Text style={styles.policyTitle}>International Users</Text>
+                <Text style={styles.policyText}>
+                  Your information may be transferred to, stored, and processed in the United States where our servers are located.
+                </Text>
+              </View>
             </View>
           </View>
         </View>
 
-        {/* Your Rights */}
+        {/* Contact Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Privacy Rights</Text>
-          <Text style={styles.bodyText}>
-            Under HIPAA and applicable privacy laws, you have the right to:
-          </Text>
+          <Text style={styles.sectionTitle}>Questions? Contact Our Privacy Team</Text>
           
-          <View style={styles.rightsGrid}>
-            <View style={styles.rightItem}>
-              <Ionicons name="eye" size={18} color="#4CAF50" />
-              <Text style={styles.rightText}>Access your health information</Text>
+          <View style={styles.contactCard}>
+            <Text style={styles.contactIntro}>
+              If you have questions about this Privacy Policy or our privacy practices, please contact us:
+            </Text>
+            
+            <View style={styles.contactActions}>
+              <TouchableOpacity
+                style={[styles.contactButton, { backgroundColor: theme.primary }]}
+                onPress={() => handleContactPress('email')}
+              >
+                <Ionicons name="mail" size={20} color="#FFFFFF" />
+                <Text style={styles.contactButtonText}>Email Privacy Team</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.contactButtonSecondary, { borderColor: theme.primary }]}
+                onPress={handleCopyEmail}
+              >
+                <Ionicons name="copy" size={18} color={theme.primary} />
+                <Text style={[styles.contactButtonSecondaryText, { color: theme.primary }]}>
+                  Copy Email
+                </Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.rightItem}>
-              <Ionicons name="create" size={18} color="#4CAF50" />
-              <Text style={styles.rightText}>Request corrections to your data</Text>
-            </View>
-            <View style={styles.rightItem}>
-              <Ionicons name="download" size={18} color="#4CAF50" />
-              <Text style={styles.rightText}>Export your data</Text>
-            </View>
-            <View style={styles.rightItem}>
-              <Ionicons name="trash" size={18} color="#4CAF50" />
-              <Text style={styles.rightText}>Request deletion of your account</Text>
-            </View>
-            <View style={styles.rightItem}>
-              <Ionicons name="ban" size={18} color="#4CAF50" />
-              <Text style={styles.rightText}>Restrict certain uses of your information</Text>
-            </View>
-            <View style={styles.rightItem}>
-              <Ionicons name="document-text" size={18} color="#4CAF50" />
-              <Text style={styles.rightText}>Receive an accounting of disclosures</Text>
+
+            <View style={styles.contactInfo}>
+              <View style={styles.contactItem}>
+                <Ionicons name="mail" size={16} color="#64748B" />
+                <Text style={styles.contactText}>privacy@meditracker.com</Text>
+              </View>
+              <View style={styles.contactItem}>
+                <Ionicons name="call" size={16} color="#64748B" />
+                <Text style={styles.contactText}>1-800-MEDITRACK</Text>
+              </View>
+              <View style={styles.contactItem}>
+                <Ionicons name="location" size={16} color="#64748B" />
+                <Text style={styles.contactText}>
+                  MediTracker Technologies{'\n'}Privacy Officer{'\n'}123 Healthcare Blvd{'\n'}Medical City, MC 12345
+                </Text>
+              </View>
             </View>
           </View>
         </View>
 
-        {/* Data Retention */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data Retention</Text>
-          <Text style={styles.bodyText}>
-            We retain your information only as long as necessary to provide our services and comply with legal obligations. Medication logs older than 1 year are automatically archived, and inactive accounts are deleted after 3 years of inactivity (with prior notice).
-          </Text>
-        </View>
-
-        {/* Children's Privacy */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Children&apos;s Privacy</Text>
-          <Text style={styles.bodyText}>
-            MediTracker is not intended for children under 13. We do not knowingly collect personal information from children under 13. If a parent or guardian becomes aware that their child has provided personal information, please contact us immediately.
-          </Text>
-        </View>
-
-        {/* International Users */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>International Users</Text>
-          <Text style={styles.bodyText}>
-            If you are accessing MediTracker from outside the United States, please note that your information may be transferred to, stored, and processed in the United States where our servers are located and our central database is operated.
-          </Text>
-        </View>
-
-        {/* Changes to Privacy Policy */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Changes to This Privacy Policy</Text>
-          <Text style={styles.bodyText}>
-            We may update this Privacy Policy from time to time. We will notify you of any material changes by posting the new Privacy Policy in the app and sending you an email notification. Changes become effective immediately upon posting.
-          </Text>
-        </View>
-
-        {/* Contact Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact Us</Text>
-          <Text style={styles.bodyText}>
-            If you have questions about this Privacy Policy or our privacy practices, please contact us:
-          </Text>
-          
-          <View style={styles.contactInfo}>
-            <View style={styles.contactItem}>
-              <Ionicons name="mail" size={16} color="#64748B" />
-              <Text style={styles.contactText}>privacy@meditracker.com</Text>
-            </View>
-            <View style={styles.contactItem}>
-              <Ionicons name="call" size={16} color="#64748B" />
-              <Text style={styles.contactText}>1-800-MEDITRACK</Text>
-            </View>
-            <View style={styles.contactItem}>
-              <Ionicons name="location" size={16} color="#64748B" />
-              <Text style={styles.contactText}>MediTracker Technologies{'\n'}Privacy Officer{'\n'}123 Healthcare Blvd{'\n'}Medical City, MC 12345</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Compliance Badge */}
+        {/* Compliance Footer */}
         <View style={styles.complianceSection}>
-          <View style={styles.complianceBadge}>
-            <Ionicons name="shield-checkmark" size={24} color="#4CAF50" />
-            <View style={styles.complianceText}>
-              <Text style={styles.complianceTitle}>HIPAA Compliant</Text>
-              <Text style={styles.complianceSubtext}>SOC 2 Type II Certified</Text>
+          <LinearGradient
+            colors={[theme.primaryLight, theme.primaryLight + '80']}
+            style={styles.complianceBadge}
+          >
+            <View style={[styles.complianceIcon, { backgroundColor: theme.primary }]}>
+              <Ionicons name="shield-checkmark" size={24} color="#FFFFFF" />
             </View>
-          </View>
+            <View style={styles.complianceTextContainer}>
+              <Text style={[styles.complianceTitle, { color: theme.primaryDark }]}>
+                HIPAA Compliant & SOC 2 Certified
+              </Text>
+              <Text style={[styles.complianceSubtext, { color: theme.primary }]}>
+                Your health data is protected by the highest security standards
+              </Text>
+            </View>
+          </LinearGradient>
         </View>
       </ScrollView>
     </View>
@@ -344,7 +518,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING[4],
-    shadowColor: '#4CAF50',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -362,32 +535,39 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: SPACING[2],
+    marginBottom: SPACING[4],
+  },
+  lastUpdatedBadge: {
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[2],
+    borderRadius: RADIUS.full,
   },
   lastUpdated: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#4CAF50',
-    backgroundColor: '#E8F5E8',
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[1],
-    borderRadius: RADIUS.full,
+    fontWeight: '500',
   },
   section: {
     paddingHorizontal: SPACING[5],
-    paddingVertical: SPACING[5],
+    paddingVertical: SPACING[2],
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: '600',
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: '700',
     color: '#1E293B',
     marginBottom: SPACING[4],
+    textAlign: 'center',
   },
-  subsectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: SPACING[3],
-    marginTop: SPACING[4],
+  introCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.xl,
+    padding: SPACING[5],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   bodyText: {
     fontSize: TYPOGRAPHY.fontSize.md,
@@ -396,34 +576,90 @@ const styles = StyleSheet.create({
     textAlign: 'justify',
   },
   highlightBox: {
-    backgroundColor: '#E8F5E8',
     borderRadius: RADIUS.xl,
-    padding: SPACING[5],
     borderWidth: 1,
-    borderColor: '#C8E6C9',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  highlightGradient: {
+    padding: SPACING[5],
   },
   highlightHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: SPACING[3],
-    gap: SPACING[2],
+    gap: SPACING[3],
+  },
+  highlightIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   highlightTitle: {
     fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: '600',
-    color: '#2E7D32',
+    fontWeight: '700',
   },
   highlightText: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    color: '#2E7D32',
     lineHeight: 22,
+  },
+  collapsibleHeader: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.xl,
+    padding: SPACING[4],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: SPACING[2],
+  },
+  collapsibleHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  collapsibleIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
+  },
+  collapsibleTitle: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  collapsibleContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.xl,
+    padding: SPACING[5],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: SPACING[4],
+  },
+  contentIntro: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#475569',
+    lineHeight: 24,
+    marginBottom: SPACING[4],
   },
   subsection: {
     marginBottom: SPACING[4],
   },
+  subsectionTitle: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: SPACING[3],
+  },
   bulletList: {
     gap: SPACING[2],
-    marginTop: SPACING[2],
   },
   bulletItem: {
     flexDirection: 'row',
@@ -434,7 +670,6 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#2196F3',
     marginTop: 9,
   },
   bulletText: {
@@ -442,6 +677,30 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: '#475569',
     lineHeight: 24,
+  },
+  rightsGrid: {
+    gap: SPACING[3],
+  },
+  rightItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: RADIUS.lg,
+    padding: SPACING[3],
+    gap: SPACING[3],
+  },
+  rightIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rightText: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#475569',
+    fontWeight: '500',
   },
   securityGrid: {
     flexDirection: 'row',
@@ -451,19 +710,22 @@ const styles = StyleSheet.create({
   },
   securityItem: {
     flex: 1,
-    minWidth: '45%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.lg,
-    padding: SPACING[4],
-    alignItems: 'center',
+    minWidth: '30%',
+    borderRadius: RADIUS.xl,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',
+  },
+  securityGradient: {
+    padding: SPACING[4],
+    alignItems: 'center',
+    minHeight: 120,
+    justifyContent: 'center',
   },
   securityIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING[2],
@@ -481,33 +743,89 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 16,
   },
-  rightsGrid: {
-    gap: SPACING[3],
-    marginTop: SPACING[4],
+  additionalPolicies: {
+    gap: SPACING[4],
   },
-  rightItem: {
+  policyCard: {
     flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.xl,
     padding: SPACING[4],
-    gap: SPACING[3],
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    alignItems: 'flex-start',
   },
-  rightText: {
+  policyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
+  },
+  policyContent: {
+    flex: 1,
+  },
+  policyTitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    color: '#475569',
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: SPACING[1],
   },
-  contactInfo: {
+  policyText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+    lineHeight: 20,
+  },
+  contactCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.xl,
     padding: SPACING[5],
-    marginTop: SPACING[4],
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    gap: SPACING[4],
+  },
+  contactIntro: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#475569',
+    lineHeight: 24,
+    marginBottom: SPACING[4],
+    textAlign: 'center',
+  },
+  contactActions: {
+    flexDirection: 'row',
+    gap: SPACING[3],
+    marginBottom: SPACING[5],
+  },
+  contactButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[3],
+    gap: SPACING[2],
+  },
+  contactButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  contactButtonSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    borderWidth: 1,
+    gap: SPACING[2],
+  },
+  contactButtonSecondaryText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
+  },
+  contactInfo: {
+    gap: SPACING[3],
   },
   contactItem: {
     flexDirection: 'row',
@@ -515,9 +833,9 @@ const styles = StyleSheet.create({
     gap: SPACING[3],
   },
   contactText: {
-    fontSize: TYPOGRAPHY.fontSize.md,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     color: '#475569',
-    lineHeight: 22,
+    lineHeight: 20,
   },
   complianceSection: {
     alignItems: 'center',
@@ -527,25 +845,30 @@ const styles = StyleSheet.create({
   complianceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E8F5E8',
     borderRadius: RADIUS.xl,
     paddingHorizontal: SPACING[5],
     paddingVertical: SPACING[4],
     gap: SPACING[3],
     borderWidth: 1,
-    borderColor: '#C8E6C9',
+    borderColor: '#E2E8F0',
   },
-  complianceText: {
+  complianceIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
     alignItems: 'center',
+  },
+  complianceTextContainer: {
+    flex: 1,
   },
   complianceTitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: '600',
-    color: '#2E7D32',
+    fontWeight: '700',
   },
   complianceSubtext: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#388E3C',
+    fontWeight: '500',
     marginTop: SPACING[1],
   },
 });

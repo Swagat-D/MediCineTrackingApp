@@ -19,6 +19,9 @@ import SettingsScreen from '../screens/shared/SettingsScreen';
 // Types
 import { PatientTabParamList, PatientStackParamList } from '../types/navigation.types';
 import { TYPOGRAPHY } from '../constants/themes/theme';
+import AboutScreen from '@/screens/shared/AboutScree';
+import HelpSupportScreen from '@/screens/shared/HelpSupportScreen';
+import PrivacyPolicyScreen from '@/screens/shared/PrivacyPolicyScree';
 
 const Tab = createBottomTabNavigator<PatientTabParamList>();
 const Stack = createStackNavigator<PatientStackParamList>();
@@ -37,6 +40,8 @@ const HomeStack: React.FC = () => (
 const MedicationsStack: React.FC = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="MedicationList" component={MedicationListScreen} />
+    <Stack.Screen name="MealSettings" component={MealSettingsScreen} />
+    <Stack.Screen name="SOS" component={SOSScreen} />
   </Stack.Navigator>
 );
 
@@ -54,6 +59,9 @@ const ProfileStack: React.FC = () => (
     <Stack.Screen name="Settings" component={SettingsScreen} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} />
     <Stack.Screen name="SOS" component={SOSScreen} />
+    <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+    <Stack.Screen name="About" component={AboutScreen} />
+    <Stack.Screen name="Privacy" component={PrivacyPolicyScreen} />
   </Stack.Navigator>
 );
 
@@ -98,7 +106,7 @@ const PatientNavigator: React.FC = () => {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E2E8F0',
-          height: 60,
+          height: 70,
           paddingBottom: 8,
           paddingTop: 8,
           shadowColor: '#64748B',

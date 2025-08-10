@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,10 @@ import {
   Platform,
   Vibration,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, Camera } from 'expo-camera';
+import { CameraView, CameraType, FlashMode, useCameraPermissions } from 'expo-camera';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { 
   setScanningBarcode, 
@@ -25,7 +26,7 @@ import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 interface Props {
   navigation: any;
@@ -38,42 +39,78 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
     isConnected
   } = useAppSelector(state => state.patient);
   
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+  const [flashMode, setFlashMode] = useState<FlashMode>('off');
+  const [cameraType, setCameraType] = useState<CameraType>('back');
+  const [isActive, setIsActive] = useState(true);
+  const cameraRef = useRef<CameraView>(null);
+
+  // Blue theme colors
+  const theme = {
+    primary: '#2563EB',
+    primaryLight: '#DBEAFE',
+    success: '#059669',
+    warning: '#F59E0B',
+    error: '#EF4444',
+  };
 
   useEffect(() => {
-    const getPermissions = async () => {
-      try {
-        const { status } = await Camera.requestCameraPermissionsAsync();
-        setHasPermission(status === 'granted');
-      } catch (error) {
-        console.error('Error requesting camera permissions:', error);
-        setHasPermission(false);
-      }
+    // Request permissions on mount
+    if (!permission?.granted) {
+      requestPermission();
+    }
+
+    // Focus/unfocus handling
+    const unsubscribe = navigation.addListener('focus', () => {
+      setIsActive(true);
+    });
+
+    const unsubscribeBlur = navigation.addListener('blur', () => {
+      setIsActive(false);
+      resetScanner();
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeBlur();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation, permission]);
 
-    getPermissions();
-  }, []);
-
-  const handleBarCodeScanned = async ({ data }: { data: string }) => {
-    if (scanned || isScanningBarcode) return;
+  const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
+    if (scanned || isScanningBarcode || !isActive) return;
     
     setScanned(true);
     dispatch(setScanningBarcode(true));
     
+    // Haptic feedback
     try {
-      Vibration.vibrate(200);
+      if (Platform.OS === 'ios') {
+        Vibration.vibrate([100]);
+      } else {
+        Vibration.vibrate(200);
+      }
     } catch (error) {
-      console.error(error);
+      console.error(error)
       console.log('Vibration not available');
     }
 
     try {
+      console.log('Scanned barcode:', { type, data });
+      
+      // Validate barcode data
+      if (!data || data.trim() === '') {
+        throw new Error('Invalid barcode data');
+      }
+
       const result = await patientAPI.scanMedicationBarcode(data);
       dispatch(setScannedBarcodeData(result));
       showMedicationDialog(result);
     } catch (error: any) {
+      console.error('Barcode scan error:', error);
       dispatch(setError(error.message));
+      
       Alert.alert(
         'Scan Failed',
         error.message || 'Failed to scan barcode. Please try again.',
@@ -137,27 +174,39 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
     setScanned(false);
     dispatch(clearBarcodeData());
     dispatch(clearError());
+    setIsActive(true);
   };
 
-  if (hasPermission === null) {
+  const toggleFlash = () => {
+    setFlashMode(current => current === 'off' ? 'on' : 'off');
+  };
+
+  const flipCamera = () => {
+    setCameraType(current => current === 'back' ? 'front' : 'back');
+  };
+
+  // Permission states
+  if (!permission) {
     return (
       <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#000000" />
         <PatientSecondaryNavbar
           title="Scanner"
           onBackPress={() => navigation.goBack()}
           onSOSPress={() => navigation.navigate('SOS')}
         />
         <View style={styles.permissionContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
-          <Text style={styles.permissionText}>Requesting camera permission...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={styles.permissionText}>Loading camera...</Text>
         </View>
       </View>
     );
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
       <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#000000" />
         <PatientSecondaryNavbar
           title="Scanner"
           onBackPress={() => navigation.goBack()}
@@ -170,11 +219,8 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
             Please allow camera access to scan medication barcodes
           </Text>
           <TouchableOpacity 
-            style={styles.permissionButton} 
-            onPress={async () => {
-              const { status } = await Camera.requestCameraPermissionsAsync();
-              setHasPermission(status === 'granted');
-            }}
+            style={[styles.permissionButton, { backgroundColor: theme.primary }]} 
+            onPress={requestPermission}
           >
             <Text style={styles.permissionButtonText}>Grant Permission</Text>
           </TouchableOpacity>
@@ -185,6 +231,8 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      
       <PatientSecondaryNavbar
         title="Scan Medication"
         subtitle="Point camera at barcode"
@@ -193,66 +241,121 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
       />
 
       <View style={styles.scannerContainer}>
-        <View style={styles.cameraView}>
+        {isActive && (
           <CameraView
+            ref={cameraRef}
             style={StyleSheet.absoluteFillObject}
-            facing="back"
+            facing={cameraType}
+            flash={flashMode}
             onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
             barcodeScannerSettings={{
-              barcodeTypes: ["qr", "code128", "code39", "ean13", "ean8"],
+              barcodeTypes: [
+                'qr',
+                'code128',
+                'code39',
+                'code93',
+                'ean13',
+                'ean8',
+                'upc_a',
+                'upc_e',
+                'codabar',
+                'itf14',
+                'pdf417',
+                'aztec',
+                'datamatrix'
+              ],
             }}
-          />
-          
-          <View style={styles.scannerOverlay}>
-            {!isConnected && (
-              <View style={styles.connectionWarning}>
-                <Ionicons name="wifi-outline" size={20} color="#F59E0B" />
-                <Text style={styles.warningText}>
-                  Offline mode: Scan results may not be real-time
-                </Text>
-              </View>
-            )}
-            
-            <View style={styles.overlayMiddle}>
-              <View style={styles.overlaySide} />
-              <View style={styles.scannerFrame}>
-                <View style={styles.cornerTL} />
-                <View style={styles.cornerTR} />
-                <View style={styles.cornerBL} />
-                <View style={styles.cornerBR} />
-              </View>
-              <View style={styles.overlaySide} />
-            </View>
-          </View>
-
-          {isScanningBarcode && (
-            <View style={styles.scanningIndicator}>
-              <ActivityIndicator size="large" color="#FFFFFF" />
-              <Text style={styles.scanningText}>Processing barcode...</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.instructionsContainer}>
-          <View style={styles.instructionCard}>
-            <Ionicons name="qr-code" size={24} color="#2563EB" />
-            <Text style={styles.instructionTitle}>Scan Medication Barcode</Text>
-            <Text style={styles.instructionText}>
-              Position the barcode within the frame. The app will automatically detect and process it.
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.controlsContainer}>
-          <TouchableOpacity
-            style={styles.controlButton}
-            onPress={resetScanner}
-            disabled={isScanningBarcode}
           >
-            <Ionicons name="refresh" size={24} color="#FFFFFF" />
-            <Text style={styles.controlButtonText}>Reset</Text>
-          </TouchableOpacity>
-        </View>
+            {/* Scanner Overlay */}
+            <View style={styles.scannerOverlay}>
+              {/* Connection Warning */}
+              {!isConnected && (
+                <View style={styles.connectionWarning}>
+                  <Ionicons name="wifi-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.warningText}>
+                    Offline mode: Scan results may not be real-time
+                  </Text>
+                </View>
+              )}
+
+              {/* Instructions */}
+              <View style={styles.instructionsContainer}>
+                <View style={styles.instructionCard}>
+                  <Ionicons name="qr-code" size={20} color={theme.primary} />
+                  <Text style={styles.instructionTitle}>Scan Medication Barcode</Text>
+                  <Text style={styles.instructionText}>
+                    Position the barcode within the frame
+                  </Text>
+                </View>
+              </View>
+
+              {/* Scanning Frame */}
+              <View style={styles.overlayContent}>
+                <View style={styles.overlayTop} />
+                
+                <View style={styles.overlayMiddle}>
+                  <View style={styles.overlaySide} />
+                  <View style={styles.scannerFrame}>
+                    <View style={[styles.corner, styles.cornerTL, { borderColor: theme.primary }]} />
+                    <View style={[styles.corner, styles.cornerTR, { borderColor: theme.primary }]} />
+                    <View style={[styles.corner, styles.cornerBL, { borderColor: theme.primary }]} />
+                    <View style={[styles.corner, styles.cornerBR, { borderColor: theme.primary }]} />
+                    
+                    {/* Scanning Line Animation */}
+                    {!scanned && (
+                      <View style={styles.scanLineContainer}>
+                        <View style={[styles.scanLine, { backgroundColor: theme.primary }]} />
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.overlaySide} />
+                </View>
+                
+                <View style={styles.overlayBottom} />
+              </View>
+
+              {/* Camera Controls */}
+              <View style={styles.controlsContainer}>
+                <TouchableOpacity
+                  style={[styles.controlButton, styles.flashButton]}
+                  onPress={toggleFlash}
+                  disabled={isScanningBarcode}
+                >
+                  <Ionicons 
+                    name={flashMode === 'on' ? 'flash' : 'flash-off'} 
+                    size={24} 
+                    color={flashMode === 'on' ? theme.warning : '#FFFFFF'} 
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.controlButton, styles.resetButton, { backgroundColor: theme.primary }]}
+                  onPress={resetScanner}
+                  disabled={isScanningBarcode}
+                >
+                  <Ionicons name="refresh" size={20} color="#FFFFFF" />
+                  <Text style={styles.controlButtonText}>Reset</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.controlButton, styles.flipButton]}
+                  onPress={flipCamera}
+                  disabled={isScanningBarcode}
+                >
+                  <Ionicons name="camera-reverse" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Scanning Indicator */}
+              {isScanningBarcode && (
+                <View style={styles.scanningIndicator}>
+                  <ActivityIndicator size="large" color="#FFFFFF" />
+                  <Text style={styles.scanningText}>Processing barcode...</Text>
+                </View>
+              )}
+            </View>
+          </CameraView>
+        )}
       </View>
     </View>
   );
@@ -283,12 +386,17 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     marginBottom: SPACING[6],
+    lineHeight: 22,
   },
   permissionButton: {
-    backgroundColor: '#2563EB',
     paddingHorizontal: SPACING[6],
     paddingVertical: SPACING[4],
     borderRadius: RADIUS.lg,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   permissionButtonText: {
     fontSize: TYPOGRAPHY.fontSize.md,
@@ -299,16 +407,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginTop: Platform.OS === 'ios' ? 114 : 70,
   },
-  cameraView: {
-    flex: 1,
-    position: 'relative',
-  },
   scannerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     backgroundColor: 'transparent',
   },
   connectionWarning: {
@@ -319,6 +419,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING[2],
     borderRadius: RADIUS.md,
     margin: SPACING[4],
+    marginTop: SPACING[2],
     gap: SPACING[2],
   },
   warningText: {
@@ -327,120 +428,163 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
   },
+  instructionsContainer: {
+    position: 'absolute',
+    top: 20,
+    left: SPACING[4],
+    right: SPACING[4],
+    zIndex: 10,
+  },
+  instructionCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: RADIUS.lg,
+    padding: SPACING[3],
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACING[2],
+  },
+  instructionTitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
+    color: '#1E293B',
+    flex: 1,
+  },
+  instructionText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#64748B',
+    flex: 1,
+  },
+  overlayContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  overlayTop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
   overlayMiddle: {
     flexDirection: 'row',
-    height: 200,
-    marginTop: 100,
+    height: Math.min(width * 0.6, 200),
   },
   overlaySide: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
+  overlayBottom: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
   scannerFrame: {
-    width: 250,
-    height: 200,
+    width: Math.min(width * 0.7, 280),
+    height: Math.min(width * 0.6, 200),
     position: 'relative',
     backgroundColor: 'transparent',
   },
-  cornerTL: {
+  corner: {
     position: 'absolute',
-    top: 0,
-    left: 0,
     width: 30,
     height: 30,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-    borderColor: '#2563EB',
+    borderWidth: 4,
+  },
+  cornerTL: {
+    top: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
   },
   cornerTR: {
-    position: 'absolute',
     top: 0,
     right: 0,
-    width: 30,
-    height: 30,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-    borderColor: '#2563EB',
+    borderLeftWidth: 0,
+    borderBottomWidth: 0,
   },
   cornerBL: {
-    position: 'absolute',
     bottom: 0,
     left: 0,
-    width: 30,
-    height: 30,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-    borderColor: '#2563EB',
+    borderRightWidth: 0,
+    borderTopWidth: 0,
   },
   cornerBR: {
-    position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 30,
-    height: 30,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-    borderColor: '#2563EB',
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+  },
+  scanLineContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: 0,
+    right: 0,
+    height: 2,
+    transform: [{ translateY: -1 }],
+  },
+  scanLine: {
+    height: 2,
+    opacity: 0.8,
+  },
+  controlsContainer: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 50 : 30,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingHorizontal: SPACING[8],
+  },
+  controlButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: RADIUS.full,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  flashButton: {
+    width: 50,
+    height: 50,
+  },
+  flipButton: {
+    width: 50,
+    height: 50,
+  },
+  resetButton: {
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[3],
+    flexDirection: 'row',
+    gap: SPACING[1],
+    minWidth: 80,
+  },
+  controlButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   scanningIndicator: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -75 }, { translateY: -50 }],
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    transform: [{ translateX: -75 }, { translateY: -40 }],
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     borderRadius: RADIUS.lg,
     padding: SPACING[4],
     alignItems: 'center',
     width: 150,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
   },
   scanningText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: '#FFFFFF',
     marginTop: SPACING[2],
     textAlign: 'center',
-  },
-  instructionsContainer: {
-    position: 'absolute',
-    top: 50,
-    left: SPACING[5],
-    right: SPACING[5],
-  },
-  instructionCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: RADIUS.lg,
-    padding: SPACING[4],
-    alignItems: 'center',
-  },
-  instructionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginVertical: SPACING[2],
-  },
-  instructionText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#64748B',
-    textAlign: 'center',
-  },
-  controlsContainer: {
-    position: 'absolute',
-    bottom: SPACING[8],
-    left: SPACING[5],
-    right: SPACING[5],
-    alignItems: 'center',
-  },
-  controlButton: {
-    alignItems: 'center',
-    padding: SPACING[4],
-    borderRadius: RADIUS.lg,
-    backgroundColor: '#2563EB',
-    minWidth: 120,
-  },
-  controlButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#FFFFFF',
-    fontWeight: '600',
-    marginTop: SPACING[1],
+    fontWeight: '500',
   },
 });
 

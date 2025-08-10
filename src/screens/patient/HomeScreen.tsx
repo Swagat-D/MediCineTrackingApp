@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useCallback } from 'react';
 import {
   View,
@@ -7,8 +8,10 @@ import {
   RefreshControl,
   Platform,
   Alert,
-  ActivityIndicator,
   StyleSheet,
+  Modal,
+  Image,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,15 +27,37 @@ import { patientAPI } from '../../services/api/patientAPI';
 import { useFocusEffect } from '@react-navigation/native';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientNavbar from '../../components/common/PatientNavbar';
+import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const { width, height } = Dimensions.get('window');
 
 interface Props {
   navigation: any; 
 }
 
+interface DashboardStats {
+  totalMedications: number;
+  activeMedications: number;
+  adherenceRate: number;
+  todayReminders: number;
+  upcomingDoses: number;
+  missedDoses: number;
+}
+
+interface RecentActivity {
+  id: string;
+  type: 'dose_taken' | 'dose_missed' | 'reminder_sent' | 'medication_added';
+  medicationName: string;
+  message: string;
+  timestamp: string;
+  priority: 'low' | 'medium' | 'high';
+}
+
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const dispatch = useAppDispatch();
   const { 
-    dashboardStats,
+    dashboardStats: reduxDashboardStats,
     todaysMedications,
     isDashboardLoading,
     isConnected,
@@ -41,29 +66,83 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAppSelector(state => state.auth);
   
   const [refreshing, setRefreshing] = useState(false);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [allActivities, setAllActivities] = useState<RecentActivity[]>([]);
+  
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
+    totalMedications: 0,
+    activeMedications: 0,
+    adherenceRate: 0,
+    todayReminders: 0,
+    upcomingDoses: 0,
+    missedDoses: 0,
+  });
+  
+  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+
+  // Blue theme for patient side
+  const theme = {
+    primary: '#2563EB',
+    primaryLight: '#DBEAFE',
+    primaryDark: '#1D4ED8',
+    gradient: ['#EBF4FF', '#FFFFFF'] as [string, string],
+    accent: '#3B82F6',
+    success: '#059669',
+    warning: '#F59E0B',
+    error: '#EF4444',
+  };
 
   // Load data when screen focuses
   useFocusEffect(
     useCallback(() => {
       loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
 
   const loadData = async () => {
     dispatch(setDashboardLoading(true));
     try {
-      const [dashboardData, notificationsData] = await Promise.all([
+      const [dashboardData, notificationsData, activitiesData] = await Promise.all([
         patientAPI.getDashboardData(),
-        patientAPI.getNotifications()
+        patientAPI.getNotifications(),
+        patientAPI.getRecentActivities?.() || Promise.resolve([])
       ]);
       
       dispatch(setDashboardData(dashboardData));
       dispatch(setNotifications(notificationsData));
       dispatch(setConnectionStatus(true));
+
+      // Update local dashboard stats
+      setDashboardStats({
+        totalMedications: dashboardData.stats.totalMedications || 0,
+        activeMedications: dashboardData.stats.activeMedications || 0,
+        adherenceRate: dashboardData.stats.adherenceRate || 0,
+        todayReminders: dashboardData.stats.todayReminders || 0,
+        upcomingDoses: dashboardData.stats.upcomingDoses || 0,
+        missedDoses: dashboardData.stats.missedDoses || 0,
+      });
+
+      // Set activities
+      if (activitiesData && activitiesData.length > 0) {
+        setRecentActivities(activitiesData.slice(0, 5));
+        setAllActivities(activitiesData);
+      }
+
     } catch (error: any) {
       dispatch(setError(error.message));
       dispatch(setConnectionStatus(false));
+      
+      // Fallback to Redux data
+      if (reduxDashboardStats) {
+        setDashboardStats({
+          totalMedications: reduxDashboardStats.totalMedications || 0,
+          activeMedications: reduxDashboardStats.activeMedications || 0,
+          adherenceRate: reduxDashboardStats.adherenceRate || 0,
+          todayReminders: 0,
+          upcomingDoses: 0,
+          missedDoses: 0,
+        });
+      }
     } finally {
       dispatch(setDashboardLoading(false));
     }
@@ -96,7 +175,102 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     return 'Good Evening';
   };
 
-  if (isDashboardLoading && !dashboardStats) {
+  const getActivityIcon = (type: RecentActivity['type']) => {
+    switch (type) {
+      case 'dose_taken': return 'checkmark-circle';
+      case 'dose_missed': return 'close-circle';
+      case 'reminder_sent': return 'notifications';
+      case 'medication_added': return 'add-circle';
+      default: return 'information-circle';
+    }
+  };
+
+  const getActivityColor = (priority: RecentActivity['priority']) => {
+    switch (priority) {
+      case 'high': return theme.error;
+      case 'medium': return theme.warning;
+      case 'low': return theme.success;
+      default: return '#6B7280';
+    }
+  };
+
+  const ActivityModal = () => (
+    <Modal
+      visible={showActivityModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowActivityModal(false)}
+    >
+      <View style={styles.modalContainer}>
+        {/* Modal Header */}
+        <View style={styles.modalHeader}>
+          <View style={styles.modalTitleContainer}>
+            <Text style={styles.modalTitle}>Recent Activities</Text>
+            <Text style={styles.modalSubtitle}>Your medication history</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => setShowActivityModal(false)}
+          >
+            <Ionicons name="close" size={24} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Modal Content */}
+        <ScrollView
+          style={styles.modalScrollView}
+          contentContainerStyle={styles.modalScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.modalActivityList}>
+            {allActivities.map((activity, index) => (
+              <TouchableOpacity
+                key={activity.id}
+                style={[
+                  styles.modalActivityItem,
+                  index === allActivities.length - 1 && styles.lastModalActivityItem
+                ]}
+                activeOpacity={0.7}
+              >
+                <View style={[
+                  styles.activityIconContainer,
+                  { backgroundColor: getActivityColor(activity.priority) + '15' }
+                ]}>
+                  <Ionicons
+                    name={getActivityIcon(activity.type)}
+                    size={18}
+                    color={getActivityColor(activity.priority)}
+                  />
+                </View>
+                
+                <View style={styles.activityContent}>
+                  <View style={styles.activityHeader}>
+                    <Text style={styles.activityMedication}>{activity.medicationName}</Text>
+                    <Text style={styles.activityTime}>{activity.timestamp}</Text>
+                  </View>
+                  <Text style={styles.activityMessage}>{activity.message}</Text>
+                </View>
+                
+                {activity.priority === 'high' && (
+                  <View style={styles.highPriorityIndicator} />
+                )}
+              </TouchableOpacity>
+            ))}
+            
+            {allActivities.length === 0 && (
+              <View style={styles.emptyState}>
+                <Ionicons name="time-outline" size={48} color="#94A3B8" />
+                <Text style={styles.emptyStateText}>No recent activities</Text>
+                <Text style={styles.emptyStateSubtext}>Your medication activities will appear here</Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+
+  if (isDashboardLoading && !dashboardStats.totalMedications) {
     return (
       <View style={styles.container}>
         <PatientNavbar
@@ -105,7 +279,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           notificationCount={unreadNotificationCount}
         />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <LoadingSpinner size="large" color={theme.primary} />
           <Text style={styles.loadingText}>Loading your dashboard...</Text>
         </View>
       </View>
@@ -127,108 +301,265 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#2563EB"
-            colors={['#2563EB']}
+            tintColor={theme.primary}
+            colors={[theme.primary]}
           />
         }
+        showsVerticalScrollIndicator={false}
       >
-        {/* Greeting Section */}
-        <LinearGradient colors={['#EBF4FF', '#FFFFFF']} style={styles.greetingContainer}>
+        {/* Enhanced Greeting Section */}
+        <LinearGradient
+          colors={theme.gradient}
+          style={styles.greetingContainer}
+        >
           <View style={styles.greetingContent}>
             <View style={styles.greetingText}>
               <Text style={styles.greeting}>{getGreeting()},</Text>
               <Text style={styles.userName}>{user?.name || 'Patient'}</Text>
               <Text style={styles.subtitle}>How are you feeling today?</Text>
               <View style={styles.connectionStatus}>
-                <View style={[styles.connectionDot, { backgroundColor: isConnected ? '#059669' : '#EF4444' }]} />
+                <View style={[styles.connectionDot, { backgroundColor: isConnected ? theme.success : theme.error }]} />
                 <Text style={styles.connectionText}>
                   {isConnected ? 'Connected' : 'Offline'}
                 </Text>
               </View>
             </View>
-          </View>
-        </LinearGradient>
-
-        {/* Progress Card */}
-        {dashboardStats && (
-          <View style={styles.progressSection}>
-            <Text style={styles.sectionTitle}>Today&apos;s Progress</Text>
-            <View style={styles.progressCard}>
-              <View style={styles.progressHeader}>
-                <View style={styles.progressInfo}>
-                  <Text style={styles.progressTitle}>Medication Adherence</Text>
-                  <Text style={styles.progressSubtitle}>
-                    {dashboardStats.activeMedications} of {dashboardStats.totalMedications} medications
-                  </Text>
-                </View>
-                <View style={styles.adherenceCircle}>
-                  <Text style={styles.adherenceText}>{dashboardStats.adherenceRate}%</Text>
-                </View>
+            <View style={styles.greetingIcon}>
+              <View style={[styles.iconContainer, { backgroundColor: theme.primaryLight, shadowColor: theme.primary }]}>
+                <Image 
+                  source={require('../../../assets/images/human.png')} 
+                  style={styles.humanIcon}
+                  resizeMode="contain"
+                />
               </View>
             </View>
           </View>
-        )}
+        </LinearGradient>
+
+        {/* Stats Overview */}
+        <View style={styles.statsSection}>
+          <View style={styles.statsRow}>
+            <TouchableOpacity
+              style={[styles.statItem, styles.primaryStat]}
+              onPress={() => navigation.navigate('Medications')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statContent}>
+                <View style={styles.statHeader}>
+                  <Ionicons name="medical" size={20} color={theme.primary} />
+                  <Text style={styles.statLabel}>Total Medications</Text>
+                </View>
+                <Text style={[styles.statValue, { color: theme.primary }]}>{dashboardStats.totalMedications}</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.statItem}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statContent}>
+                <View style={styles.statHeader}>
+                  <Ionicons name="checkmark-circle" size={20} color={theme.success} />
+                  <Text style={styles.statLabel}>Adherence Rate</Text>
+                </View>
+                <Text style={styles.statValue}>{dashboardStats.adherenceRate}%</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.statsRow}>
+            <TouchableOpacity
+              style={styles.statItem}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statContent}>
+                <View style={styles.statHeader}>
+                  <Ionicons name="time" size={20} color={theme.warning} />
+                  <Text style={styles.statLabel}>Today&apos;s Doses</Text>
+                </View>
+                <Text style={styles.statValue}>{dashboardStats.upcomingDoses}</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.statItem, dashboardStats.missedDoses > 0 && styles.alertStat]}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statContent}>
+                <View style={styles.statHeader}>
+                  <Ionicons 
+                    name="alert-circle" 
+                    size={20} 
+                    color={dashboardStats.missedDoses > 0 ? theme.error : "#6B7280"} 
+                  />
+                  <Text style={styles.statLabel}>Missed Doses</Text>
+                </View>
+                <Text style={[
+                  styles.statValue,
+                  dashboardStats.missedDoses > 0 && styles.alertValue
+                ]}>
+                  {dashboardStats.missedDoses}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* Today's Medications */}
         <View style={styles.medicationsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Today&apos;s Medications</Text>
+            <Text style={styles.sectionTitle}>Today&s Medications</Text>
             <TouchableOpacity onPress={() => navigation.navigate('Medications')}>
-              <Text style={styles.viewAllText}>View All</Text>
+              <Text style={[styles.viewAllText, { color: theme.primary }]}>View All</Text>
             </TouchableOpacity>
           </View>
           
-          {todaysMedications.length > 0 ? (
-            todaysMedications.map((medication) => (
-              <TouchableOpacity key={medication.id} style={styles.medicationCard}>
-                <View style={styles.medicationHeader}>
-                  <View style={styles.medicationIcon}>
-                    <Ionicons name="medical" size={20} color="#2563EB" />
+          <View style={styles.medicationsList}>
+            {todaysMedications && todaysMedications.length > 0 ? (
+              todaysMedications.slice(0, 3).map((medication, index) => (
+                <TouchableOpacity 
+                  key={medication.id} 
+                  style={[
+                    styles.medicationCard,
+                    index === Math.min(todaysMedications.length - 1, 2) && styles.lastMedicationCard
+                  ]}
+                >
+                  <View style={styles.medicationHeader}>
+                    <View style={[styles.medicationIcon, { backgroundColor: theme.primaryLight }]}>
+                      <Ionicons name="medical" size={20} color={theme.primary} />
+                    </View>
+                    <View style={styles.medicationInfo}>
+                      <Text style={styles.medicationName}>{medication.name}</Text>
+                      <Text style={styles.medicationDosage}>{medication.dosage}</Text>
+                    </View>
+                    <TouchableOpacity 
+                      style={[styles.takeButton, { backgroundColor: theme.success }]}
+                      onPress={() => handleDoseTaken(medication.id)}
+                    >
+                      <Text style={styles.takeButtonText}>Take</Text>
+                    </TouchableOpacity>
                   </View>
-                  <View style={styles.medicationInfo}>
-                    <Text style={styles.medicationName}>{medication.name}</Text>
-                    <Text style={styles.medicationDosage}>{medication.dosage}</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.takeButton}
-                    onPress={() => handleDoseTaken(medication.id)}
-                  >
-                    <Text style={styles.takeButtonText}>Take</Text>
-                  </TouchableOpacity>
-                </View>
-                {medication.instructions && (
-                  <Text style={styles.medicationInstructions}>{medication.instructions}</Text>
-                )}
-              </TouchableOpacity>
-            ))
-          ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No medications for today</Text>
-            </View>
-          )}
+                  {medication.instructions && (
+                    <Text style={styles.medicationInstructions}>{medication.instructions}</Text>
+                  )}
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.emptyMedicationCard}>
+                <Ionicons name="medical-outline" size={32} color="#94A3B8" />
+                <Text style={styles.emptyMedicationText}>No medications for today</Text>
+                <Text style={styles.emptyMedicationSubtext}>Your daily medications will appear here</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Quick Actions */}
         <View style={styles.quickActionsSection}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActionsGrid}>
-            <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('Scanner')}>
-              <Ionicons name="scan" size={24} color="#2563EB" />
+            <TouchableOpacity 
+              style={styles.actionCard} 
+              onPress={() => navigation.navigate('Scanner')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="scan" size={24} color={theme.primary} />
               <Text style={styles.actionText}>Scan</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('MealSettings')}>
-              <Ionicons name="time" size={24} color="#2563EB" />
+            <TouchableOpacity 
+              style={styles.actionCard} 
+              onPress={() => navigation.navigate('MealSettings')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="time" size={24} color={theme.primary} />
               <Text style={styles.actionText}>Meal Times</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={[styles.actionCard, styles.sosCard]} onPress={() => navigation.navigate('SOS')}>
-              <Ionicons name="alert-circle" size={24} color="#EF4444" />
+            <TouchableOpacity 
+              style={[styles.actionCard, styles.sosCard]} 
+              onPress={() => navigation.navigate('SOS')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="alert-circle" size={24} color={theme.error} />
               <Text style={styles.actionText}>Emergency</Text>
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Recent Activity */}
+        <View style={styles.activitySection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <TouchableOpacity onPress={() => setShowActivityModal(true)}>
+              <Text style={[styles.viewAllText, { color: theme.primary }]}>View All</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.activityList}>
+            {recentActivities.length > 0 ? (
+              recentActivities.map((activity, index) => (
+                <TouchableOpacity
+                  key={activity.id}
+                  style={[
+                    styles.activityItem,
+                    index === recentActivities.length - 1 && styles.lastActivityItem
+                  ]}
+                  activeOpacity={0.7}
+                >
+                  <View style={[
+                    styles.activityIconContainer,
+                    { backgroundColor: getActivityColor(activity.priority) + '15' }
+                  ]}>
+                    <Ionicons
+                      name={getActivityIcon(activity.type)}
+                      size={18}
+                      color={getActivityColor(activity.priority)}
+                    />
+                  </View>
+                  
+                  <View style={styles.activityContent}>
+                    <View style={styles.activityHeader}>
+                      <Text style={styles.activityMedication}>{activity.medicationName}</Text>
+                      <Text style={styles.activityTime}>{activity.timestamp}</Text>
+                    </View>
+                    <Text style={styles.activityMessage}>{activity.message}</Text>
+                  </View>
+                  
+                  {activity.priority === 'high' && (
+                    <View style={styles.highPriorityIndicator} />
+                  )}
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.emptyActivityCard}>
+                <Ionicons name="time-outline" size={32} color="#94A3B8" />
+                <Text style={styles.emptyActivityText}>No recent activities</Text>
+                <Text style={styles.emptyActivitySubtext}>Your medication activities will appear here</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Adherence Alert */}
+        {dashboardStats.adherenceRate < 80 && (
+          <TouchableOpacity style={styles.adherenceAlert} activeOpacity={0.8}>
+            <View style={styles.adherenceContent}>
+              <Ionicons name="warning" size={20} color={theme.warning} />
+              <View style={styles.adherenceText}>
+                <Text style={styles.adherenceTitle}>Improve Your Adherence</Text>
+                <Text style={styles.adherenceMessage}>
+                  Your medication adherence is {dashboardStats.adherenceRate}%. Try to maintain above 80% for better health outcomes.
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.warning} />
+          </TouchableOpacity>
+        )}
       </ScrollView>
+
+      {/* Activity Modal */}
+      <ActivityModal />
     </View>
   );
 };
@@ -252,7 +583,8 @@ const styles = StyleSheet.create({
     marginTop: Platform.OS === 'ios' ? 114 : 70,
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: SPACING[4],
+    fontSize: TYPOGRAPHY.fontSize.md,
     color: '#64748B',
   },
   greetingContainer: {
@@ -263,24 +595,42 @@ const styles = StyleSheet.create({
   greetingContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   greetingText: {
     flex: 1,
+  },
+  greetingIcon: {
+    marginLeft: SPACING[4],
+  },
+  iconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   greeting: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     color: '#6B7280',
     fontWeight: '500',
+    marginBottom: SPACING[1],
   },
   userName: {
     fontSize: TYPOGRAPHY.fontSize['2xl'],
     fontWeight: '700',
     color: '#1E293B',
-    marginVertical: SPACING[1],
+    marginBottom: SPACING[2],
   },
   subtitle: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: '#64748B',
+    lineHeight: 20,
   },
   connectionStatus: {
     flexDirection: 'row',
@@ -298,54 +648,58 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontWeight: '500',
   },
-  progressSection: {
-    paddingHorizontal: SPACING[5],
-    paddingBottom: SPACING[6],
-  },
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: '600',
     color: '#1E293B',
     marginBottom: SPACING[4],
   },
-  progressCard: {
+  statsSection: {
+    paddingHorizontal: SPACING[5],
+    paddingVertical: SPACING[5],
+  },
+  statsRow: {
+    flexDirection: 'row',
+    marginBottom: SPACING[3],
+    gap: SPACING[3],
+  },
+  statItem: {
+    flex: 1,
     backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.lg,
-    padding: SPACING[5],
+    padding: SPACING[4],
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  progressHeader: {
+  primaryStat: {
+    borderColor: '#2563EB',
+    backgroundColor: '#EBF4FF',
+  },
+  alertStat: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
+  statContent: {
+    alignItems: 'flex-start',
+  },
+  statHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: SPACING[2],
+    gap: SPACING[2],
   },
-  progressInfo: {
-    flex: 1,
-  },
-  progressTitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  progressSubtitle: {
+  statLabel: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: '#64748B',
-    marginTop: SPACING[1],
+    fontWeight: '500',
   },
-  adherenceCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 3,
-    borderColor: '#2563EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  adherenceText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
+  statValue: {
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
     fontWeight: '700',
-    color: '#2563EB',
+    color: '#1E293B',
+  },
+  alertValue: {
+    color: '#EF4444',
   },
   medicationsSection: {
     paddingHorizontal: SPACING[5],
@@ -359,16 +713,21 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#2563EB',
     fontWeight: '600',
   },
-  medicationCard: {
+  medicationsList: {
     backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.lg,
-    padding: SPACING[4],
-    marginBottom: SPACING[3],
     borderWidth: 1,
     borderColor: '#E2E8F0',
+  },
+  medicationCard: {
+    padding: SPACING[4],
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  lastMedicationCard: {
+    borderBottomWidth: 0,
   },
   medicationHeader: {
     flexDirection: 'row',
@@ -378,7 +737,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#EBF4FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING[3],
@@ -397,7 +755,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   takeButton: {
-    backgroundColor: '#059669',
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[2],
     borderRadius: RADIUS.md,
@@ -413,20 +770,26 @@ const styles = StyleSheet.create({
     marginTop: SPACING[2],
     fontStyle: 'italic',
   },
-  emptyCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.lg,
-    padding: SPACING[6],
+  emptyMedicationCard: {
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    paddingVertical: SPACING[8],
+    paddingHorizontal: SPACING[5],
   },
-  emptyText: {
+  emptyMedicationText: {
     fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
     color: '#64748B',
+    marginTop: SPACING[3],
+    marginBottom: SPACING[1],
+  },
+  emptyMedicationSubtext: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#94A3B8',
+    textAlign: 'center',
   },
   quickActionsSection: {
     paddingHorizontal: SPACING[5],
+    paddingBottom: SPACING[6],
   },
   quickActionsGrid: {
     flexDirection: 'row',
@@ -440,6 +803,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    gap: SPACING[2],
   },
   sosCard: {
     backgroundColor: '#FEF2F2',
@@ -449,8 +813,208 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '500',
     color: '#475569',
-    marginTop: SPACING[2],
+    textAlign: 'center',
   },
-});
+  activitySection: {
+    paddingHorizontal: SPACING[5],
+    paddingBottom: SPACING[6],
+  },
+  activityList: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    minHeight: 120,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING[4],
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  lastActivityItem: {
+    borderBottomWidth: 0,
+  },
+  activityIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING[1],
+  },
+  activityMedication: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  activityTime: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#94A3B8',
+  },
+  activityMessage: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#475569',
+    lineHeight: 18,
+  },
+  humanIcon: {
+    height:74,
+    width:74,
+    borderRadius: RADIUS.full
+  },
+  highPriorityIndicator: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#EF4444',
+  },
+  emptyActivityCard: {
+    alignItems: 'center',
+    paddingVertical: SPACING[8],
+    paddingHorizontal: SPACING[5],
+  },
+  emptyActivityText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: SPACING[3],
+    marginBottom: SPACING[1],
+  },
+  emptyActivitySubtext: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+  adherenceAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFBEB',
+    marginHorizontal: SPACING[5],
+    borderRadius: RADIUS.lg,
+    padding: SPACING[4],
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    marginBottom: SPACING[6],
+  },
+  adherenceContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: SPACING[3],
+  },
+  adherenceText: {
+    flex: 1,
+  },
+  adherenceTitle: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: '#D97706',
+    marginBottom: SPACING[1],
+  },
+  adherenceMessage: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#92400E',
+    lineHeight: 18,
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING[5],
+    paddingVertical: SPACING[4],
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    ...Platform.select({
+      ios: {
+        paddingTop: SPACING[12],
+      },
+      android: {
+        paddingTop: SPACING[6],
+      },
+    }),
+  },
+  modalTitleContainer: {
+    flex: 1,
+  },
+  modalTitle: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: SPACING[1],
+  },
+  modalSubtitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalScrollView: {
+    flex: 1,
+  },
+  modalScrollContent: {
+    paddingHorizontal: SPACING[5],
+    paddingVertical: SPACING[5],
+  },
+  modalActivityList: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    minHeight: height * 0.6,
+  },
+  modalActivityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING[4],
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  lastModalActivityItem: {
+    borderBottomWidth: 0,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING[12],
+    paddingHorizontal: SPACING[6],
+  },
+  emptyStateText: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: SPACING[4],
+    marginBottom: SPACING[2],
+  },
+  emptyStateSubtext: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 20,
+  }
+})
 
 export default HomeScreen;

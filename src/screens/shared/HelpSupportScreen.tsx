@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   Alert,
   Platform,
   Image,
+  Clipboard,
+  Animated,
+  LayoutAnimation,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,6 +23,11 @@ interface HelpSupportScreenProps {
 }
 
 const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => {
+  const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
+  const [animatedValues] = useState(
+    Array(5).fill(0).map(() => new Animated.Value(0))
+  );
+
   const handleContactPress = (type: 'email' | 'phone') => {
     switch (type) {
       case 'email':
@@ -31,9 +39,71 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
     }
   };
 
-  const handleFAQPress = (question: string, answer: string) => {
-    Alert.alert(question, answer, [{ text: 'OK' }]);
+  const handleCopyToClipboard = (text: string, type: string) => {
+    Clipboard.setString(text);
+    Alert.alert(
+      'Copied!', 
+      `${type} has been copied to clipboard`,
+      [{ text: 'OK' }]
+    );
   };
+
+  const toggleFAQ = (index: number) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    
+    if (expandedFAQ === index) {
+      setExpandedFAQ(null);
+      Animated.timing(animatedValues[index], {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+    } else {
+      // Close previously opened FAQ
+      if (expandedFAQ !== null) {
+        Animated.timing(animatedValues[expandedFAQ], {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: false,
+        }).start();
+      }
+      
+      setExpandedFAQ(index);
+      Animated.timing(animatedValues[index], {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+    }
+  };
+
+  const faqData = [
+    {
+      question: 'How do I add a new medication?',
+      answer: 'Go to your patient details screen and tap "Add Medication". Fill in the required information including medicine name, dosage, frequency, and timing. A barcode will be automatically generated for tracking.',
+      icon: 'medical'
+    },
+    {
+      question: 'How does barcode scanning work?',
+      answer: 'Patients scan the medication barcode using their phone camera. The app verifies if it\'s time for the dose and prevents double-dosing by tracking when medications were last taken.',
+      icon: 'qr-code'
+    },
+    {
+      question: 'Can I manage multiple patients?',
+      answer: 'Yes! As a caregiver, you can add and manage multiple patients. Each patient can have their own set of medications and schedules. You\'ll receive notifications for all your patients.',
+      icon: 'people'
+    },
+    {
+      question: 'How do I reset my password?',
+      answer: 'On the login screen, tap "Forgot Password". Enter your email address and we\'ll send you a verification code. Use this code to create a new password.',
+      icon: 'lock-closed'
+    },
+    {
+      question: 'What if I miss a medication reminder?',
+      answer: 'If you miss a scheduled dose, the app will show this in your medication history. Caregivers will also be notified of missed doses. You can still take the medication and mark it as taken, but always consult your healthcare provider about missed doses.',
+      icon: 'time'
+    }
+  ];
 
   return (
     <View style={styles.container}>
@@ -53,11 +123,11 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
           style={styles.headerSection}
         >
           <View style={styles.headerContent}>
-              <Image 
-                  source={require('../../../assets/images/hep.png')} 
-                  style={styles.helpIcon}
-                  resizeMode="contain"
-                />
+            <Image 
+              source={require('../../../assets/images/hep.png')} 
+              style={styles.helpIcon}
+              resizeMode="contain"
+            />
             <Text style={styles.headerTitle}>We&apos;re Here to Help</Text>
             <Text style={styles.headerSubtitle}>
               Get assistance with MediTracker features and troubleshooting
@@ -65,130 +135,160 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
           </View>
         </LinearGradient>
 
-        {/* Contact Options */}
+        {/* Enhanced Contact Options */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contact Support</Text>
           
           <View style={styles.contactGrid}>
-            <TouchableOpacity
-              style={styles.contactCard}
-              onPress={() => handleContactPress('email')}
-            >
-              <View style={styles.contactIcon}>
-                <Ionicons name="mail" size={24} color="#059669" />
+            {/* Email Support Card */}
+            <View style={styles.contactCard}>
+              <View style={styles.contactHeader}>
+                <View style={styles.contactIcon}>
+                  <Ionicons name="mail" size={24} color="#059669" />
+                </View>
+                <View style={styles.contactInfo}>
+                  <Text style={styles.contactTitle}>Email Support</Text>
+                  <Text style={styles.contactSubtitle}>We reply within 24 hours</Text>
+                </View>
               </View>
-              <Text style={styles.contactTitle}>Email Support</Text>
-              <Text style={styles.contactSubtitle}>support@meditracker.com</Text>
-              <Text style={styles.contactDescription}>
-                Get detailed help within 24 hours
-              </Text>
-            </TouchableOpacity>
+              
+              <View style={styles.contactActions}>
+                <TouchableOpacity
+                  style={styles.primaryButton}
+                  onPress={() => handleContactPress('email')}
+                >
+                  <Ionicons name="send" size={16} color="#FFFFFF" />
+                  <Text style={styles.primaryButtonText}>Send Email</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={() => handleCopyToClipboard('support@meditracker.com', 'Email address')}
+                >
+                  <Ionicons name="copy" size={16} color="#059669" />
+                  <Text style={styles.secondaryButtonText}>Copy</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={styles.contactDetail}>support@meditracker.com</Text>
+            </View>
 
-            <TouchableOpacity
-              style={styles.contactCard}
-              onPress={() => handleContactPress('phone')}
-            >
-              <View style={styles.contactIcon}>
-                <Ionicons name="call" size={24} color="#059669" />
+            {/* Phone Support Card */}
+            <View style={styles.contactCard}>
+              <View style={styles.contactHeader}>
+                <View style={styles.contactIcon}>
+                  <Ionicons name="call" size={24} color="#059669" />
+                </View>
+                <View style={styles.contactInfo}>
+                  <Text style={styles.contactTitle}>Phone Support</Text>
+                  <Text style={styles.contactSubtitle}>Mon-Fri, 9 AM - 6 PM EST</Text>
+                </View>
               </View>
-              <Text style={styles.contactTitle}>Phone Support</Text>
-              <Text style={styles.contactSubtitle}>1-800-MEDITRACK</Text>
-              <Text style={styles.contactDescription}>
-                Mon-Fri, 9 AM - 6 PM EST
-              </Text>
-            </TouchableOpacity>
+              
+              <View style={styles.contactActions}>
+                <TouchableOpacity
+                  style={styles.primaryButton}
+                  onPress={() => handleContactPress('phone')}
+                >
+                  <Ionicons name="call" size={16} color="#FFFFFF" />
+                  <Text style={styles.primaryButtonText}>Call Now</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={() => handleCopyToClipboard('1-800-MEDITRACK', 'Phone number')}
+                >
+                  <Ionicons name="copy" size={16} color="#059669" />
+                  <Text style={styles.secondaryButtonText}>Copy</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={styles.contactDetail}>1-800-MEDITRACK</Text>
+            </View>
           </View>
         </View>
 
-        {/* FAQs */}
+        {/* Enhanced FAQs with Accordion */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
           
-          <View style={styles.faqList}>
-            <TouchableOpacity
-              style={styles.faqItem}
-              onPress={() => handleFAQPress(
-                'How do I add a new medication?',
-                'Go to your patient details screen and tap "Add Medication". Fill in the required information including medicine name, dosage, frequency, and timing. A barcode will be automatically generated for tracking.'
-              )}
-            >
-              <View style={styles.faqIcon}>
-                <Ionicons name="medical" size={20} color="#059669" />
-              </View>
-              <View style={styles.faqContent}>
-                <Text style={styles.faqQuestion}>How do I add a new medication?</Text>
-                <Text style={styles.faqPreview}>Learn about adding medications and generating barcodes</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.faqItem}
-              onPress={() => handleFAQPress(
-                'How does barcode scanning work?',
-                'Patients scan the medication barcode using their phone camera. The app verifies if it\'s time for the dose and prevents double-dosing by tracking when medications were last taken.'
-              )}
-            >
-              <View style={styles.faqIcon}>
-                <Ionicons name="qr-code" size={20} color="#059669" />
-              </View>
-              <View style={styles.faqContent}>
-                <Text style={styles.faqQuestion}>How does barcode scanning work?</Text>
-                <Text style={styles.faqPreview}>Understanding the barcode verification system</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.faqItem}
-              onPress={() => handleFAQPress(
-                'Can I manage multiple patients?',
-                'Yes! As a caregiver, you can add and manage multiple patients. Each patient can have their own set of medications and schedules. You\'ll receive notifications for all your patients.'
-              )}
-            >
-              <View style={styles.faqIcon}>
-                <Ionicons name="people" size={20} color="#059669" />
-              </View>
-              <View style={styles.faqContent}>
-                <Text style={styles.faqQuestion}>Can I manage multiple patients?</Text>
-                <Text style={styles.faqPreview}>Managing multiple patients as a caregiver</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.faqItem}
-              onPress={() => handleFAQPress(
-                'How do I reset my password?',
-                'On the login screen, tap "Forgot Password". Enter your email address and we\'ll send you a verification code. Use this code to create a new password.'
-              )}
-            >
-              <View style={styles.faqIcon}>
-                <Ionicons name="lock-closed" size={20} color="#059669" />
-              </View>
-              <View style={styles.faqContent}>
-                <Text style={styles.faqQuestion}>How do I reset my password?</Text>
-                <Text style={styles.faqPreview}>Password recovery and account security</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.faqItem}
-              onPress={() => handleFAQPress(
-                'What if I miss a medication reminder?',
-                'If you miss a scheduled dose, the app will show this in your medication history. Caregivers will also be notified of missed doses. You can still take the medication and mark it as taken, but always consult your healthcare provider about missed doses.'
-              )}
-            >
-              <View style={styles.faqIcon}>
-                <Ionicons name="time" size={20} color="#059669" />
-              </View>
-              <View style={styles.faqContent}>
-                <Text style={styles.faqQuestion}>What if I miss a medication reminder?</Text>
-                <Text style={styles.faqPreview}>Handling missed doses and notifications</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-            </TouchableOpacity>
+          <View style={styles.faqContainer}>
+            {faqData.map((faq, index) => {
+              const isExpanded = expandedFAQ === index;
+              const rotateAnimation = animatedValues[index].interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0deg', '180deg'],
+              });
+              
+              return (
+                <View key={index} style={styles.faqItem}>
+                  <TouchableOpacity
+                    style={[
+                      styles.faqQuestion,
+                      isExpanded && styles.faqQuestionExpanded
+                    ]}
+                    onPress={() => toggleFAQ(index)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.faqQuestionContent}>
+                      <View style={[
+                        styles.faqQuestionIcon,
+                        isExpanded && styles.faqQuestionIconExpanded
+                      ]}>
+                        <Ionicons name={faq.icon as any} size={20} color="#059669" />
+                      </View>
+                      
+                      <View style={styles.faqQuestionTextContainer}>
+                        <Text style={[
+                          styles.faqQuestionText,
+                          isExpanded && styles.faqQuestionTextExpanded
+                        ]}>
+                          {faq.question}
+                        </Text>
+                      </View>
+                      
+                      <Animated.View style={[
+                        styles.faqChevron,
+                        { transform: [{ rotate: rotateAnimation }] }
+                      ]}>
+                        <Ionicons 
+                          name="chevron-down" 
+                          size={20} 
+                          color={isExpanded ? "#059669" : "#94A3B8"} 
+                        />
+                      </Animated.View>
+                    </View>
+                  </TouchableOpacity>
+                  
+                  {isExpanded && (
+                    <Animated.View style={[
+                      styles.faqAnswer,
+                      {
+                        opacity: animatedValues[index],
+                        transform: [{
+                          scale: animatedValues[index].interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.95, 1],
+                          })
+                        }]
+                      }
+                    ]}>
+                      <LinearGradient
+                        colors={['#F0FDF4', '#FFFFFF']}
+                        style={styles.faqAnswerGradient}
+                      >
+                        <View style={styles.faqAnswerContent}>
+                          <View style={styles.faqAnswerIcon}>
+                            <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                          </View>
+                          <Text style={styles.faqAnswerText}>{faq.answer}</Text>
+                        </View>
+                      </LinearGradient>
+                    </Animated.View>
+                  )}
+                </View>
+              );
+            })}
           </View>
         </View>
 
@@ -198,47 +298,69 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
           
           <View style={styles.tipsList}>
             <View style={styles.tipItem}>
-              <View style={styles.tipIcon}>
-                <Ionicons name="bulb" size={16} color="#F59E0B" />
-              </View>
-              <Text style={styles.tipText}>
-                Print medication labels on adhesive paper for easy attachment to pill bottles
-              </Text>
+              <LinearGradient
+                colors={['#FFFBEB', '#FEF3C7']}
+                style={styles.tipGradient}
+              >
+                <View style={styles.tipIcon}>
+                  <Ionicons name="bulb" size={16} color="#F59E0B" />
+                </View>
+                <Text style={styles.tipText}>
+                  Print medication labels on adhesive paper for easy attachment to pill bottles
+                </Text>
+              </LinearGradient>
             </View>
 
             <View style={styles.tipItem}>
-              <View style={styles.tipIcon}>
-                <Ionicons name="bulb" size={16} color="#F59E0B" />
-              </View>
-              <Text style={styles.tipText}>
-                Set up meal times in your profile to get accurate timing reminders
-              </Text>
+              <LinearGradient
+                colors={['#FFFBEB', '#FEF3C7']}
+                style={styles.tipGradient}
+              >
+                <View style={styles.tipIcon}>
+                  <Ionicons name="bulb" size={16} color="#F59E0B" />
+                </View>
+                <Text style={styles.tipText}>
+                  Set up meal times in your profile to get accurate timing reminders
+                </Text>
+              </LinearGradient>
             </View>
 
             <View style={styles.tipItem}>
-              <View style={styles.tipIcon}>
-                <Ionicons name="bulb" size={16} color="#F59E0B" />
-              </View>
-              <Text style={styles.tipText}>
-                Use the SOS feature for emergency contact with your caregivers
-              </Text>
+              <LinearGradient
+                colors={['#FFFBEB', '#FEF3C7']}
+                style={styles.tipGradient}
+              >
+                <View style={styles.tipIcon}>
+                  <Ionicons name="bulb" size={16} color="#F59E0B" />
+                </View>
+                <Text style={styles.tipText}>
+                  Use the SOS feature for emergency contact with your caregivers
+                </Text>
+              </LinearGradient>
             </View>
 
             <View style={styles.tipItem}>
-              <View style={styles.tipIcon}>
-                <Ionicons name="bulb" size={16} color="#F59E0B" />
-              </View>
-              <Text style={styles.tipText}>
-                Keep your app updated for the latest features and security improvements
-              </Text>
+              <LinearGradient
+                colors={['#FFFBEB', '#FEF3C7']}
+                style={styles.tipGradient}
+              >
+                <View style={styles.tipIcon}>
+                  <Ionicons name="bulb" size={16} color="#F59E0B" />
+                </View>
+                <Text style={styles.tipText}>
+                  Keep your app updated for the latest features and security improvements
+                </Text>
+              </LinearGradient>
             </View>
           </View>
         </View>
 
         {/* App Version */}
         <View style={styles.versionSection}>
-          <Text style={styles.versionText}>MediTracker v1.0.0</Text>
-          <Text style={styles.versionSubtext}>Build 2024.12.15</Text>
+          <View style={styles.versionCard}>
+            <Text style={styles.versionText}>MediTracker v1.0.0</Text>
+            <Text style={styles.versionSubtext}>Last Updated Aug 2025</Text>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -266,19 +388,11 @@ const styles = StyleSheet.create({
   headerContent: {
     alignItems: 'center',
   },
-  headerIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
+  helpIcon: {
+    height: 88,
+    width: 88,
+    borderRadius: RADIUS.full,
     marginBottom: SPACING[4],
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
   },
   headerTitle: {
     fontSize: TYPOGRAPHY.fontSize['2xl'],
@@ -304,22 +418,24 @@ const styles = StyleSheet.create({
     marginBottom: SPACING[4],
   },
   contactGrid: {
-    flexDirection: 'row',
     gap: SPACING[4],
   },
   contactCard: {
-    flex: 1,
     backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.xl,
     padding: SPACING[5],
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowRadius: 4,
     elevation: 2,
+  },
+  contactHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING[4],
   },
   contactIcon: {
     width: 48,
@@ -328,34 +444,70 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING[3],
+    marginRight: SPACING[3],
+  },
+  contactInfo: {
+    flex: 1,
   },
   contactTitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '600',
     color: '#1E293B',
     marginBottom: SPACING[1],
-    textAlign: 'center',
   },
   contactSubtitle: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: '500',
-    color: '#059669',
-    marginBottom: SPACING[2],
-    textAlign: 'center',
-  },
-  contactDescription: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
     color: '#64748B',
+  },
+  contactActions: {
+    flexDirection: 'row',
+    gap: SPACING[3],
+    marginBottom: SPACING[3],
+  },
+  primaryButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#059669',
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    gap: SPACING[2],
+  },
+  primaryButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    gap: SPACING[2],
+    borderWidth: 1,
+    borderColor: '#059669',
+  },
+  secondaryButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  contactDetail: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#059669',
+    fontWeight: '500',
     textAlign: 'center',
-    lineHeight: 16,
+    backgroundColor: '#F0FDF4',
+    paddingVertical: SPACING[2],
+    paddingHorizontal: SPACING[3],
+    borderRadius: RADIUS.md,
   },
-  helpIcon: {
-    height: 88,
-    width: 88,
-    borderRadius: RADIUS.full
-  },
-  faqList: {
+  faqContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.xl,
     borderWidth: 1,
@@ -363,43 +515,87 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   faqItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING[4],
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  faqIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  faqQuestion: {
+    padding: SPACING[4],
+    backgroundColor: '#FFFFFF',
+  },
+  faqQuestionExpanded: {
+    backgroundColor: '#F8FAFC',
+  },
+  faqQuestionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  faqQuestionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#F0FDF4',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING[3],
   },
-  faqContent: {
+  faqQuestionIconExpanded: {
+    backgroundColor: '#DCFCE7',
+  },
+  faqQuestionTextContainer: {
     flex: 1,
   },
-  faqQuestion: {
+  faqQuestionText: {
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '500',
     color: '#1E293B',
-    marginBottom: SPACING[1],
   },
-  faqPreview: {
+  faqQuestionTextExpanded: {
+    color: '#059669',
+    fontWeight: '600',
+  },
+  faqChevron: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  faqAnswer: {
+    overflow: 'hidden',
+  },
+  faqAnswerGradient: {
+    padding: SPACING[4],
+    paddingTop: 0,
+  },
+  faqAnswerContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  faqAnswerIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#DCFCE7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
+    marginTop: 2,
+  },
+  faqAnswerText: {
+    flex: 1,
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#64748B',
-    lineHeight: 18,
+    color: '#475569',
+    lineHeight: 20,
   },
   tipsList: {
     gap: SPACING[3],
   },
   tipItem: {
+    borderRadius: RADIUS.lg,
+    overflow: 'hidden',
+  },
+  tipGradient: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#FFFBEB',
-    borderRadius: RADIUS.lg,
     padding: SPACING[4],
     borderWidth: 1,
     borderColor: '#FDE68A',
@@ -422,7 +618,17 @@ const styles = StyleSheet.create({
   },
   versionSection: {
     alignItems: 'center',
-    paddingVertical: SPACING[6],
+    paddingVertical: SPACING[1],
+    paddingHorizontal: SPACING[5],
+  },
+  versionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[4],
+    paddingHorizontal: SPACING[6],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
   },
   versionText: {
     fontSize: TYPOGRAPHY.fontSize.sm,

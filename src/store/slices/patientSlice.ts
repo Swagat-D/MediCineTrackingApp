@@ -79,14 +79,18 @@ const patientSlice = createSlice({
    
    // Dashboard
    setDashboardData: (state, action: PayloadAction<{
-     stats: any;
-     todaysMedications: any[];
-     upcomingReminders: any[];
-   }>) => {
-     state.dashboardStats = action.payload.stats;
-     state.todaysMedications = action.payload.todaysMedications;
-     state.upcomingReminders = action.payload.upcomingReminders;
-   },
+  stats: any;
+  todaysMedications?: any[];
+  upcomingReminders?: any[];
+}>) => {
+  state.dashboardStats = action.payload.stats;
+  if (action.payload.todaysMedications) {
+    state.todaysMedications = action.payload.todaysMedications;
+  }
+  if (action.payload.upcomingReminders) {
+    state.upcomingReminders = action.payload.upcomingReminders;
+  }
+},
    
    // Medications
    setMedications: (state, action: PayloadAction<any[]>) => {
@@ -106,15 +110,27 @@ const patientSlice = createSlice({
    setMealTimes: (state, action: PayloadAction<any[]>) => {
      state.mealTimes = action.payload;
    },
+
+   updateMealTime: (state, action: PayloadAction<{ id: string; updates: Partial<any> }>) => {
+  const { id, updates } = action.payload;
+  const index = state.mealTimes.findIndex(meal => meal.id === id);
+  if (index !== -1) {
+    state.mealTimes[index] = { ...state.mealTimes[index], ...updates };
+  }
+},
    
    // Notifications
-   setNotifications: (state, action: PayloadAction<{
-     notifications: any[];
-     unreadCount: number;
-   }>) => {
-     state.notifications = action.payload.notifications;
-     state.unreadNotificationCount = action.payload.unreadCount;
-   },
+   setNotifications: (state, action: PayloadAction<any>) => {
+  if (Array.isArray(action.payload)) {
+    // If it's an array, treat it as just notifications
+    state.notifications = action.payload;
+    state.unreadNotificationCount = action.payload.filter((n: any) => !n.isRead).length;
+  } else {
+    // If it's an object with notifications and unreadCount
+    state.notifications = action.payload.notifications || action.payload;
+    state.unreadNotificationCount = action.payload.unreadCount || 0;
+  }
+},
    updateNotificationCount: (state, action: PayloadAction<number>) => {
      state.unreadNotificationCount = action.payload;
    },
@@ -151,6 +167,7 @@ export const {
  setCurrentMedication,
  updateMedication,
  setMealTimes,
+ updateMealTime,
  setNotifications,
  updateNotificationCount,
  setScannedBarcodeData,

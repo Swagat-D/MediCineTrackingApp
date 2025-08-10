@@ -7,8 +7,12 @@ import {
   TouchableOpacity,
   Linking,
   Platform,
-  Image
+  Image,
+  Clipboard,
+  Alert,
+  ColorValue
 } from 'react-native';
+
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import SecondaryNavbar from '../../components/common/SecondaryNavbar';
@@ -16,12 +20,131 @@ import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 
 interface AboutScreenProps {
   navigation: any;
+  userRole?: 'caregiver' | 'patient'; // Add this prop to determine role
 }
 
-const AboutScreen: React.FC<AboutScreenProps> = ({ navigation }) => {
+const AboutScreen: React.FC<AboutScreenProps> = ({ navigation, userRole = 'caregiver' }) => {
+
+
+  const theme = {
+    primary: userRole === 'caregiver' ? '#059669' : '#2196F3',
+    primaryLight: userRole === 'caregiver' ? '#F0FDF4' : '#E3F2FD',
+    primaryDark: userRole === 'caregiver' ? '#047857' : '#1976D2',
+    gradient: (userRole === 'caregiver'
+      ? ['#F0FDF4', '#FFFFFF']
+      : ['#E3F2FD', '#FFFFFF']) as [ColorValue, ColorValue],
+  };
+
   const handleLinkPress = (url: string) => {
     Linking.openURL(url);
   };
+
+  const handleCopyEmail = () => {
+    Clipboard.setString('info@meditracker.com');
+    Alert.alert('Email Copied', 'Email address has been copied to clipboard');
+  };
+
+
+  const roleSpecificContent = {
+    caregiver: {
+      heroTitle: "Supporting Caregivers in Medication Management",
+      heroSubtitle: "Empowering you to provide the best care for your patients",
+      benefits: [
+        {
+          icon: "people-outline",
+          title: "Manage Multiple Patients",
+          description: "Efficiently track medications for all your patients in one place"
+        },
+        {
+          icon: "qr-code-outline",
+          title: "Smart Barcode System",
+          description: "Generate unique barcodes for each medication to prevent dosing errors"
+        },
+        {
+          icon: "notifications-outline",
+          title: "Medication Alerts",
+          description: "Get notified when patients miss doses or medications are running low"
+        },
+        {
+          icon: "shield-checkmark-outline",
+          title: "Safety Monitoring",
+          description: "Prevent double-dosing and ensure medication adherence"
+        }
+      ],
+      howItWorks: [
+        {
+          step: "1",
+          title: "Add Patients",
+          description: "Register patients using their mobile number or email address"
+        },
+        {
+          step: "2",
+          title: "Input Medications",
+          description: "Add medicine details including dosage, frequency, and timing"
+        },
+        {
+          step: "3",
+          title: "Generate Barcodes",
+          description: "Print unique barcodes for each medication package"
+        },
+        {
+          step: "4",
+          title: "Monitor Progress",
+          description: "Track patient adherence and receive important alerts"
+        }
+      ]
+    },
+    patient: {
+      heroTitle: "Never Miss Your Medication Again",
+      heroSubtitle: "Take control of your health with smart medication reminders",
+      benefits: [
+        {
+          icon: "time-outline",
+          title: "Personalized Reminders",
+          description: "Get medication alerts based on your meal times and schedule"
+        },
+        {
+          icon: "scan-outline",
+          title: "Easy Barcode Scanning",
+          description: "Scan medication barcodes to confirm you're taking the right dose"
+        },
+        {
+          icon: "checkmark-circle-outline",
+          title: "Track Your Progress",
+          description: "See your medication history and adherence progress"
+        },
+        {
+          icon: "call-outline",
+          title: "Emergency Support",
+          description: "Quick SOS feature to contact your caregiver in emergencies"
+        }
+      ],
+      howItWorks: [
+        {
+          step: "1",
+          title: "Set Meal Times",
+          description: "Configure your breakfast, lunch, and dinner schedule"
+        },
+        {
+          step: "2",
+          title: "Receive Reminders",
+          description: "Get timely notifications when it's time to take your medicine"
+        },
+        {
+          step: "3",
+          title: "Scan & Confirm",
+          description: "Scan the barcode to verify and record your medication intake"
+        },
+        {
+          step: "4",
+          title: "Stay Connected",
+          description: "Your caregiver stays informed about your medication adherence"
+        }
+      ]
+    }
+  };
+
+  const currentContent = roleSpecificContent[userRole];
 
   return (
     <View style={styles.container}>
@@ -37,12 +160,12 @@ const AboutScreen: React.FC<AboutScreenProps> = ({ navigation }) => {
       >
         {/* Header */}
         <LinearGradient
-          colors={['#F0FDF4', '#FFFFFF']}
+          colors={theme.gradient}
           style={styles.headerSection}
         >
           <View style={styles.headerContent}>
             <View style={styles.logoContainer}>
-              <View style={styles.logo}>
+              <View style={[styles.logo, { shadowColor: theme.primary }]}>
                 <Image 
                   source={require('../../../assets/images/logo.png')} 
                   style={styles.logoIcon}
@@ -51,209 +174,164 @@ const AboutScreen: React.FC<AboutScreenProps> = ({ navigation }) => {
               </View>
             </View>
             <Text style={styles.appName}>MediTracker</Text>
-            <Text style={styles.appTagline}>Your trusted medication companion</Text>
+            <Text style={[styles.appTagline, { color: theme.primary }]}>
+              Your trusted medication companion
+            </Text>
             <Text style={styles.appVersion}>Version 1.0.0</Text>
           </View>
         </LinearGradient>
 
-        {/* Mission */}
+        {/* Hero Section */}
+        <View style={styles.section}>
+          <View style={[styles.heroCard, { borderColor: theme.primaryLight }]}>
+            <LinearGradient
+              colors={theme.gradient}
+              style={styles.heroGradient}
+            >
+              <View style={[styles.heroIcon, { backgroundColor: theme.primaryLight }]}>
+                <Ionicons 
+                  name={userRole === 'caregiver' ? 'medical' : 'heart'} 
+                  size={32} 
+                  color={theme.primary} 
+                />
+              </View>
+              <Text style={styles.heroTitle}>{currentContent.heroTitle}</Text>
+              <Text style={styles.heroSubtitle}>{currentContent.heroSubtitle}</Text>
+            </LinearGradient>
+          </View>
+        </View>
+
+        {/* Mission Statement */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Our Mission</Text>
-          <Text style={styles.missionText}>
-            MediTracker was created to help patients and caregivers manage medications safely and effectively. 
-            We believe that proper medication management is crucial for better health outcomes, and our app 
-            provides the tools to prevent missed doses, avoid dangerous double-dosing, and maintain clear 
-            communication between patients and their caregivers.
-          </Text>
-        </View>
-
-        {/* Key Features */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Key Features</Text>
-          
-          <View style={styles.featuresList}>
-            <View style={styles.featureItem}>
-              <View style={styles.featureIcon}>
-                <Ionicons name="qr-code" size={20} color="#059669" />
-              </View>
-              <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>Smart Barcode System</Text>
-                <Text style={styles.featureDescription}>
-                  Scan medication barcodes to verify doses and prevent double-dosing
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.featureItem}>
-              <View style={styles.featureIcon}>
-                <Ionicons name="notifications" size={20} color="#059669" />
-              </View>
-              <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>Intelligent Reminders</Text>
-                <Text style={styles.featureDescription}>
-                  Personalized medication reminders based on your schedule and meal times
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.featureItem}>
-              <View style={styles.featureIcon}>
-                <Ionicons name="people" size={20} color="#059669" />
-              </View>
-              <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>Caregiver Connection</Text>
-                <Text style={styles.featureDescription}>
-                  Connect patients with caregivers for better medication monitoring
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.featureItem}>
-              <View style={styles.featureIcon}>
-                <Ionicons name="shield-checkmark" size={20} color="#059669" />
-              </View>
-              <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>Safety First</Text>
-                <Text style={styles.featureDescription}>
-                  HIPAA-compliant security with medication verification and SOS alerts
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.featureItem}>
-              <View style={styles.featureIcon}>
-                <Ionicons name="analytics" size={20} color="#059669" />
-              </View>
-              <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>Adherence Tracking</Text>
-                <Text style={styles.featureDescription}>
-                  Monitor medication adherence with detailed reports and insights
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Technology */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Built With Care</Text>
-          <View style={styles.techGrid}>
-            <View style={styles.techItem}>
-              <View style={styles.techIcon}>
-                <Ionicons name="phone-portrait" size={24} color="#0EA5E9" />
-              </View>
-              <Text style={styles.techLabel}>React Native</Text>
-              <Text style={styles.techDescription}>Cross-platform mobile app</Text>
-            </View>
-
-            <View style={styles.techItem}>
-              <View style={styles.techIcon}>
-                <Ionicons name="server" size={24} color="#10B981" />
-              </View>
-              <Text style={styles.techLabel}>Node.js</Text>
-              <Text style={styles.techDescription}>Secure backend API</Text>
-            </View>
-
-            <View style={styles.techItem}>
-              <View style={styles.techIcon}>
-                <Ionicons name="cloud" size={24} color="#8B5CF6" />
-              </View>
-              <Text style={styles.techLabel}>MongoDB</Text>
-              <Text style={styles.techDescription}>Reliable data storage</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Statistics */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Making a Difference</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>1.5M+</Text>
-              <Text style={styles.statLabel}>Americans harmed by medication errors yearly</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>50%</Text>
-              <Text style={styles.statLabel}>Of prescriptions go unused due to forgetfulness</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>24/7</Text>
-              <Text style={styles.statLabel}>Medication monitoring and support</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Team */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Development Team</Text>
-          <View style={styles.teamCard}>
-            <Text style={styles.teamDescription}>
-              MediTracker is developed by a dedicated team of healthcare technology specialists, 
-              software engineers, and medical professionals who understand the critical importance 
-              of medication adherence and patient safety.
+          <View style={styles.missionCard}>
+            <Text style={styles.missionText}>
+              We&apos;re committed to solving medication adherence challenges that affect millions worldwide. 
+              Our app helps prevent medication errors, reduces confusion about dosing, and ensures 
+              patients receive the right medication at the right time, every time.
             </Text>
             
-            <View style={styles.teamValues}>
-              <View style={styles.valueItem}>
-                <Ionicons name="heart" size={16} color="#EF4444" />
-                <Text style={styles.valueText}>Patient-centered design</Text>
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={[styles.statNumber, { color: theme.primary }]}>1.5M+</Text>
+                <Text style={styles.statLabel}>Americans affected by medication errors annually</Text>
               </View>
-              <View style={styles.valueItem}>
-                <Ionicons name="shield" size={16} color="#3B82F6" />
-                <Text style={styles.valueText}>Privacy & security first</Text>
-              </View>
-              <View style={styles.valueItem}>
-                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                <Text style={styles.valueText}>Evidence-based solutions</Text>
+              <View style={styles.statItem}>
+                <Text style={[styles.statNumber, { color: theme.primary }]}>50%</Text>
+                <Text style={styles.statLabel}>Of prescriptions unused due to confusion</Text>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Links */}
+        {/* Key Benefits */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Learn More</Text>
-          <View style={styles.linksList}>
-            <TouchableOpacity
-              style={styles.linkItem}
-              onPress={() => handleLinkPress('https://meditracker.com')}
-            >
-              <View style={styles.linkIcon}>
-                <Ionicons name="globe" size={20} color="#059669" />
+          <Text style={styles.sectionTitle}>
+            {userRole === 'caregiver' ? 'Benefits for Caregivers' : 'Benefits for Patients'}
+          </Text>
+          
+          <View style={styles.benefitsList}>
+            {currentContent.benefits.map((benefit, index) => (
+              <View key={index} style={styles.benefitItem}>
+                <View style={[styles.benefitIcon, { backgroundColor: theme.primaryLight }]}>
+                  <Ionicons name={benefit.icon as any} size={24} color={theme.primary} />
+                </View>
+                <View style={styles.benefitContent}>
+                  <Text style={styles.benefitTitle}>{benefit.title}</Text>
+                  <Text style={styles.benefitDescription}>{benefit.description}</Text>
+                </View>
               </View>
-              <Text style={styles.linkText}>Visit our website</Text>
-              <Ionicons name="open" size={16} color="#94A3B8" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.linkItem}
-              onPress={() => handleLinkPress('mailto:info@meditracker.com')}
-            >
-              <View style={styles.linkIcon}>
-                <Ionicons name="mail" size={20} color="#059669" />
-              </View>
-              <Text style={styles.linkText}>Contact us</Text>
-              <Ionicons name="open" size={16} color="#94A3B8" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.linkItem}
-              onPress={() => handleLinkPress('https://meditracker.com/research')}
-            >
-              <View style={styles.linkIcon}>
-                <Ionicons name="document-text" size={20} color="#059669" />
-              </View>
-              <Text style={styles.linkText}>Research & studies</Text>
-              <Ionicons name="open" size={16} color="#94A3B8" />
-            </TouchableOpacity>
+            ))}
           </View>
         </View>
 
-        {/* Copyright */}
-        <View style={styles.copyrightSection}>
-          <Text style={styles.copyrightText}>© 2024 MediTracker Technologies</Text>
-          <Text style={styles.copyrightSubtext}>All rights reserved</Text>
-          <Text style={styles.complianceText}>HIPAA Compliant • SOC 2 Certified</Text>
+        {/* How It Works */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>How It Works</Text>
+          
+          <View style={styles.stepsContainer}>
+            {currentContent.howItWorks.map((step, index) => (
+              <View key={index} style={styles.stepItem}>
+                <View style={[styles.stepNumber, { backgroundColor: theme.primary }]}>
+                  <Text style={styles.stepNumberText}>{step.step}</Text>
+                </View>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>{step.title}</Text>
+                  <Text style={styles.stepDescription}>{step.description}</Text>
+                </View>
+                {index < currentContent.howItWorks.length - 1 && (
+                  <View style={[styles.stepConnector, { backgroundColor: theme.primaryLight }]} />
+                )}
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Safety & Privacy */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Safety & Privacy</Text>
+          
+          <View style={styles.safetyCard}>
+            <View style={styles.safetyHeader}>
+              <View style={[styles.safetyIcon, { backgroundColor: theme.primaryLight }]}>
+                <Ionicons name="shield-checkmark" size={24} color={theme.primary} />
+              </View>
+              <Text style={styles.safetyTitle}>Your Data is Protected</Text>
+            </View>
+            
+            <View style={styles.safetyFeatures}>
+              <View style={styles.safetyFeature}>
+                <Ionicons name="lock-closed" size={16} color={theme.primary} />
+                <Text style={styles.safetyFeatureText}>HIPAA Compliant Security</Text>
+              </View>
+              <View style={styles.safetyFeature}>
+                <Ionicons name="shield" size={16} color={theme.primary} />
+                <Text style={styles.safetyFeatureText}>End-to-End Encryption</Text>
+              </View>
+              <View style={styles.safetyFeature}>
+                <Ionicons name="checkmark-circle" size={16} color={theme.primary} />
+                <Text style={styles.safetyFeatureText}>SOC 2 Certified</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Contact Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Need Help?</Text>
+          
+          <View style={styles.contactCard}>
+            <TouchableOpacity
+              style={[styles.contactButton, { backgroundColor: theme.primary }]}
+              onPress={() => handleLinkPress('mailto:info@meditracker.com')}
+            >
+              <Ionicons name="mail" size={20} color="#FFFFFF" />
+              <Text style={styles.contactButtonText}>Send us an Email</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.contactButtonSecondary, { borderColor: theme.primary }]}
+              onPress={handleCopyEmail}
+            >
+              <Ionicons name="copy" size={20} color={theme.primary} />
+              <Text style={[styles.contactButtonSecondaryText, { color: theme.primary }]}>
+                Copy Email Address
+              </Text>
+            </TouchableOpacity>
+            
+            <Text style={styles.contactEmail}>info@meditracker.com</Text>
+          </View>
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>© 2024 MediTracker Technologies</Text>
+          <Text style={styles.footerSubtext}>Making medication management safer for everyone</Text>
+          <View style={[styles.complianceBadge, { backgroundColor: theme.primaryLight }]}>
+            <Text style={[styles.complianceText, { color: theme.primary }]}>
+              HIPAA Compliant • SOC 2 Certified
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -291,11 +369,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#059669',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+  },
+  logoIcon: {
+    height: 60,
+    width: 60,
+    borderRadius: RADIUS.full,
   },
   appName: {
     fontSize: TYPOGRAPHY.fontSize['3xl'],
@@ -305,7 +387,6 @@ const styles = StyleSheet.create({
   },
   appTagline: {
     fontSize: TYPOGRAPHY.fontSize.lg,
-    color: '#059669',
     marginBottom: SPACING[2],
     fontWeight: '500',
   },
@@ -322,199 +403,285 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING[6],
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: '600',
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: '700',
     color: '#1E293B',
+    marginBottom: SPACING[5],
+    textAlign: 'center',
+  },
+  heroCard: {
+    borderRadius: RADIUS['2xl'],
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  heroGradient: {
+    padding: SPACING[6],
+    alignItems: 'center',
+  },
+  heroIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: SPACING[4],
+  },
+  heroTitle: {
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: '700',
+    color: '#1E293B',
+    textAlign: 'center',
+    marginBottom: SPACING[2],
+  },
+  heroSubtitle: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  missionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.xl,
+    padding: SPACING[6],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   missionText: {
     fontSize: TYPOGRAPHY.fontSize.md,
     color: '#475569',
-    lineHeight: 24,
+    lineHeight: 26,
     textAlign: 'justify',
+    marginBottom: SPACING[5],
   },
-  featuresList: {
-    gap: SPACING[4],
-  },
-  featureItem: {
+  statsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.lg,
-    padding: SPACING[4],
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  featureIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F0FDF4',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING[3],
-  },
-  featureContent: {
-    flex: 1,
-  },
-  featureTitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: SPACING[1],
-  },
-  featureDescription: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#64748B',
-    lineHeight: 20,
-  },
-  techGrid: {
-    flexDirection: 'row',
-    gap: SPACING[4],
-  },
-  techItem: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.lg,
-    padding: SPACING[4],
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  techIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F8FAFC',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING[3],
-  },
-  techLabel: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: SPACING[1],
-    textAlign: 'center',
-  },
-  techDescription: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: '#64748B',
-    textAlign: 'center',
-  },
-  statsGrid: {
     gap: SPACING[4],
   },
   statItem: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.lg,
-    padding: SPACING[5],
+    flex: 1,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    padding: SPACING[4],
+    backgroundColor: '#F8FAFC',
+    borderRadius: RADIUS.lg,
   },
   statNumber: {
-    fontSize: TYPOGRAPHY.fontSize['3xl'],
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
     fontWeight: '700',
-    color: '#059669',
-    marginBottom: SPACING[2],
+    marginBottom: SPACING[1],
   },
   statLabel: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontSize: TYPOGRAPHY.fontSize.xs,
     color: '#64748B',
     textAlign: 'center',
+    lineHeight: 16,
+  },
+  benefitsList: {
+    gap: SPACING[4],
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.xl,
+    padding: SPACING[5],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  benefitIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[4],
+  },
+  benefitContent: {
+    flex: 1,
+  },
+  benefitTitle: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: SPACING[1],
+  },
+  benefitDescription: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
     lineHeight: 20,
   },
-  teamCard: {
+  stepsContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.xl,
     padding: SPACING[5],
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  teamDescription: {
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    position: 'relative',
+    paddingBottom: SPACING[5],
+  },
+  stepNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[4],
+    zIndex: 1,
+  },
+  stepNumberText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  stepContent: {
+    flex: 1,
+    paddingTop: SPACING[1],
+  },
+  stepTitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    color: '#475569',
-    lineHeight: 24,
-    marginBottom: SPACING[5],
-    textAlign: 'justify',
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: SPACING[1],
   },
-  logoIcon: {
-    height:88,
-    width:88, borderRadius: RADIUS.full
+  stepDescription: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+    lineHeight: 20,
   },
-  teamValues: {
+  stepConnector: {
+    position: 'absolute',
+    left: 15,
+    top: 32,
+    width: 2,
+    height: 40,
+    zIndex: 0,
+  },
+  safetyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.xl,
+    padding: SPACING[5],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  safetyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING[4],
+  },
+  safetyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
+  },
+  safetyTitle: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  safetyFeatures: {
     gap: SPACING[3],
   },
-  valueItem: {
+  safetyFeature: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING[2],
   },
-  valueText: {
+  safetyFeatureText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: '#64748B',
     fontWeight: '500',
   },
-  linksList: {
+  contactCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.xl,
+    padding: SPACING[5],
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    overflow: 'hidden',
+    alignItems: 'center',
   },
-  linkItem: {
+  contactButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING[4],
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  linkIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F0FDF4',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING[3],
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[4],
+    paddingHorizontal: SPACING[6],
+    marginBottom: SPACING[3],
+    width: '100%',
+    gap: SPACING[2],
   },
-  linkText: {
-    flex: 1,
+  contactButtonText: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: '500',
-    color: '#475569',
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
-  copyrightSection: {
+  contactButtonSecondary: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING[6],
+    justifyContent: 'center',
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[5],
+    borderWidth: 1,
+    marginBottom: SPACING[3],
+    gap: SPACING[2],
+  },
+  contactButtonSecondaryText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
+  },
+  contactEmail: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  footer: {
+    alignItems: 'center',
+    paddingVertical: SPACING[8],
+    paddingHorizontal: SPACING[5],
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
-    marginHorizontal: SPACING[5],
   },
-  copyrightText: {
+  footerText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#64748B',
     marginBottom: SPACING[1],
   },
-  copyrightSubtext: {
+  footerSubtext: {
     fontSize: TYPOGRAPHY.fontSize.xs,
     color: '#94A3B8',
-    marginBottom: SPACING[3],
+    marginBottom: SPACING[4],
+    textAlign: 'center',
+  },
+  complianceBadge: {
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[2],
+    borderRadius: RADIUS.full,
   },
   complianceText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: '#059669',
-    fontWeight: '500',
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[1],
-    borderRadius: RADIUS.full,
+    fontWeight: '600',
   },
 });
 

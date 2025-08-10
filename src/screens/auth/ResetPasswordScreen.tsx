@@ -59,7 +59,10 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-  const { email, otp } = route.params;
+  const { email, otp, role } = route.params;
+  
+  // Get role from params or default to patient
+  const selectedRole = role || 'patient';
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -124,7 +127,8 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
             {
               text: 'Login Now',
               onPress: () => {
-                navigation.navigate('Login', { role: 'patient' }); // Default to patient, user can change
+                // Redirect to login with the appropriate role
+                navigation.navigate('Login', { role: selectedRole });
               }
             }
           ]
@@ -144,6 +148,19 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleBackToOTP = () => {
     navigation.goBack();
+  };
+
+  // Role-based color functions
+  const getRoleColor = () => {
+    return selectedRole === 'caregiver' ? '#059669' : '#2563EB';
+  };
+
+  const getRoleIcon = () => {
+    return selectedRole === 'caregiver' ? 'people' : 'person';
+  };
+
+  const getRoleTitle = () => {
+    return selectedRole === 'caregiver' ? 'Caregiver' : 'Patient';
   };
 
   const getPasswordStrength = (password: string) => {
@@ -171,9 +188,9 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
       
       {/* Background Elements */}
       <View style={styles.backgroundElements}>
-        <View style={[styles.bgCircle, styles.bgCircle1]} />
-        <View style={[styles.bgCircle, styles.bgCircle2]} />
-        <View style={[styles.bgCircle, styles.bgCircle3]} />
+        <View style={[styles.bgCircle, styles.bgCircle1, { backgroundColor: getRoleColor() + '08' }]} />
+        <View style={[styles.bgCircle, styles.bgCircle2, { backgroundColor: getRoleColor() + '05' }]} />
+        <View style={[styles.bgCircle, styles.bgCircle3, { backgroundColor: '#10B981' + '06' }]} />
       </View>
       
       <KeyboardAvoidingView
@@ -217,6 +234,24 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
             </Animated.View>
           </View>
 
+          {/* Role Indicator */}
+          <Animated.View 
+            style={[
+              styles.roleSection,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <View style={styles.roleCard}>
+              <View style={[styles.roleIconContainer, { backgroundColor: getRoleColor() }]}>
+                <Ionicons name={getRoleIcon()} size={20} color="#FFFFFF" />
+              </View>
+              <Text style={styles.roleText}>{getRoleTitle()} Password Reset</Text>
+            </View>
+          </Animated.View>
+
           {/* Reset Password Form */}
           <Animated.View 
             style={[
@@ -229,8 +264,8 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
           >
             {/* Icon and Title */}
             <View style={styles.iconSection}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="shield-checkmark" size={48} color="#10B981" />
+              <View style={[styles.iconContainer, { backgroundColor: getRoleColor() + '15', borderColor: getRoleColor() + '30' }]}>
+                <Ionicons name="shield-checkmark" size={48} color={getRoleColor()} />
               </View>
               <Text style={styles.mainTitle}>Create New Password</Text>
               <Text style={styles.mainDescription}>
@@ -241,10 +276,10 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
             {/* Form Fields */}
             <View style={styles.inputSection}>
               {/* Email Display */}
-              <View style={styles.emailContainer}>
+              <View style={[styles.emailContainer, { backgroundColor: getRoleColor() + '10', borderColor: getRoleColor() + '30' }]}>
                 <View style={styles.emailInfo}>
-                  <Ionicons name="mail" size={18} color="#059669" />
-                  <Text style={styles.emailText}>Resetting password for: {email}</Text>
+                  <Ionicons name="mail" size={18} color={getRoleColor()} />
+                  <Text style={[styles.emailText, { color: getRoleColor() }]}>Resetting password for: {email}</Text>
                 </View>
               </View>
 
@@ -268,6 +303,7 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                         onRightIconPress={() => setShowNewPassword(!showNewPassword)}
                         autoComplete="new-password"
                         required
+                        userRole={selectedRole} // Pass the user role
                       />
                       {/* Password Strength Indicator */}
                       {value && (
@@ -312,6 +348,7 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                       onRightIconPress={() => setShowConfirmPassword(!showConfirmPassword)}
                       autoComplete="new-password"
                       required
+                      userRole={selectedRole} // Pass the user role
                     />
                   )}
                 />
@@ -333,9 +370,9 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                     <Ionicons 
                       name={watchedPassword && watchedPassword.length >= 6 ? "checkmark-circle" : "ellipse-outline"} 
                       size={16} 
-                      color={watchedPassword && watchedPassword.length >= 6 ? "#10B981" : "#94A3B8"} 
+                      color={watchedPassword && watchedPassword.length >= 6 ? getRoleColor() : "#94A3B8"} 
                     />
-                    <Text style={[styles.requirementText, watchedPassword && watchedPassword.length >= 6 && styles.requirementMet]}>
+                    <Text style={[styles.requirementText, watchedPassword && watchedPassword.length >= 6 && { ...styles.requirementMet, color: getRoleColor() }]}>
                       At least 6 characters
                     </Text>
                   </View>
@@ -343,9 +380,9 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                     <Ionicons 
                       name={watchedPassword && /[A-Z]/.test(watchedPassword) ? "checkmark-circle" : "ellipse-outline"} 
                       size={16} 
-                      color={watchedPassword && /[A-Z]/.test(watchedPassword) ? "#10B981" : "#94A3B8"} 
+                      color={watchedPassword && /[A-Z]/.test(watchedPassword) ? getRoleColor() : "#94A3B8"} 
                     />
-                    <Text style={[styles.requirementText, watchedPassword && /[A-Z]/.test(watchedPassword) && styles.requirementMet]}>
+                    <Text style={[styles.requirementText, watchedPassword && /[A-Z]/.test(watchedPassword) && { ...styles.requirementMet, color: getRoleColor() }]}>
                       One uppercase letter
                     </Text>
                   </View>
@@ -353,9 +390,9 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                     <Ionicons 
                       name={watchedPassword && /[a-z]/.test(watchedPassword) ? "checkmark-circle" : "ellipse-outline"} 
                       size={16} 
-                      color={watchedPassword && /[a-z]/.test(watchedPassword) ? "#10B981" : "#94A3B8"} 
+                      color={watchedPassword && /[a-z]/.test(watchedPassword) ? getRoleColor() : "#94A3B8"} 
                     />
-                    <Text style={[styles.requirementText, watchedPassword && /[a-z]/.test(watchedPassword) && styles.requirementMet]}>
+                    <Text style={[styles.requirementText, watchedPassword && /[a-z]/.test(watchedPassword) && { ...styles.requirementMet, color: getRoleColor() }]}>
                       One lowercase letter
                     </Text>
                   </View>
@@ -363,9 +400,9 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                     <Ionicons 
                       name={watchedPassword && /\d/.test(watchedPassword) ? "checkmark-circle" : "ellipse-outline"} 
                       size={16} 
-                      color={watchedPassword && /\d/.test(watchedPassword) ? "#10B981" : "#94A3B8"} 
+                      color={watchedPassword && /\d/.test(watchedPassword) ? getRoleColor() : "#94A3B8"} 
                     />
-                    <Text style={[styles.requirementText, watchedPassword && /\d/.test(watchedPassword) && styles.requirementMet]}>
+                    <Text style={[styles.requirementText, watchedPassword && /\d/.test(watchedPassword) && { ...styles.requirementMet, color: getRoleColor() }]}>
                       One number
                     </Text>
                   </View>
@@ -381,6 +418,7 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                   loading={isLoading}
                   fullWidth
                   style={styles.submitButton}
+                  userRole={selectedRole} // Pass the user role
                 />
               </View>
 
@@ -389,8 +427,8 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                 style={styles.backToOTPButton}
                 onPress={handleBackToOTP}
               >
-                <Ionicons name="arrow-back" size={16} color="#2563EB" />
-                <Text style={styles.backToOTPText}>Back to Verification</Text>
+                <Ionicons name="arrow-back" size={16} color={getRoleColor()} />
+                <Text style={[styles.backToOTPText, { color: getRoleColor() }]}>Back to Verification</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -432,21 +470,18 @@ const styles = StyleSheet.create({
   bgCircle1: {
     width: 160,
     height: 160,
-    backgroundColor: '#10B98108',
     top: -80,
     right: -30,
   },
   bgCircle2: {
     width: 120,
     height: 120,
-    backgroundColor: '#2563EB05',
     bottom: 100,
     left: -60,
   },
   bgCircle3: {
     width: 80,
     height: 80,
-    backgroundColor: '#F59E0B06',
     top: '50%',
     right: -20,
   },
@@ -500,6 +535,39 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontWeight: '500',
   },
+  roleSection: {
+    marginBottom: SPACING[8],
+    paddingHorizontal: SPACING[2],
+  },
+  roleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: SPACING[4],
+    paddingHorizontal: SPACING[6],
+    borderRadius: RADIUS.xl,
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  roleIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
+  },
+  roleText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '700',
+    color: '#334155',
+  },
   formSection: {
     marginBottom: SPACING[8],
   },
@@ -511,12 +579,10 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#ECFDF5',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING[6],
     borderWidth: 2,
-    borderColor: '#D1FAE5',
   },
   mainTitle: {
     fontSize: isSmallDevice ? TYPOGRAPHY.fontSize.xl : TYPOGRAPHY.fontSize['2xl'],
@@ -537,12 +603,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[2],
   },
   emailContainer: {
-    backgroundColor: '#ECFDF5',
     borderRadius: RADIUS.lg,
     padding: SPACING[4],
     marginBottom: SPACING[6],
     borderWidth: 1,
-    borderColor: '#D1FAE5',
   },
   emailInfo: {
     flexDirection: 'row',
@@ -550,7 +614,6 @@ const styles = StyleSheet.create({
   },
   emailText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#059669',
     fontWeight: '600',
     marginLeft: SPACING[2],
     flex: 1,
@@ -623,14 +686,12 @@ const styles = StyleSheet.create({
     marginLeft: SPACING[2],
   },
   requirementMet: {
-    color: '#059669',
     fontWeight: '500',
   },
   buttonWrapper: {
     marginBottom: SPACING[6],
   },
   submitButton: {
-    backgroundColor: '#10B981',
     minHeight: 56,
     borderRadius: RADIUS.xl,
     shadowColor: '#000',
@@ -648,7 +709,6 @@ const styles = StyleSheet.create({
   },
   backToOTPText: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    color: '#2563EB',
     fontWeight: '600',
   },
   securitySection: {

@@ -203,6 +203,14 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const passwordStrength = getPasswordStrength(watchedPassword);
 
+  // Dynamic picker styles based on role
+  const getDynamicPickerStyles = () => {
+    return {
+      ...styles.pickerContainer,
+      borderColor: errors.gender ? '#EF4444' : COLORS.gray[300],
+    };
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
@@ -331,6 +339,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
                     autoCapitalize="words"
                     autoComplete="name"
                     required
+                    userRole={selectedRole} // Pass the user role
                   />
                 )}
               />
@@ -354,6 +363,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
                     autoCapitalize="none"
                     autoComplete="email"
                     required
+                    userRole={selectedRole} // Pass the user role
                   />
                 )}
               />
@@ -376,6 +386,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
                     keyboardType="phone-pad"
                     autoComplete="tel"
                     required
+                    userRole={selectedRole} // Pass the user role
                   />
                 )}
               />
@@ -398,6 +409,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
                       leftIcon="calendar-outline"
                       keyboardType="numeric"
                       required
+                      userRole={selectedRole} // Pass the user role
                     />
                   )}
                 />
@@ -411,7 +423,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
                   control={control}
                   name="gender"
                   render={({ field: { onChange, value } }) => (
-                    <View style={[styles.pickerContainer, errors.gender && styles.pickerError]}>
+                    <View style={getDynamicPickerStyles()}>
                       <Picker
                         selectedValue={value}
                         onValueChange={onChange}
@@ -460,6 +472,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
                       onRightIconPress={() => setShowPassword(!showPassword)}
                       autoComplete="new-password"
                       required
+                      userRole={selectedRole} // Pass the user role
                     />
                     {/* Password Strength Indicator */}
                     {value && (
@@ -504,6 +517,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
                     onRightIconPress={() => setShowConfirmPassword(!showConfirmPassword)}
                     autoComplete="new-password"
                     required
+                    userRole={selectedRole} // Pass the user role
                   />
                 )}
               />
@@ -536,7 +550,8 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
                 disabled={!isValid || isLoading}
                 loading={isLoading}
                 fullWidth
-                style={{ ...styles.signupButton, backgroundColor: getRoleColor() }}
+                style={styles.signupButton}
+                userRole={selectedRole} // Pass the user role
               />
             </View>
 
@@ -753,9 +768,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     minHeight: 48,
     justifyContent: 'center',
-  },
-  pickerError: {
-    borderColor: '#EF4444',
   },
   picker: {
     height: 48,

@@ -329,7 +329,8 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     paddingHorizontal: SPACING[5],
-    paddingVertical: SPACING[8],
+    paddingBottom: SPACING[8],
+    paddingTop: SPACING[12],
     alignItems: 'center',
   },
   headerContent: {

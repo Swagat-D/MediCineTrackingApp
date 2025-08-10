@@ -8,6 +8,7 @@ import {
   Linking,
   Alert,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -52,9 +53,11 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
           style={styles.headerSection}
         >
           <View style={styles.headerContent}>
-            <View style={styles.headerIcon}>
-              <Ionicons name="help-circle" size={48} color="#059669" />
-            </View>
+              <Image 
+                  source={require('../../../assets/images/hep.png')} 
+                  style={styles.helpIcon}
+                  resizeMode="contain"
+                />
             <Text style={styles.headerTitle}>We&apos;re Here to Help</Text>
             <Text style={styles.headerSubtitle}>
               Get assistance with MediTracker features and troubleshooting
@@ -256,7 +259,8 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     paddingHorizontal: SPACING[5],
-    paddingVertical: SPACING[8],
+    paddingBottom: SPACING[8],
+    paddingTop: SPACING[12],
     alignItems: 'center',
   },
   headerContent: {
@@ -345,6 +349,11 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 16,
+  },
+  helpIcon: {
+    height: 88,
+    width: 88,
+    borderRadius: RADIUS.full
   },
   faqList: {
     backgroundColor: '#FFFFFF',

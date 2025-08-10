@@ -11,6 +11,7 @@ import {
   Alert,
   Dimensions,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -162,10 +163,13 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
         onSettingsPress={() => navigation.navigate('Settings')}
         rightActions={
           <TouchableOpacity
-            style={styles.addButton}
             onPress={() => navigation.navigate('AddPatient')}
           >
-            <Ionicons name="add" size={20} color="#FFFFFF" />
+            <Image 
+              source={require('../../../assets/images/addpatient.png')} 
+              style={styles.addpatientIcon}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
         }
       />
@@ -190,7 +194,11 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
         >
           <View style={styles.headerContent}>
             <View style={styles.headerIcon}>
-              <Ionicons name="people" size={32} color="#059669" />
+              <Image 
+                  source={require('../../../assets/images/patient.png')} 
+                  style={styles.patientIcon}
+                  resizeMode="contain"
+                />
             </View>
             <Text style={styles.headerTitle}>Patient Management</Text>
             <Text style={styles.headerSubtitle}>
@@ -416,13 +424,6 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quickActionItem}
-              onPress={() => Alert.alert('Feature Coming Soon', 'Bulk import will be available soon')}
-            >
-              <Ionicons name="cloud-upload-outline" size={20} color="#0EA5E9" />
-              <Text style={styles.quickActionText}>Import Data</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.quickActionItem}
               onPress={() => Alert.alert('Feature Coming Soon', 'Export functionality will be available soon')}
             >
               <Ionicons name="download-outline" size={20} color="#8B5CF6" />
@@ -446,19 +447,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: SPACING[6],
-  },
-  addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#059669',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
   },
   headerSection: {
     paddingHorizontal: SPACING[5],
@@ -788,6 +776,12 @@ const styles = StyleSheet.create({
     marginBottom: SPACING[3],
     textAlign: 'center',
   },
+  patientIcon: {
+    height: 64, 
+    width: 64,
+    borderRadius: RADIUS.full,
+
+  },
   emptyMessage: {
     fontSize: TYPOGRAPHY.fontSize.md,
     color: '#64748B',
@@ -808,6 +802,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1E293B',
     marginBottom: SPACING[3],
+  },
+  addpatientIcon: {
+    width: 42,
+    height:42,
+    borderRadius: RADIUS.full
   },
   quickActionsGrid: {
     flexDirection: 'row',

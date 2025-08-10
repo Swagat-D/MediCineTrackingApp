@@ -22,6 +22,8 @@ export interface ButtonProps {
   style?: ViewStyle;
   textStyle?: TextStyle;
   testID?: string;
+  userRole?: 'patient' | 'caregiver'; // New prop for role-based styling
+  customColor?: string; // Allow custom color override
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -37,30 +39,141 @@ const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
   testID,
+  userRole,
+  customColor,
 }) => {
+  // Get role-based colors
+  const getRoleColors = () => {
+    if (customColor) {
+      return {
+        primary: customColor,
+        secondary: customColor,
+      };
+    }
+
+    if (userRole === 'patient') {
+      return {
+        primary: '#2563EB', // Blue for patient
+        secondary: '#2563EB',
+      };
+    } else if (userRole === 'caregiver') {
+      return {
+        primary: '#059669', // Green for caregiver
+        secondary: '#059669',
+      };
+    }
+
+    // Default colors from theme
+    return {
+      primary: COLORS.primary[500],
+      secondary: COLORS.secondary[500],
+    };
+  };
+
+  const roleColors = getRoleColors();
+
+  // Dynamic styles based on role
+  const getDynamicStyles = () => {
+    const baseStyle = {
+      ...styles.base,
+      ...styles[size],
+    };
+
+    if (fullWidth) {
+      Object.assign(baseStyle, styles.fullWidth);
+    }
+
+    if (disabled) {
+      return {
+        ...baseStyle,
+        ...styles.disabled,
+      };
+    }
+
+    switch (variant) {
+      case 'primary':
+        return {
+          ...baseStyle,
+          backgroundColor: roleColors.primary,
+          ...SHADOWS.sm,
+        };
+      case 'secondary':
+        return {
+          ...baseStyle,
+          backgroundColor: roleColors.secondary,
+          ...SHADOWS.sm,
+        };
+      case 'outline':
+        return {
+          ...baseStyle,
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          borderColor: roleColors.primary,
+        };
+      case 'ghost':
+        return {
+          ...baseStyle,
+          backgroundColor: 'transparent',
+        };
+      case 'danger':
+        return {
+          ...baseStyle,
+          backgroundColor: COLORS.error,
+          ...SHADOWS.sm,
+        };
+      default:
+        return {
+          ...baseStyle,
+          backgroundColor: roleColors.secondary,
+          ...SHADOWS.sm,
+        };
+    }
+  };
+
+  // Dynamic text colors based on role
+  const getDynamicTextColor = () => {
+    if (disabled) {
+      return COLORS.gray[500];
+    }
+
+    switch (variant) {
+      case 'primary':
+      case 'secondary':
+      case 'danger':
+        return COLORS.background;
+      case 'outline':
+      case 'ghost':
+        return roleColors.primary;
+      default:
+        return COLORS.background;
+    }
+  };
+
   const buttonStyles = [
-    styles.base,
-    styles[variant],
-    styles[size],
-    fullWidth && styles.fullWidth,
-    disabled && styles.disabled,
+    getDynamicStyles(),
     style,
   ];
 
   const textStyles = [
     styles.text,
-    styles[`${variant}Text`],
     styles[`${size}Text`],
-    disabled && styles.disabledText,
+    { color: getDynamicTextColor() },
     textStyle,
   ];
+
+  const getActivityIndicatorColor = () => {
+    if (variant === 'outline' || variant === 'ghost') {
+      return roleColors.primary;
+    }
+    return COLORS.background;
+  };
 
   const renderContent = () => {
     if (loading) {
       return (
         <ActivityIndicator
           size={size === 'small' ? 'small' : 'small'}
-          color={variant === 'outline' || variant === 'ghost' ? COLORS.primary[500] : COLORS.background}
+          color={getActivityIndicatorColor()}
         />
       );
     }
@@ -97,26 +210,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: RADIUS.md,
-    ...SHADOWS.sm,
-  },
-  
-  // Variants
-  primary: {
-    backgroundColor: COLORS.primary[500],
-  },
-  secondary: {
-    backgroundColor: COLORS.secondary[500],
-  },
-  outline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: COLORS.primary[500],
-  },
-  ghost: {
-    backgroundColor: 'transparent',
-  },
-  danger: {
-    backgroundColor: COLORS.error,
   },
   
   // Sizes
@@ -152,23 +245,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   
-  // Variant text styles
-  primaryText: {
-    color: COLORS.background,
-  },
-  secondaryText: {
-    color: COLORS.background,
-  },
-  outlineText: {
-    color: COLORS.primary[500],
-  },
-  ghostText: {
-    color: COLORS.primary[500],
-  },
-  dangerText: {
-    color: COLORS.background,
-  },
-  
   // Size text styles
   smallText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
@@ -181,10 +257,6 @@ const styles = StyleSheet.create({
   largeText: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     lineHeight: TYPOGRAPHY.lineHeight.lg,
-  },
-  
-  disabledText: {
-    color: COLORS.gray[500],
   },
 });
 

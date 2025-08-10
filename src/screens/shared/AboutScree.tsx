@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Linking,
   Platform,
+  Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -42,7 +43,11 @@ const AboutScreen: React.FC<AboutScreenProps> = ({ navigation }) => {
           <View style={styles.headerContent}>
             <View style={styles.logoContainer}>
               <View style={styles.logo}>
-                <Ionicons name="medical" size={48} color="#059669" />
+                <Image 
+                  source={require('../../../assets/images/logo.png')} 
+                  style={styles.logoIcon}
+                  resizeMode="contain"
+                />
               </View>
             </View>
             <Text style={styles.appName}>MediTracker</Text>
@@ -269,7 +274,8 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     paddingHorizontal: SPACING[5],
-    paddingVertical: SPACING[8],
+    paddingBottom: SPACING[8],
+    paddingTop: SPACING[12],
     alignItems: 'center',
   },
   headerContent: {
@@ -436,6 +442,10 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: SPACING[5],
     textAlign: 'justify',
+  },
+  logoIcon: {
+    height:88,
+    width:88, borderRadius: RADIUS.full
   },
   teamValues: {
     gap: SPACING[3],

@@ -119,7 +119,7 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleForgotPassword = () => {
-    navigation.navigate('ForgotPassword');
+    navigation.navigate('ForgotPassword', {role: selectedRole});
   };
 
   const handleSignup = () => {
@@ -265,6 +265,7 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
                     autoCapitalize="none"
                     autoComplete="email"
                     required
+                    userRole={selectedRole} // Pass the user role
                   />
                 )}
               />
@@ -289,6 +290,7 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
                     onRightIconPress={() => setShowPassword(!showPassword)}
                     autoComplete="password"
                     required
+                    userRole={selectedRole} // Pass the user role
                   />
                 )}
               />
@@ -323,7 +325,8 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
                 disabled={!isValid || isLoading}
                 loading={isLoading}
                 fullWidth
-                style={{ ...styles.loginButton, backgroundColor: getRoleColor() }}
+                style={styles.loginButton}
+                userRole={selectedRole} // Pass the user role
               />
             </Animated.View>
 

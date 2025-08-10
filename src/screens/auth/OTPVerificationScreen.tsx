@@ -40,10 +40,13 @@ type Props = AuthStackScreenProps<'OTPVerification'>;
 const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
   const dispatch = useAppDispatch();
   const { isLoading, error } = useAppSelector((state) => state.auth);
-  const { email, type } = route.params;
+  const { email, type, role } = route.params;
   const [otp, setOTP] = useState(['', '', '', '', '', '']);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes
   const [canResend, setCanResend] = useState(false);
+  
+  // Get role from params or default to patient
+  const selectedRole = role || 'patient';
   
   const inputRefs = useRef<TextInput[]>([]);
 
@@ -145,49 +148,50 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleVerifyOTP = async (otpCode?: string) => {
-  const otpToVerify = otpCode || otp.join('');
-  
-  if (otpToVerify.length !== APP_CONFIG.OTP_LENGTH) {
-    Alert.alert('Invalid OTP', 'Please enter the complete 6-digit code.');
-    return;
-  }
-
-  try {
-    dispatch(clearError());
-    const result = await dispatch(verifyOTP({ 
-      email, 
-      otp: otpToVerify,
-      type: type
-    }));
+    const otpToVerify = otpCode || otp.join('');
     
-    if (verifyOTP.fulfilled.match(result)) {
-      if (type === 'forgot_password') {
-        // Navigate to ResetPassword screen
-        navigation.navigate('ResetPassword', {
-          email: email,
-          otp: otpToVerify
-        });
-      } else {
-        // Signup success - MainNavigator will handle navigation
-        Alert.alert(
-          'Success',
-          'Account created successfully!',
-          [{ text: 'OK' }]
-        );
-      }
-    } else {
-      Alert.alert(
-        'Verification Failed',
-        result.payload || 'Invalid OTP. Please try again.'
-      );
-      setOTP(['', '', '', '', '', '']);
-      inputRefs.current[0]?.focus();
+    if (otpToVerify.length !== APP_CONFIG.OTP_LENGTH) {
+      Alert.alert('Invalid OTP', 'Please enter the complete 6-digit code.');
+      return;
     }
-  } catch (err) {
-    console.error(err)
-    Alert.alert('Error', 'An unexpected error occurred');
-  }
-};
+
+    try {
+      dispatch(clearError());
+      const result = await dispatch(verifyOTP({ 
+        email, 
+        otp: otpToVerify,
+        type: type
+      }));
+      
+      if (verifyOTP.fulfilled.match(result)) {
+        if (type === 'forgot_password') {
+          // Navigate to ResetPassword screen
+          navigation.navigate('ResetPassword', {
+            email: email,
+            otp: otpToVerify,
+            role: selectedRole
+          });
+        } else {
+          // Signup success - MainNavigator will handle navigation
+          Alert.alert(
+            'Success',
+            'Account created successfully!',
+            [{ text: 'OK' }]
+          );
+        }
+      } else {
+        Alert.alert(
+          'Verification Failed',
+          result.payload || 'Invalid OTP. Please try again.'
+        );
+        setOTP(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
+      }
+    } catch (err) {
+      console.error(err)
+      Alert.alert('Error', 'An unexpected error occurred');
+    }
+  };
 
   const handleResendOTP = async () => {
     if (!canResend) return;
@@ -227,9 +231,17 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
       : 'Enter the 6-digit security code we sent to reset your password safely.';
   };
 
+  // Role-based color functions
   const getRoleColor = () => {
-    // You can determine this based on the previous screen's role or default
-    return COLORS.primary[500]; // Default color
+    return selectedRole === 'caregiver' ? '#059669' : '#2563EB';
+  };
+
+  const getRoleIcon = () => {
+    return selectedRole === 'caregiver' ? 'people' : 'person';
+  };
+
+  const getRoleTitle = () => {
+    return selectedRole === 'caregiver' ? 'Caregiver' : 'Patient';
   };
 
   return (
@@ -286,6 +298,24 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
             </Animated.View>
           </View>
 
+          {/* Role Indicator */}
+          <Animated.View 
+            style={[
+              styles.roleSection,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <View style={styles.roleCard}>
+              <View style={[styles.roleIconContainer, { backgroundColor: getRoleColor() }]}>
+                <Ionicons name={getRoleIcon()} size={20} color="#FFFFFF" />
+              </View>
+              <Text style={styles.roleText}>{getRoleTitle()} Verification</Text>
+            </View>
+          </Animated.View>
+
           {/* Verification Section */}
           <Animated.View 
             style={[
@@ -313,7 +343,7 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
               <TouchableOpacity 
                 onPress={handleChangeEmail}
-                style={styles.changeEmailButton}
+                style={[styles.changeEmailButton, { backgroundColor: getRoleColor() + '10' }]}
               >
                 <Text style={[styles.changeEmailText, { color: getRoleColor() }]}>Change</Text>
               </TouchableOpacity>
@@ -346,7 +376,7 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
                   }}
                   style={[
                     styles.otpInput,
-                    digit && styles.otpInputFilled,
+                    digit && { ...styles.otpInputFilled, borderColor: getRoleColor() },
                     error && styles.otpInputError,
                   ]}
                   value={digit}
@@ -403,26 +433,19 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             </View>
             
-            <TouchableOpacity
-              style={[
-                styles.resendButton,
-                !canResend && styles.resendButtonDisabled
-              ]}
+            <Button
+              title="Resend Code"
               onPress={handleResendOTP}
               disabled={!canResend}
-            >
-              <Ionicons 
-                name="refresh" 
-                size={18} 
-                color={canResend ? COLORS.background : COLORS.gray[400]} 
-              />
-              <Text style={[
-                styles.resendText,
-                !canResend && styles.resendTextDisabled
-              ]}>
-                Resend Code
-              </Text>
-            </TouchableOpacity>
+              variant="outline"
+              fullWidth
+              style={StyleSheet.flatten([
+                styles.resendButton,
+                !canResend && styles.resendButtonDisabled,
+              ])}
+              userRole={selectedRole} // Pass the user role
+              icon={<Ionicons name="refresh" size={18} color={canResend ? getRoleColor() : COLORS.gray[400]} />}
+            />
           </Animated.View>
 
           {/* Verify Button */}
@@ -438,7 +461,8 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
               disabled={otp.some(digit => !digit) || isLoading}
               loading={isLoading}
               fullWidth
-              style={{ ...styles.verifyButton, backgroundColor: getRoleColor() }}
+              style={styles.verifyButton}
+              userRole={selectedRole} // Pass the user role
               icon={<Ionicons name="checkmark-circle" size={20} color={COLORS.background} />}
             />
           </Animated.View>
@@ -460,7 +484,7 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
             </Text>
           </Animated.View>
         </View>
-              </ScrollView>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -549,6 +573,39 @@ const styles = StyleSheet.create({
     color: '#1E293B',
     letterSpacing: -1,
   },
+  roleSection: {
+    marginBottom: isShortDevice ? SPACING[4] : SPACING[6],
+    paddingHorizontal: SPACING[2],
+  },
+  roleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[5],
+    borderRadius: RADIUS.xl,
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  roleIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
+  },
+  roleText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '700',
+    color: '#334155',
+  },
   verificationSection: {
     marginBottom: isShortDevice ? SPACING[4] : SPACING[8],
   },
@@ -610,7 +667,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[2],
     borderRadius: RADIUS.md,
-    backgroundColor: '#F8FAFC',
     marginLeft: SPACING[2],
   },
   changeEmailText: {
@@ -650,9 +706,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   otpInputFilled: {
-    borderColor: COLORS.primary[500],
-    backgroundColor: '#F0F9FF',
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
+    elevation: 3,
   },
   otpInputError: {
     borderColor: '#EF4444',
@@ -719,32 +774,12 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   resendButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: isSmallDevice ? SPACING[2] : SPACING[3],
-    paddingHorizontal: isSmallDevice ? SPACING[4] : SPACING[6],
+    minHeight: isSmallDevice ? 48 : 52,
     borderRadius: RADIUS.xl,
-    backgroundColor: COLORS.primary[500],
-    gap: SPACING[2],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderWidth: 2,
   },
   resendButtonDisabled: {
-    backgroundColor: COLORS.gray[300],
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  resendText: {
-    fontSize: isSmallDevice ? TYPOGRAPHY.fontSize.sm : TYPOGRAPHY.fontSize.md,
-    color: COLORS.background,
-    fontWeight: '600',
-  },
-  resendTextDisabled: {
-    color: COLORS.gray[400],
+    opacity: 0.5,
   },
   buttonContainer: {
     marginBottom: isShortDevice ? SPACING[4] : SPACING[6],

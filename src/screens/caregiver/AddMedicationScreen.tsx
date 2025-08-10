@@ -8,6 +8,7 @@ import {
   Platform,
   TouchableOpacity,
   Alert,
+  Image,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -229,9 +230,11 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
         >
           {/* Form Header */}
           <View style={styles.formHeader}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="medical" size={40} color="#059669" />
-            </View>
+              <Image 
+                  source={require('../../../assets/images/medicine.png')} 
+                  style={styles.medicineIcon}
+                  resizeMode="contain"
+                />
             <Text style={styles.formTitle}>Medication Details</Text>
             <Text style={styles.formSubtitle}>
               Fill in the information below to add a new medication
@@ -484,9 +487,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {/* Instructions - Optional */}
           <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Additional Instructions</Text>
-            <Text style={styles.optionalLabel}>(Optional)</Text>
-            
+            <Text style={styles.sectionTitle}>Additional Instructions</Text>            
             <Controller
               control={control}
               name="instructions"
@@ -752,6 +753,11 @@ const styles = StyleSheet.create({
   },
   dateButtonPlaceholder: {
     color: '#9CA3AF',
+  },
+  medicineIcon:{
+    height: 120,
+    width: 120,
+    borderRadius: RADIUS.full
   },
   supplyInfo: {
     backgroundColor: '#F8FAFC',

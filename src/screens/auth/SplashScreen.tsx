@@ -256,23 +256,6 @@ const SplashScreen: React.FC = () => {
               <Text style={styles.personSubLabel}>Takes & Tracks</Text>
             </Animated.View>
           </View>
-
-          {/* Connection Lines - Separate positioned element */}
-          <Animated.View
-            style={[
-              styles.connectionContainer,
-              {
-                opacity: connectionAnim,
-                transform: [{ scale: pulseAnim }],
-              },
-            ]}
-          >
-            <View style={styles.connectionLine} />
-            <View style={styles.connectionDot}>
-              <Ionicons name="heart" size={16} color="#EF4444" />
-            </View>
-            <View style={styles.connectionLine} />
-          </Animated.View>
         </View>
 
         {/* Features Animation */}

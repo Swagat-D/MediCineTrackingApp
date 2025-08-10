@@ -890,10 +890,16 @@ const styles = StyleSheet.create({
   // Print Settings Modal Styles
   settingsModalContainer: {
     backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.xl,
-    width: '100%',
-    maxWidth: 450,
-    maxHeight: '85%',
+  borderTopLeftRadius: RADIUS['2xl'],
+  borderTopRightRadius: RADIUS['2xl'],
+  width: '100%',
+  minHeight: height * 0.75,
+  maxHeight: height * 0.9,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: -4 },
+  shadowOpacity: 0.25,
+  shadowRadius: 20,
+  elevation: 25,
   },
   settingsHeader: {
     flexDirection: 'row',

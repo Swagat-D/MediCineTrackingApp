@@ -30,6 +30,8 @@ const DashboardStack: React.FC = () => (
     <Stack.Screen name="Dashboard" component={DashboardScreen} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} />
     <Stack.Screen name="Settings" component={SettingsScreen} />
+    <Stack.Screen name="AddPatient" component={AddPatientScreen} />
+    <Stack.Screen name="BarcodeGenerator" component={BarcodeGeneratorScreen} />
     <Stack.Screen name="PatientDetails" component={PatientDetailsScreen} />
   </Stack.Navigator>
 );
@@ -95,7 +97,7 @@ const CaregiverNavigator: React.FC = () => {
           backgroundColor: COLORS.background,
           borderTopWidth: 1,
           borderTopColor: COLORS.gray[200],
-          height: 60,
+          height: 70,
           paddingBottom: 8,
           paddingTop: 8,
         },

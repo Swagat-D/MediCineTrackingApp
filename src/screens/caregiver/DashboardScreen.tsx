@@ -8,6 +8,8 @@ import {
   RefreshControl,
   Dimensions,
   Platform,
+  Modal,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,7 +20,7 @@ import CaregiverNavbar from '../../components/common/CaregiverNavbar';
 import { caregiverAPI } from '../../services/api/caregiverAPI';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 type Props = CaregiverStackScreenProps<'Dashboard'>;
 
@@ -41,6 +43,8 @@ interface RecentActivity {
 const DashboardScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAppSelector(state => state.auth);
   const [refreshing, setRefreshing] = useState(false);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [allActivities, setAllActivities] = useState<RecentActivity[]>([]);
   
   const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
     totalPatients: 0,
@@ -52,22 +56,25 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
 
   const onRefresh = async () => {
-  setRefreshing(true);
-  try {
-    const data = await caregiverAPI.getDashboardStats();
-    setDashboardStats(data.stats);
-    setRecentActivities(
-      data.recentActivities.map((activity: any) => ({
+    setRefreshing(true);
+    try {
+      const data = await caregiverAPI.getDashboardStats();
+      setDashboardStats(data.stats);
+      
+      const activities = data.recentActivities.map((activity: any) => ({
         ...activity,
         type: activity.type as 'dose_taken' | 'dose_missed' | 'low_stock' | 'sos_alert',
-      }))
-    );
-  } catch (error) {
-    console.error('Error fetching dashboard data:', error);
-  } finally {
-    setRefreshing(false);
-  }
-};
+      }));
+      
+      // Limit recent activities to 10
+      setRecentActivities(activities.slice(0, 7));
+      setAllActivities(activities); // Store all activities for modal
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     onRefresh();
@@ -99,6 +106,88 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
       default: return '#6B7280';
     }
   };
+
+  const ActivityModal = () => (
+    <Modal
+      visible={showActivityModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowActivityModal(false)}
+    >
+      <View style={styles.modalContainer}>
+        {/* Modal Header */}
+        <View style={styles.modalHeader}>
+          <View style={styles.modalTitleContainer}>
+            <Text style={styles.modalTitle}>Recent Activities</Text>
+            <Text style={styles.modalSubtitle}>Last 7 days</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => setShowActivityModal(false)}
+          >
+            <Ionicons name="close" size={24} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Modal Content */}
+        <ScrollView
+          style={styles.modalScrollView}
+          contentContainerStyle={styles.modalScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.modalActivityList}>
+            {allActivities.map((activity, index) => (
+              <TouchableOpacity
+                key={activity.id}
+                style={[
+                  styles.modalActivityItem,
+                  index === allActivities.length - 1 && styles.lastModalActivityItem
+                ]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  if (activity.type === 'sos_alert') {
+                    setShowActivityModal(false);
+                    navigation.navigate('PatientDetails', { patientId: activity.id });
+                  }
+                }}
+              >
+                <View style={[
+                  styles.activityIconContainer,
+                  { backgroundColor: getActivityColor(activity.priority) + '15' }
+                ]}>
+                  <Ionicons
+                    name={getActivityIcon(activity.type)}
+                    size={18}
+                    color={getActivityColor(activity.priority)}
+                  />
+                </View>
+                
+                <View style={styles.activityContent}>
+                  <View style={styles.activityHeader}>
+                    <Text style={styles.activityPatient}>{activity.patientName}</Text>
+                    <Text style={styles.activityTime}>{activity.timestamp}</Text>
+                  </View>
+                  <Text style={styles.activityMessage}>{activity.message}</Text>
+                </View>
+                
+                {activity.priority === 'critical' && (
+                  <View style={styles.criticalIndicator} />
+                )}
+              </TouchableOpacity>
+            ))}
+            
+            {allActivities.length === 0 && (
+              <View style={styles.emptyState}>
+                <Ionicons name="time-outline" size={48} color="#94A3B8" />
+                <Text style={styles.emptyStateText}>No recent activities</Text>
+                <Text style={styles.emptyStateSubtext}>Activities will appear here as they happen</Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
 
   return (
     <View style={styles.container}>
@@ -133,9 +222,11 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.subtitle}>Here&apos;s your patient overview for today</Text>
             </View>
             <View style={styles.greetingIcon}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="medical" size={28} color="#059669" />
-              </View>
+                <Image 
+                  source={require('../../../assets/images/caregiver.png')} 
+                  style={styles.caregiverIcon}
+                  resizeMode="contain"
+                />
             </View>
           </View>
         </LinearGradient>
@@ -163,7 +254,11 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
             >
               <View style={styles.statContent}>
                 <View style={styles.statHeader}>
-                  <Ionicons name="medical" size={20} color="#0EA5E9" />
+                  <Image 
+                  source={require('../../../assets/images/tablet.png')} 
+                  style={styles.medicineIcon}
+                  resizeMode="contain"
+                />
                   <Text style={styles.statLabel}>Medications</Text>
                 </View>
                 <Text style={styles.statValue}>{dashboardStats.activeMedications}</Text>
@@ -246,7 +341,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.activitySection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowActivityModal(true)}>
               <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
@@ -309,6 +404,9 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* Activity Modal */}
+      <ActivityModal />
     </View>
   );
 };
@@ -353,6 +451,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+  },
+  caregiverIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: RADIUS.full
   },
   greeting: {
     fontSize: TYPOGRAPHY.fontSize.lg,
@@ -547,6 +650,98 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: '#B91C1C',
     lineHeight: 18,
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  medicineIcon: {
+    height:24,
+    width:24
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING[5],
+    paddingVertical: SPACING[4],
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    ...Platform.select({
+      ios: {
+        paddingTop: SPACING[12],
+      },
+      android: {
+        paddingTop: SPACING[6],
+      },
+    }),
+  },
+  modalTitleContainer: {
+    flex: 1,
+  },
+  modalTitle: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: SPACING[1],
+  },
+  modalSubtitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalScrollView: {
+    flex: 1,
+  },
+  modalScrollContent: {
+    paddingHorizontal: SPACING[5],
+    paddingVertical: SPACING[5],
+  },
+  modalActivityList: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    minHeight: height * 0.6,
+  },
+  modalActivityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING[4],
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  lastModalActivityItem: {
+    borderBottomWidth: 0,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING[12],
+    paddingHorizontal: SPACING[6],
+  },
+  emptyStateText: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: SPACING[4],
+    marginBottom: SPACING[2],
+  },
+  emptyStateSubtext: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
 

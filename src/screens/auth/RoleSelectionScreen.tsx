@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -26,24 +26,60 @@ type Props = AuthStackScreenProps<'RoleSelection'>;
 const RoleSelectionScreen: React.FC<Props> = ({ navigation }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    // Quick initialization - no weird loading states
+    const timer = setTimeout(() => {
+      setIsReady(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const handleRoleSelection = (role: UserRole) => {
     navigation.navigate('Login', { role });
+  };
+
+  // Simple loading dots instead of containers
+  const LoadingDots = () => {
+    const dot1 = useRef(new Animated.Value(0.3)).current;
+    const dot2 = useRef(new Animated.Value(0.3)).current;
+    const dot3 = useRef(new Animated.Value(0.3)).current;
+
+    useEffect(() => {
+      const animateDots = () => {
+        Animated.sequence([
+          Animated.timing(dot1, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot2, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot3, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot1, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot2, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot3, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+        ]).start(() => animateDots());
+      };
+      animateDots();
+    }, []);
+
+    return (
+      <View style={styles.loadingDotsContainer}>
+        <Animated.View style={[styles.dot, { opacity: dot1 }]} />
+        <Animated.View style={[styles.dot, { opacity: dot2 }]} />
+        <Animated.View style={[styles.dot, { opacity: dot3 }]} />
+      </View>
+    );
   };
 
   const RoleCard: React.FC<{
@@ -61,7 +97,7 @@ const RoleSelectionScreen: React.FC<Props> = ({ navigation }) => {
     useEffect(() => {
       Animated.timing(cardOpacity, {
         toValue: 1,
-        duration: 600,
+        duration: 400,
         delay: delay,
         useNativeDriver: true,
       }).start();
@@ -92,9 +128,8 @@ const RoleSelectionScreen: React.FC<Props> = ({ navigation }) => {
           onPress={() => handleRoleSelection(role)}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
-          activeOpacity={0.95}
+          activeOpacity={0.98}
         >
-          {/* Card Header */}
           <View style={styles.cardHeader}>
             <View style={[
               styles.iconContainer,
@@ -109,7 +144,6 @@ const RoleSelectionScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Benefits List */}
           <View style={styles.benefitsList}>
             {benefits.map((benefit, index) => (
               <View key={index} style={styles.benefitItem}>
@@ -119,7 +153,6 @@ const RoleSelectionScreen: React.FC<Props> = ({ navigation }) => {
             ))}
           </View>
 
-          {/* Card Footer */}
           <View style={styles.cardFooter}>
             <Text style={[styles.continueText, { color: gradientColors[0] }]}>
               Continue as {title}
@@ -150,7 +183,6 @@ const RoleSelectionScreen: React.FC<Props> = ({ navigation }) => {
             }
           ]}
         >
-          {/* Logo Section */}
           <View style={styles.logoSection}>
             <View style={styles.logoContainer}>
               <Image 
@@ -164,7 +196,6 @@ const RoleSelectionScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.appSubtitle}>Your trusted medication companion</Text>
           </View>
 
-          {/* Welcome Section */}
           <View style={styles.welcomeSection}>
             <Text style={styles.welcomeTitle}>Choose Your Role</Text>
             <Text style={styles.welcomeDescription}>
@@ -173,94 +204,105 @@ const RoleSelectionScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </Animated.View>
 
-        {/* Role Cards */}
-        <View style={styles.rolesContainer}>
-          <RoleCard
-            role="caregiver"
-            title="Caregiver"
-            description="For healthcare providers & family caregivers"
-            icon="people"
-            benefits={[
-              'Manage multiple patient medications',
-              'Set and monitor medication schedules',
-              'Track adherence and generate reports',
-              'Receive alerts for missed doses'
-            ]}
-            gradientColors={['#059669', '#047857']}
-            delay={200}
-          />
+        {/* Role Cards or Loading */}
+        {isReady ? (
+          <View style={styles.rolesContainer}>
+            <RoleCard
+              role="caregiver"
+              title="Caregiver"
+              description="For healthcare providers & family caregivers"
+              icon="people"
+              benefits={[
+                'Manage multiple patient medications',
+                'Set and monitor medication schedules',
+                'Track adherence and generate reports',
+                'Receive alerts for missed doses'
+              ]}
+              gradientColors={['#059669', '#047857']}
+              delay={100}
+            />
 
-          <RoleCard
-            role="patient"
-            title="Patient"
-            description="For individuals managing their medications"
-            icon="person"
-            benefits={[
-              'Track your personal medications',
-              'Receive timely reminders',
-              'Log medication intake easily',
-              'Share progress with caregivers'
-            ]}
-            gradientColors={['#2563EB', '#1D4ED8']}
-            delay={400}
-          />
-        </View>
+            <RoleCard
+              role="patient"
+              title="Patient"
+              description="For individuals managing their medications"
+              icon="person"
+              benefits={[
+                'Track your personal medications',
+                'Receive timely reminders',
+                'Log medication intake easily',
+                'Share progress with caregivers'
+              ]}
+              gradientColors={['#2563EB', '#1D4ED8']}
+              delay={200}
+            />
+          </View>
+        ) : (
+          <View style={styles.loadingSection}>
+            <Text style={styles.loadingText}>Loading your options</Text>
+            <LoadingDots />
+          </View>
+        )}
 
         {/* Features Section */}
-        <Animated.View 
-          style={[
-            styles.featuresSection,
-            { opacity: fadeAnim }
-          ]}
-        >
-          <Text style={styles.featuresTitle}>Why Choose MediTracker?</Text>
-          <View style={styles.featuresGrid}>
-            <View style={styles.featureItem}>
-              <View style={styles.featureIcon}>
-                <Ionicons name="shield-checkmark" size={22} color="#059669" />
+        {isReady && (
+          <Animated.View 
+            style={[
+              styles.featuresSection,
+              { opacity: fadeAnim }
+            ]}
+          >
+            <Text style={styles.featuresTitle}>Why Choose MediTracker?</Text>
+            <View style={styles.featuresGrid}>
+              <View style={styles.featureItem}>
+                <View style={styles.featureIcon}>
+                  <Ionicons name="shield-checkmark" size={22} color="#059669" />
+                </View>
+                <Text style={styles.featureTitle}>Secure & Private</Text>
+                <Text style={styles.featureDescription}>HIPAA compliant data protection</Text>
               </View>
-              <Text style={styles.featureTitle}>Secure & Private</Text>
-              <Text style={styles.featureDescription}>HIPAA compliant data protection</Text>
-            </View>
-            
-            <View style={styles.featureItem}>
-              <View style={styles.featureIcon}>
-                <Ionicons name="notifications" size={22} color="#059669" />
+              
+              <View style={styles.featureItem}>
+                <View style={styles.featureIcon}>
+                  <Ionicons name="notifications" size={22} color="#059669" />
+                </View>
+                <Text style={styles.featureTitle}>Smart Reminders</Text>
+                <Text style={styles.featureDescription}>Never miss a medication dose</Text>
               </View>
-              <Text style={styles.featureTitle}>Smart Reminders</Text>
-              <Text style={styles.featureDescription}>Never miss a medication dose</Text>
-            </View>
-            
-            <View style={styles.featureItem}>
-              <View style={styles.featureIcon}>
-                <Ionicons name="qr-code" size={22} color="#059669" />
+              
+              <View style={styles.featureItem}>
+                <View style={styles.featureIcon}>
+                  <Ionicons name="qr-code" size={22} color="#059669" />
+                </View>
+                <Text style={styles.featureTitle}>Barcode Scanning</Text>
+                <Text style={styles.featureDescription}>Quick medication identification</Text>
               </View>
-              <Text style={styles.featureTitle}>Barcode Scanning</Text>
-              <Text style={styles.featureDescription}>Quick medication identification</Text>
-            </View>
-            
-            <View style={styles.featureItem}>
-              <View style={styles.featureIcon}>
-                <Ionicons name="analytics" size={22} color="#059669" />
+              
+              <View style={styles.featureItem}>
+                <View style={styles.featureIcon}>
+                  <Ionicons name="analytics" size={22} color="#059669" />
+                </View>
+                <Text style={styles.featureTitle}>Health Insights</Text>
+                <Text style={styles.featureDescription}>Track adherence patterns</Text>
               </View>
-              <Text style={styles.featureTitle}>Health Insights</Text>
-              <Text style={styles.featureDescription}>Track adherence patterns</Text>
             </View>
-          </View>
-        </Animated.View>
+          </Animated.View>
+        )}
 
         {/* Help Section */}
-        <Animated.View 
-          style={[
-            styles.helpSection,
-            { opacity: fadeAnim }
-          ]}
-        >
-          <TouchableOpacity style={styles.helpButton}>
-            <Ionicons name="help-circle-outline" size={18} color="#64748B" />
-            <Text style={styles.helpText}>Need help choosing? Contact Support</Text>
-          </TouchableOpacity>
-        </Animated.View>
+        {isReady && (
+          <Animated.View 
+            style={[
+              styles.helpSection,
+              { opacity: fadeAnim }
+            ]}
+          >
+            <TouchableOpacity style={styles.helpButton}>
+              <Ionicons name="help-circle-outline" size={18} color="#64748B" />
+              <Text style={styles.helpText}>Need help choosing? Contact Support</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -325,6 +367,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     maxWidth: '90%',
+  },
+  loadingSection: {
+    alignItems: 'center',
+    paddingVertical: SPACING[10],
+    marginBottom: SPACING[10],
+  },
+  loadingText: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    color: '#64748B',
+    fontWeight: '500',
+    marginBottom: SPACING[6],
+  },
+  loadingDotsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+  },
+  dot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#059669',
   },
   rolesContainer: {
     gap: SPACING[6],

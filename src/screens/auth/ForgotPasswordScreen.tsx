@@ -43,10 +43,13 @@ const forgotPasswordSchema = yup.object().shape({
     .matches(VALIDATION_RULES.EMAIL, 'Please enter a valid email'),
 });
 
-const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
+const ForgotPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
   const dispatch = useAppDispatch();
   const { isLoading, error } = useAppSelector(state => state.auth);
   const [emailSent, setEmailSent] = useState(false);
+  
+  // Get role from route params or default to patient
+  const selectedRole = route.params?.role || 'patient';
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -118,7 +121,8 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
               onPress: () => {
                 navigation.navigate('OTPVerification', {
                   email: data.email,
-                  type: 'forgot_password'
+                  type: 'forgot_password',
+                  role: selectedRole
                 });
               }
             }
@@ -167,6 +171,19 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  // Role-based color functions
+  const getRoleColor = () => {
+    return selectedRole === 'caregiver' ? '#059669' : '#2563EB';
+  };
+
+  const getRoleIcon = () => {
+    return selectedRole === 'caregiver' ? 'people' : 'person';
+  };
+
+  const getRoleTitle = () => {
+    return selectedRole === 'caregiver' ? 'Caregiver' : 'Patient';
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
@@ -174,9 +191,9 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
       
       {/* Background Elements */}
       <View style={styles.backgroundElements}>
-        <View style={[styles.bgCircle, styles.bgCircle1]} />
-        <View style={[styles.bgCircle, styles.bgCircle2]} />
-        <View style={[styles.bgCircle, styles.bgCircle3]} />
+        <View style={[styles.bgCircle, styles.bgCircle1, { backgroundColor: getRoleColor() + '08' }]} />
+        <View style={[styles.bgCircle, styles.bgCircle2, { backgroundColor: getRoleColor() + '05' }]} />
+        <View style={[styles.bgCircle, styles.bgCircle3, { backgroundColor: '#10B981' + '06' }]} />
       </View>
       
       <KeyboardAvoidingView
@@ -233,8 +250,8 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
             >
               {/* Icon and Title */}
               <View style={styles.iconSection}>
-                <View style={styles.iconContainer}>
-                  <Ionicons name="lock-closed" size={48} color="#2563EB" />
+                <View style={[styles.iconContainer, { backgroundColor: getRoleColor() + '15', borderColor: getRoleColor() + '30' }]}>
+                  <Ionicons name="lock-closed" size={48} color={getRoleColor()} />
                 </View>
                 <Text style={styles.mainTitle}>Forgot Password?</Text>
                 <Text style={styles.mainDescription}>
@@ -260,6 +277,7 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
                       autoCapitalize="none"
                       autoComplete="email"
                       required
+                      userRole={selectedRole} // Pass the user role
                     />
                   )}
                 />
@@ -281,6 +299,7 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
                     loading={isLoading}
                     fullWidth
                     style={styles.submitButton}
+                    userRole={selectedRole} // Pass the user role
                   />
                 </View>
 
@@ -289,8 +308,8 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
                   style={styles.backToLoginButton}
                   onPress={handleBackToLogin}
                 >
-                  <Ionicons name="arrow-back" size={16} color="#2563EB" />
-                  <Text style={styles.backToLoginText}>Back to Login</Text>
+                  <Ionicons name="arrow-back" size={16} color={getRoleColor()} />
+                  <Text style={[styles.backToLoginText, { color: getRoleColor() }]}>Back to Login</Text>
                 </TouchableOpacity>
               </View>
             </Animated.View>
@@ -328,10 +347,12 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
                   title="Enter Reset Code"
                   onPress={() => navigation.navigate('OTPVerification', {
                     email: getValues('email'),
-                    type: 'forgot_password'
+                    type: 'forgot_password',
+                    role: selectedRole
                   })}
                   fullWidth
                   style={styles.primaryAction}
+                  userRole={selectedRole} // Pass the user role
                 />
 
                 <Button
@@ -341,14 +362,15 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
                   fullWidth
                   style={styles.secondaryAction}
                   disabled={isLoading}
+                  userRole={selectedRole} // Pass the user role
                 />
 
                 <TouchableOpacity 
                   style={styles.backToLoginButton}
                   onPress={handleBackToLogin}
                 >
-                  <Ionicons name="arrow-back" size={16} color="#2563EB" />
-                  <Text style={styles.backToLoginText}>Back to Login</Text>
+                  <Ionicons name="arrow-back" size={16} color={getRoleColor()} />
+                  <Text style={[styles.backToLoginText, { color: getRoleColor() }]}>Back to Login</Text>
                 </TouchableOpacity>
               </View>
             </Animated.View>
@@ -370,9 +392,9 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
                   or contact our support team for assistance.
                 </Text>
                 
-                <TouchableOpacity style={styles.contactSupport}>
-                  <Text style={styles.contactSupportText}>Contact Support</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#2563EB" />
+                <TouchableOpacity style={[styles.contactSupport, { backgroundColor: getRoleColor() + '15' }]}>
+                  <Text style={[styles.contactSupportText, { color: getRoleColor() }]}>Contact Support</Text>
+                  <Ionicons name="chevron-forward" size={16} color={getRoleColor()} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -415,21 +437,18 @@ const styles = StyleSheet.create({
   bgCircle1: {
     width: 160,
     height: 160,
-    backgroundColor: '#2563EB08',
     top: -80,
     right: -30,
   },
   bgCircle2: {
     width: 120,
     height: 120,
-    backgroundColor: '#10B98105',
     bottom: 100,
     left: -60,
   },
   bgCircle3: {
     width: 80,
     height: 80,
-    backgroundColor: '#F59E0B06',
     top: '50%',
     right: -20,
   },
@@ -494,12 +513,10 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#EBF4FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING[6],
     borderWidth: 2,
-    borderColor: '#DBEAFE',
   },
   mainTitle: {
     fontSize: isSmallDevice ? TYPOGRAPHY.fontSize.xl : TYPOGRAPHY.fontSize['2xl'],
@@ -541,7 +558,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING[6],
   },
   submitButton: {
-    backgroundColor: '#2563EB',
     minHeight: 56,
     borderRadius: RADIUS.xl,
     shadowColor: '#000',
@@ -559,7 +575,6 @@ const styles = StyleSheet.create({
   },
   backToLoginText: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    color: '#2563EB',
     fontWeight: '600',
   },
   successSection: {
@@ -621,12 +636,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[2],
   },
   primaryAction: {
-    backgroundColor: '#2563EB',
     minHeight: 56,
     borderRadius: RADIUS.xl,
   },
   secondaryAction: {
-    borderColor: '#E2E8F0',
     borderWidth: 2,
     minHeight: 56,
     borderRadius: RADIUS.xl,
@@ -667,7 +680,6 @@ const styles = StyleSheet.create({
   contactSupport: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EBF4FF',
     paddingVertical: SPACING[3],
     paddingHorizontal: SPACING[4],
     borderRadius: RADIUS.lg,
@@ -675,7 +687,6 @@ const styles = StyleSheet.create({
   },
   contactSupportText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#2563EB',
     fontWeight: '600',
     marginRight: SPACING[2],
   },

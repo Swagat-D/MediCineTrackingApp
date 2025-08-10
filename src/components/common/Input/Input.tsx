@@ -22,6 +22,8 @@ export interface InputProps extends TextInputProps {
   inputStyle?: ViewStyle;
   required?: boolean;
   disabled?: boolean;
+  userRole?: 'patient' | 'caregiver'; // New prop for role-based styling
+  customColor?: string; // Allow custom color override
 }
 
 const Input = forwardRef<TextInput, InputProps>(
@@ -38,12 +40,44 @@ const Input = forwardRef<TextInput, InputProps>(
       required = false,
       disabled = false,
       secureTextEntry,
+      userRole,
+      customColor,
       ...props
     },
     ref
   ) => {
     const [isFocused, setIsFocused] = useState(false);
     const [isSecure, setIsSecure] = useState(secureTextEntry);
+
+    // Get role-based colors
+    const getRoleColors = () => {
+      if (customColor) {
+        return {
+          primary: customColor,
+          focused: customColor,
+        };
+      }
+
+      if (userRole === 'patient') {
+        return {
+          primary: '#2563EB', // Blue for patient
+          focused: '#2563EB',
+        };
+      } else if (userRole === 'caregiver') {
+        return {
+          primary: '#059669', // Green for caregiver
+          focused: '#059669',
+        };
+      }
+
+      // Default colors from theme
+      return {
+        primary: COLORS.secondary[500],
+        focused: COLORS.secondary[500],
+      };
+    };
+
+    const roleColors = getRoleColors();
 
     const toggleSecureEntry = () => {
       setIsSecure(!isSecure);
@@ -59,10 +93,34 @@ const Input = forwardRef<TextInput, InputProps>(
       props.onBlur?.(e);
     };
 
+    // Dynamic icon color based on focus and role
+    const getIconColor = () => {
+      if (error) {
+        return COLORS.error;
+      }
+      if (isFocused) {
+        return roleColors.focused;
+      }
+      return COLORS.gray[500];
+    };
+
+    // Dynamic border color based on state and role
+    const getBorderColor = () => {
+      if (error) {
+        return COLORS.error;
+      }
+      if (isFocused) {
+        return roleColors.focused;
+      }
+      return COLORS.gray[300];
+    };
+
     const inputContainerStyles = [
       styles.inputContainer,
-      isFocused && styles.focused,
-      error && styles.error,
+      {
+        borderColor: getBorderColor(),
+        borderWidth: isFocused ? 2 : 1.5,
+      },
       disabled && styles.disabled,
     ];
 
@@ -89,7 +147,7 @@ const Input = forwardRef<TextInput, InputProps>(
             <Ionicons
               name={leftIcon}
               size={20}
-              color={isFocused ? COLORS.secondary[500] : COLORS.gray[500]}
+              color={getIconColor()}
               style={styles.leftIcon}
             />
           )}
@@ -114,7 +172,7 @@ const Input = forwardRef<TextInput, InputProps>(
               <Ionicons
                 name={isSecure ? 'eye-off-outline' : 'eye-outline'}
                 size={20}
-                color={COLORS.gray[500]}
+                color={getIconColor()}
               />
             </TouchableOpacity>
           )}
@@ -128,7 +186,7 @@ const Input = forwardRef<TextInput, InputProps>(
               <Ionicons
                 name={rightIcon}
                 size={20}
-                color={isFocused ? COLORS.secondary[500] : COLORS.gray[500]}
+                color={getIconColor()}
               />
             </TouchableOpacity>
           )}
@@ -159,17 +217,9 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: COLORS.gray[300],
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.background,
     minHeight: 48,
-  },
-  focused: {
-    borderColor: COLORS.secondary[500],
-  },
-  error: {
-    borderColor: COLORS.error,
   },
   disabled: {
     backgroundColor: COLORS.gray[100],

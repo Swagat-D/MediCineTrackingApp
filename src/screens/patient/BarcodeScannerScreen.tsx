@@ -222,17 +222,21 @@ const showEmergencyOverride = (medication: any) => {
 
 const confirmMedicationTaken = async (medication: any, isEmergency = false) => {
   try {
-    await patientAPI.recordMedicationTaken(medication.id, {
+    console.log('Recording medication taken:', medication.id);
+    
+    const result = await patientAPI.recordMedicationTaken(medication.id, {
       notes: isEmergency ? 'Emergency override dose' : 'Taken via barcode scan',
       takenAt: new Date().toISOString()
     });
+
+    console.log('Medication recorded successfully:', result);
 
     Alert.alert(
       '✅ Dose Recorded',
       `Your ${medication.name} dose has been logged successfully.\n\n` +
       `Taken at: ${new Date().toLocaleTimeString()}\n` +
-      `Remaining quantity: ${medication.remainingQuantity - 1}\n` +
-      `Days left: ${Math.floor((medication.remainingQuantity - 1) / medication.frequency)}`,
+      `Remaining quantity: ${result.data?.remainingQuantity || 'Unknown'}\n` +
+      `Days left: ${result.data?.remainingDays || 'Unknown'}`,
       [
         {
           text: 'OK',
@@ -244,6 +248,7 @@ const confirmMedicationTaken = async (medication: any, isEmergency = false) => {
       ]
     );
   } catch (error: any) {
+    console.error('Error recording medication:', error);
     Alert.alert(
       'Error', 
       error.message || 'Failed to record medication. Please try again.',

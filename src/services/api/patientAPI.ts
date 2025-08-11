@@ -134,16 +134,20 @@ class PatientAPI {
 }
 
   async recordMedicationTaken(medicationId: string, data: { notes?: string; takenAt: string }) {
-    try {
-      const response = await apiClient.post(`/barcode/record/${medicationId}`, data);
-      return response.data.data;
-    } catch (error: any) {
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      }
-      throw new Error('Failed to record medication. Please try again.');
+  try {
+    console.log('API: Recording medication taken via barcode:', medicationId, data);
+    // Keep using barcode endpoint but with same logic as home screen
+    const response = await apiClient.post(`/barcode/record/${medicationId}`, data);
+    console.log('API: Record successful:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('API: Record error:', error);
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
     }
-};
+    throw new Error('Failed to record medication. Please try again.');
+  }
+}
 
   // Meal Times
   async getMealTimes(): Promise<MealTime[]> {

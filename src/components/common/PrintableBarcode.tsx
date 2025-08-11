@@ -18,7 +18,7 @@ import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { Picker } from '@react-native-picker/picker';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
-import { generateBarcodeHTML, generateBarcodePattern } from '../../utils/barcodeUtils';
+import BarcodeDisplay from './BarcodeDisplay';
 
 interface BarcodeData {
   patientName: string;
@@ -74,26 +74,9 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
   // Use first barcode for single print mode
   const singleBarcode = barcodes[0];
 
-  const generateBarcodeStripes = (barcodeText: string) => {
-  const pattern = generateBarcodePattern(barcodeText);
-  return pattern.map((bar, index) => (
-    <View
-      key={index}
-      style={[
-        styles.barcodeStripe,
-        {
-          width: bar.width,
-          backgroundColor: bar.isVisible ? '#000000' : 'transparent',
-        }
-      ]}
-    />
-  ));
-};
-
   const generateSingleBarcodeHTML = (barcode: BarcodeData, labelSize: keyof typeof LABEL_SIZES) => {
   const size = LABEL_SIZES[labelSize];
   const barcodeHeight = labelSize === 'small' ? 30 : labelSize === 'medium' ? 35 : 40;
-  const barcodeId = `barcode-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   
   return `
     <div class="barcode-label" style="
@@ -120,7 +103,7 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
       ">${barcode.patientName}</div>
       
       <div style="display: flex; justify-content: center; margin: 8px 0;">
-        <canvas id="${barcodeId}" style="max-width: ${size.width - 20}px; height: ${barcodeHeight}px;"></canvas>
+        <svg id="barcode-${barcode.barcodeData}" width="${size.width - 20}" height="${barcodeHeight}"></svg>
       </div>
       
       <div class="barcode-data" style="
@@ -149,68 +132,28 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
         margin-top: 2px;
       ">MediTracker</div>
     </div>
-    
-    <script>
-      console.log('Generating barcode for: "${barcode.barcodeData}"');
-      
-      if (typeof JsBarcode !== 'undefined') {
-        try {
-          const canvas = document.getElementById("${barcodeId}");
-          
-          // CRITICAL: Make sure we encode exactly what we want
-          JsBarcode(canvas, "${barcode.barcodeData}", {
-            format: "CODE128",
-            width: 2,
-            height: ${barcodeHeight},
-            displayValue: false,  // Don't show text below (we show it separately)
-            margin: 2,
-            background: "#ffffff",
-            lineColor: "#000000"
-          });
-          
-          console.log('Successfully generated barcode for: "${barcode.barcodeData}"');
-          
-        } catch (e) {
-          console.error('Barcode generation failed for "${barcode.barcodeData}":', e);
-          
-          // Fallback: Show text-only version
-          const canvas = document.getElementById("${barcodeId}");
-          canvas.style.border = "1px solid red";
-          canvas.style.padding = "10px";
-          canvas.style.fontSize = "12px";
-          canvas.innerHTML = "ERROR: ${barcode.barcodeData}";
-        }
-      } else {
-        console.error('JsBarcode library not loaded');
-        const canvas = document.getElementById("${barcodeId}");
-        canvas.style.border = "1px solid orange";
-        canvas.style.padding = "10px";
-        canvas.innerHTML = "JSBARCODE NOT LOADED: ${barcode.barcodeData}";
-      }
-    </script>
   `;
 };
 
   const generateBulkPrintHTML = () => {
-    const paper = PAPER_SIZES[printSettings.paperSize];
-    const isLandscape = printSettings.orientation === 'landscape';
-    const pageWidth = isLandscape ? paper.height : paper.width;
-    const pageHeight = isLandscape ? paper.width : paper.height;
+  const paper = PAPER_SIZES[printSettings.paperSize];
+  const isLandscape = printSettings.orientation === 'landscape';
+  const pageWidth = isLandscape ? paper.height : paper.width;
+  const pageHeight = isLandscape ? paper.width : paper.height;
 
-    const labelSize = LABEL_SIZES[printSettings.labelSize];
-    const labelsPerRow = printSettings.labelsPerRow;
-    
-    // Calculate how many labels fit per page
-    const rowHeight = labelSize.height + 20; // Add margin
-    const labelsPerPage = Math.floor((pageHeight - 40) / rowHeight) * labelsPerRow;
+  const labelSize = LABEL_SIZES[printSettings.labelSize];
+  const labelsPerRow = printSettings.labelsPerRow;
+  
+  const rowHeight = labelSize.height + 20;
+  const labelsPerPage = Math.floor((pageHeight - 40) / rowHeight) * labelsPerRow;
 
-    return `
-       <!DOCTYPE html>
+  return `
+    <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
       <title>Medication Barcodes - Bulk Print</title>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
       <style>
         @page {
           size: ${printSettings.paperSize} ${printSettings.orientation};
@@ -246,33 +189,60 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
         }
       </style>
     </head>
-      <body>
-        ${Math.ceil(barcodes.length / labelsPerPage) === 1 ? 
-          `<div class="page">
-             <div class="page-header">MediTracker - Medication Labels (${barcodes.length} items)</div>
-             <div class="labels-container">
-               ${barcodes.map(barcode => generateSingleBarcodeHTML(barcode, printSettings.labelSize)).join('')}
-             </div>
-           </div>` :
-          Array.from({ length: Math.ceil(barcodes.length / labelsPerPage) }, (_, pageIndex) => {
-            const startIndex = pageIndex * labelsPerPage;
-            const endIndex = Math.min(startIndex + labelsPerPage, barcodes.length);
-            const pageItems = barcodes.slice(startIndex, endIndex);
-            
-            return `
-              <div class="page">
-                <div class="page-header">MediTracker - Medication Labels (Page ${pageIndex + 1})</div>
-                <div class="labels-container">
-                  ${pageItems.map(barcode => generateSingleBarcodeHTML(barcode, printSettings.labelSize)).join('')}
-                </div>
+    <body onload="generateAllBarcodes()">
+      ${Math.ceil(barcodes.length / labelsPerPage) === 1 ? 
+        `<div class="page">
+           <div class="page-header">MediTracker - Medication Labels (${barcodes.length} items)</div>
+           <div class="labels-container">
+             ${barcodes.map(barcode => generateSingleBarcodeHTML(barcode, printSettings.labelSize)).join('')}
+           </div>
+         </div>` :
+        Array.from({ length: Math.ceil(barcodes.length / labelsPerPage) }, (_, pageIndex) => {
+          const startIndex = pageIndex * labelsPerPage;
+          const endIndex = Math.min(startIndex + labelsPerPage, barcodes.length);
+          const pageItems = barcodes.slice(startIndex, endIndex);
+          
+          return `
+            <div class="page">
+              <div class="page-header">MediTracker - Medication Labels (Page ${pageIndex + 1})</div>
+              <div class="labels-container">
+                ${pageItems.map(barcode => generateSingleBarcodeHTML(barcode, printSettings.labelSize)).join('')}
               </div>
-            `;
-          }).join('')
+            </div>
+          `;
+        }).join('')
+      }
+      
+      <script>
+        function generateAllBarcodes() {
+          if (typeof JsBarcode === 'undefined') {
+            setTimeout(generateAllBarcodes, 100);
+            return;
+          }
+          
+          document.querySelectorAll('[id^="barcode-"]').forEach(function(element) {
+            const barcodeData = element.id.replace('barcode-', '');
+            try {
+              JsBarcode(element, barcodeData, {
+                format: "CODE128",
+                width: 2,
+                height: ${LABEL_SIZES[printSettings.labelSize].height * 0.4},
+                displayValue: false,
+                margin: 0,
+                background: "#ffffff",
+                lineColor: "#000000"
+              });
+            } catch (e) {
+              console.error('Failed to generate barcode:', barcodeData, e);
+              element.innerHTML = '<text x="50%" y="50%" text-anchor="middle" font-family="monospace">' + barcodeData + '</text>';
+            }
+          });
         }
-      </body>
-      </html>
-    `;
-  };
+      </script>
+    </body>
+    </html>
+  `;
+};
 
   const handlePrint = async () => {
     try {
@@ -642,13 +612,11 @@ const PrintSettingsModal = () => (
                 </View>
 
                 <View style={styles.barcodeContainer}>
-                  <View style={styles.barcodeStripes}>
-                    {generateBarcodeStripes(singleBarcode.barcodeData)}
-                  </View>
-                </View>
-
-                <View style={styles.barcodeDataContainer}>
-                  <Text style={styles.barcodeDataText}>{singleBarcode.barcodeData}</Text>
+                  <BarcodeDisplay 
+                    barcodeData= {singleBarcode.barcodeData}
+                    size='medium'
+                    showData={true}
+                  />
                 </View>
 
                 <View style={styles.footerContainer}>

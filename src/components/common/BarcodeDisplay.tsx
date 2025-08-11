@@ -1,7 +1,6 @@
-// src/components/common/BarcodeDisplay.tsx
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { generateBarcodePattern } from '../../utils/barcodeUtils';
+import { WebView } from 'react-native-webview';
 import { SPACING, RADIUS } from '../../constants/themes/theme';
 
 interface BarcodeDisplayProps {
@@ -17,34 +16,65 @@ const BarcodeDisplay: React.FC<BarcodeDisplayProps> = ({
   size = 'medium',
   style
 }) => {
-  const pattern = generateBarcodePattern(barcodeData);
-  
   const sizeConfig = {
-    small: { height: 30, fontSize: 10, spacing: 2 },
-    medium: { height: 40, fontSize: 12, spacing: 3 },
-    large: { height: 50, fontSize: 14, spacing: 4 }
+    small: { height: 60, fontSize: 10, width: 200 },
+    medium: { height: 80, fontSize: 12, width: 250 },
+    large: { height: 100, fontSize: 14, width: 300 }
   };
   
   const config = sizeConfig[size];
 
+  const barcodeHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+      <style>
+        body { 
+          margin: 0; 
+          padding: 10px; 
+          display: flex; 
+          justify-content: center; 
+          align-items: center; 
+          height: 100vh; 
+          background: transparent;
+        }
+        #barcode { background: white; }
+      </style>
+    </head>
+    <body>
+      <svg id="barcode"></svg>
+      <script>
+        try {
+          JsBarcode("#barcode", "${barcodeData}", {
+            format: "CODE128",
+            width: 2,
+            height: ${config.height - 20},
+            displayValue: false,
+            margin: 10,
+            background: "#ffffff",
+            lineColor: "#000000"
+          });
+        } catch (e) {
+          document.body.innerHTML = '<div style="font-family: monospace; padding: 10px; border: 1px solid #ccc; background: white;">${barcodeData}</div>';
+        }
+      </script>
+    </body>
+    </html>
+  `;
+
   return (
     <View style={[styles.container, style]}>
-      <View style={[styles.barcodeContainer, { height: config.height + config.spacing * 2 }]}>
-        <View style={styles.barcodeStripes}>
-          {pattern.map((bar, index) => (
-            <View
-              key={index}
-              style={[
-                styles.barcodeStripe,
-                {
-                  width: bar.width,
-                  height: config.height,
-                  backgroundColor: bar.isVisible ? '#000000' : 'transparent',
-                }
-              ]}
-            />
-          ))}
-        </View>
+      <View style={[styles.barcodeContainer, { height: config.height, width: config.width }]}>
+        <WebView
+          source={{ html: barcodeHTML }}
+          style={styles.webview}
+          scrollEnabled={false}
+          showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
+          javaScriptEnabled={true}
+        />
       </View>
       
       {showData && (
@@ -61,23 +91,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   barcodeContainer: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.md,
-    padding: SPACING[2],
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 200,
   },
-  barcodeStripes: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 0,
-  },
-  barcodeStripe: {
-    // Styles will be applied dynamically
+  webview: {
+    backgroundColor: 'transparent',
   },
   barcodeText: {
     fontFamily: 'monospace',

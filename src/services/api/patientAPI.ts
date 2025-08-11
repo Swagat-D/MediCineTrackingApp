@@ -115,11 +115,35 @@ class PatientAPI {
     return response.data;
   }
 
-  // Barcode Scanning
-  async scanMedicationBarcode(barcodeData: string): Promise<BarcodeData> {
-    const response = await apiClient.get(`/barcode/scan/${encodeURIComponent(barcodeData)}`);
+
+  async scanMedicationBarcode(barcodeData: string) {
+  try {
+    console.log('API: Scanning barcode:', barcodeData);
+    const response = await apiClient.get(`/barcode/scan/${barcodeData}`);
+    console.log('API: Scan successful:', response.data);
     return response.data.data;
+  } catch (error: any) {
+    console.error('API: Scan error:', error);
+    console.error('API: Error response:', error.response?.data);
+    
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    }
+    throw new Error('Failed to scan barcode. Please try again.');
   }
+}
+
+  async recordMedicationTaken(medicationId: string, data: { notes?: string; takenAt: string }) {
+    try {
+      const response = await apiClient.post(`/barcode/record/${medicationId}`, data);
+      return response.data.data;
+    } catch (error: any) {
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw new Error('Failed to record medication. Please try again.');
+    }
+};
 
   // Meal Times
   async getMealTimes(): Promise<MealTime[]> {
@@ -212,6 +236,7 @@ async getRecentActivities(): Promise<{
   const response = await apiClient.get('/patient/caregivers');
   return response.data.data;
 }
+
 
   async requestCaregiverConnection(caregiverEmail: string, message?: string): Promise<{ message: string; success: boolean }> {
     const response = await apiClient.post('/patient/caregiver-request', {

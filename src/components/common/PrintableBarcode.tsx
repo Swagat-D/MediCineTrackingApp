@@ -93,6 +93,7 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
   const generateSingleBarcodeHTML = (barcode: BarcodeData, labelSize: keyof typeof LABEL_SIZES) => {
   const size = LABEL_SIZES[labelSize];
   const barcodeHeight = labelSize === 'small' ? 30 : labelSize === 'medium' ? 35 : 40;
+  const barcodeId = `barcode-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   
   return `
     <div class="barcode-label" style="
@@ -118,16 +119,19 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
         white-space: nowrap;
       ">${barcode.patientName}</div>
       
-      ${generateBarcodeHTML(barcode.barcodeData, size.width - 20, barcodeHeight)}
+      <div style="display: flex; justify-content: center; margin: 8px 0;">
+        <canvas id="${barcodeId}" style="max-width: ${size.width - 20}px; height: ${barcodeHeight}px;"></canvas>
+      </div>
       
       <div class="barcode-data" style="
-        font-family: 'Courier New', monospace; 
         font-size: ${labelSize === 'small' ? '8px' : labelSize === 'medium' ? '9px' : '10px'}; 
-        font-weight: bold; 
-        letter-spacing: 0.5px; 
-        margin: 4px 0;
-        word-break: break-all;
-        line-height: 1.2;
+        color: #666;
+        margin-top: 4px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-family: monospace;
+        font-weight: bold;
       ">${barcode.barcodeData}</div>
       
       <div class="medication-info" style="
@@ -139,14 +143,51 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
         white-space: nowrap;
       ">${barcode.medicationName}</div>
       
-      ${barcode.dosage ? `<div style="font-size: ${labelSize === 'small' ? '7px' : '8px'}; color: #888;">${barcode.dosage} • ${barcode.frequency || ''}</div>` : ''}
-      
       <div class="footer" style="
         font-size: ${labelSize === 'small' ? '6px' : '7px'};
         color: #999;
         margin-top: 2px;
       ">MediTracker</div>
     </div>
+    
+    <script>
+      console.log('Generating barcode for: "${barcode.barcodeData}"');
+      
+      if (typeof JsBarcode !== 'undefined') {
+        try {
+          const canvas = document.getElementById("${barcodeId}");
+          
+          // CRITICAL: Make sure we encode exactly what we want
+          JsBarcode(canvas, "${barcode.barcodeData}", {
+            format: "CODE128",
+            width: 2,
+            height: ${barcodeHeight},
+            displayValue: false,  // Don't show text below (we show it separately)
+            margin: 2,
+            background: "#ffffff",
+            lineColor: "#000000"
+          });
+          
+          console.log('Successfully generated barcode for: "${barcode.barcodeData}"');
+          
+        } catch (e) {
+          console.error('Barcode generation failed for "${barcode.barcodeData}":', e);
+          
+          // Fallback: Show text-only version
+          const canvas = document.getElementById("${barcodeId}");
+          canvas.style.border = "1px solid red";
+          canvas.style.padding = "10px";
+          canvas.style.fontSize = "12px";
+          canvas.innerHTML = "ERROR: ${barcode.barcodeData}";
+        }
+      } else {
+        console.error('JsBarcode library not loaded');
+        const canvas = document.getElementById("${barcodeId}");
+        canvas.style.border = "1px solid orange";
+        canvas.style.padding = "10px";
+        canvas.innerHTML = "JSBARCODE NOT LOADED: ${barcode.barcodeData}";
+      }
+    </script>
   `;
 };
 
@@ -164,46 +205,47 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
     const labelsPerPage = Math.floor((pageHeight - 40) / rowHeight) * labelsPerRow;
 
     return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Medication Barcodes - Bulk Print</title>
-        <style>
-          @page {
-            size: ${printSettings.paperSize} ${printSettings.orientation};
-            margin: 20px;
-          }
-          body { 
-            font-family: Arial, sans-serif; 
-            margin: 0; 
-            padding: 0;
-          }
-          .page {
-            width: ${pageWidth - 40}px;
-            min-height: ${pageHeight - 40}px;
-            page-break-after: always;
-          }
-          .page:last-child {
-            page-break-after: avoid;
-          }
-          .labels-container {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: flex-start;
-            align-content: flex-start;
-            gap: 10px;
-          }
-          .page-header {
-            text-align: center;
-            margin-bottom: 15px;
-            font-size: 14px;
-            color: #666;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 10px;
-          }
-        </style>
-      </head>
+       <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Medication Barcodes - Bulk Print</title>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+      <style>
+        @page {
+          size: ${printSettings.paperSize} ${printSettings.orientation};
+          margin: 20px;
+        }
+        body { 
+          font-family: Arial, sans-serif; 
+          margin: 0; 
+          padding: 0;
+        }
+        .page {
+          width: ${pageWidth - 40}px;
+          min-height: ${pageHeight - 40}px;
+          page-break-after: always;
+        }
+        .page:last-child {
+          page-break-after: avoid;
+        }
+        .labels-container {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: flex-start;
+          align-content: flex-start;
+          gap: 10px;
+        }
+        .page-header {
+          text-align: center;
+          margin-bottom: 15px;
+          font-size: 14px;
+          color: #666;
+          border-bottom: 1px solid #ddd;
+          padding-bottom: 10px;
+        }
+      </style>
+    </head>
       <body>
         ${Math.ceil(barcodes.length / labelsPerPage) === 1 ? 
           `<div class="page">

@@ -1,77 +1,115 @@
+/**
+ * Generate a structured barcode data string that contains all medication info
+ */
+export const generateMedicationBarcodeData = (medicationData: {
+  patientId: string;
+  medicationId: string;
+  medicationName: string;
+  dosage: string;
+  frequency: string;
+}): string => {
+  // Create a structured barcode that can be parsed
+  // Format: MED|PatientID|MedicationID|Name|Dosage|Frequency
+  return `MED|${medicationData.patientId}|${medicationData.medicationId}|${medicationData.medicationName}|${medicationData.dosage}|${medicationData.frequency}`;
+};
 
 /**
- * Generates a consistent barcode pattern based on the barcode data string
- * This ensures the same barcode data always produces the same visual pattern
+ * Parse barcode data to extract medication information  
+ */
+export const parseMedicationBarcodeData = (barcodeData: string) => {
+  try {
+    const parts = barcodeData.split('|');
+    
+    if (parts[0] !== 'MED' || parts.length !== 6) {
+      throw new Error('Invalid medication barcode format');
+    }
+    
+    return {
+      type: parts[0],
+      patientId: parts[1], 
+      medicationId: parts[2],
+      medicationName: parts[3],
+      dosage: parts[4],
+      frequency: parts[5]
+    };
+  } catch (error) {
+    console.error(error)
+    throw new Error('Unable to parse barcode data');
+  }
+};
+
+/**
+ * Validate short barcode format on frontend
+ */
+export const isValidShortBarcode = (barcodeData: string): boolean => {
+  // Check if it's MT followed by exactly 8 characters
+  return barcodeData.startsWith('MT') && barcodeData.length === 10 && /^MT[A-Z0-9]{8}$/.test(barcodeData);
+};
+
+/**
+ * Generate display barcode pattern for short format
  */
 export const generateBarcodePattern = (barcodeData: string): {width: number, isVisible: boolean}[] => {
+  if (!barcodeData || barcodeData.length === 0) {
+    return [];
+  }
+
   const pattern = [];
-  const cleanData = barcodeData.replace(/[^A-Z0-9_]/g, ''); // Clean the barcode data
   
-  // Use a consistent algorithm to generate pattern
-  for (let i = 0; i < Math.min(cleanData.length, 35); i++) {
-    const char = cleanData[i];
+  // Add start pattern
+  pattern.push({ width: 2, isVisible: true });
+  pattern.push({ width: 1, isVisible: false });
+  
+  // Encode each character of the short barcode
+  for (let i = 0; i < barcodeData.length; i++) {
+    const char = barcodeData[i];
     const charCode = char.charCodeAt(0);
     
-    // Create consistent width and visibility based on character
-    const width = (charCode % 3) + 1; // 1, 2, or 3 pixels wide
-    const isVisible = (charCode % 2 === 0) || (charCode % 7 === 0); // Consistent visibility pattern
+    // Create pattern based on character
+    const bars = [
+      { width: 1, isVisible: true },
+      { width: 1, isVisible: charCode % 2 === 0 },
+      { width: 1, isVisible: true },
+      { width: 1, isVisible: charCode % 3 === 0 }
+    ];
     
-    pattern.push({ width, isVisible });
+    pattern.push(...bars);
     
-    // Add separator between characters for better readability
-    if (i < cleanData.length - 1) {
+    // Add separator between characters
+    if (i < barcodeData.length - 1) {
       pattern.push({ width: 1, isVisible: false });
     }
   }
   
+  // Add end pattern
+  pattern.push({ width: 1, isVisible: false });
+  pattern.push({ width: 2, isVisible: true });
+  
   return pattern;
 };
 
-/**
- * Generates SVG barcode for high-quality rendering
- */
-export const generateBarcodeSVG = (barcodeData: string, width: number = 200, height: number = 50): string => {
-  const pattern = generateBarcodePattern(barcodeData);
-  let x = 0;
-  let bars = '';
-  
-  const totalPatternWidth = pattern.reduce((sum, bar) => sum + bar.width, 0);
-  const scaleX = width / totalPatternWidth;
-  
-  pattern.forEach(bar => {
-    if (bar.isVisible) {
-      bars += `<rect x="${x * scaleX}" y="0" width="${bar.width * scaleX}" height="${height}" fill="#000000"/>`;
-    }
-    x += bar.width;
-  });
+// Keep existing HTML generation functions for printing...
+export const generateBarcodeHTML = (barcodeData: string, width: number = 200, height: number = 40): string => {
+  const barcodeId = `barcode-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   
   return `
-    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100%" height="100%" fill="#FFFFFF"/>
-      ${bars}
-    </svg>
+    <div style="display: flex; justify-content: center; align-items: center; padding: 5px;">
+      <svg id="${barcodeId}" style="max-width: ${width}px; height: ${height}px;"></svg>
+    </div>
+    <script>
+      if (typeof JsBarcode !== 'undefined') {
+        try {
+          JsBarcode("#${barcodeId}", "${barcodeData}", {
+            format: "CODE128",
+            width: 2,
+            height: ${height},
+            displayValue: false,
+            margin: 0
+          });
+        } catch (e) {
+          console.error('Barcode generation failed:', e);
+        }
+      }
+    </script>
   `;
-};
-
-/**
- * Generates HTML for barcode rendering in print/PDF
- */
-export const generateBarcodeHTML = (barcodeData: string, width: number = 200, height: number = 40): string => {
-  const pattern = generateBarcodePattern(barcodeData);
-  let html = '';
-  
-  const totalPatternWidth = pattern.reduce((sum, bar) => sum + bar.width, 0);
-  const scaleX = width / totalPatternWidth;
-  
-  pattern.forEach(bar => {
-    const barWidth = bar.width * scaleX;
-    html += `<div style="
-      width: ${barWidth}px;
-      height: ${height}px;
-      background-color: ${bar.isVisible ? '#000000' : 'transparent'};
-      display: inline-block;
-    "></div>`;
-  });
-  
-  return `<div style="display: flex; align-items: center; justify-content: center; background: #f0f0f0; border: 1px solid #ccc; height: ${height + 10}px; padding: 5px;">${html}</div>`;
 };

@@ -78,58 +78,113 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation, permission]);
 
+  const testSpecificBarcode = () => {
+  const testData = 'MT6A569929'; // Your exact barcode from screenshot
+  console.log('Testing barcode manually:', testData);
+  handleBarCodeScanned({ type: 'manual', data: testData });
+};
+  
   const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
-    if (scanned || isScanningBarcode || !isActive) return;
+  if (scanned || isScanningBarcode || !isActive) return;
+  
+  setScanned(true);
+  dispatch(setScanningBarcode(true));
+  
+  // Haptic feedback
+  try {
+    if (Platform.OS === 'ios') {
+      Vibration.vibrate([100]);
+    } else {
+      Vibration.vibrate(200);
+    }
+  } catch (error) {
+    console.error(error)
+    console.log('Vibration not available');
+  }
+
+  try {
+    // DETAILED LOGGING
+    console.log('=== BARCODE SCAN DEBUG ===');
+    console.log('Raw scanned data:', JSON.stringify(data));
+    console.log('Data length:', data.length);
+    console.log('Starts with MT:', data.startsWith('MT'));
+    console.log('Character codes:', data.split('').map(char => `${char}:${char.charCodeAt(0)}`));
+    console.log('=========================');
     
-    setScanned(true);
-    dispatch(setScanningBarcode(true));
+    // Check for hidden characters or whitespace
+    const trimmedData = data.trim();
+    console.log('Trimmed data:', JSON.stringify(trimmedData));
+    console.log('Trimmed length:', trimmedData.length);
     
-    // Haptic feedback
-    try {
-      if (Platform.OS === 'ios') {
-        Vibration.vibrate([100]);
-      } else {
-        Vibration.vibrate(200);
-      }
-    } catch (error) {
-      console.error(error)
-      console.log('Vibration not available');
+    // Validate barcode format - use trimmed data
+    if (!trimmedData || !trimmedData.startsWith('MT') || trimmedData.length !== 10) {
+      console.log('VALIDATION FAILED:');
+      console.log('- Has data:', !!trimmedData);
+      console.log('- Starts with MT:', trimmedData.startsWith('MT'));
+      console.log('- Length is 10:', trimmedData.length === 10);
+      throw new Error(`Invalid medication barcode. Please scan a valid MediTracker barcode. Got: "${trimmedData}" (length: ${trimmedData.length})`);
     }
 
-    try {
-      console.log('Scanned barcode:', { type, data });
-      
-      // Validate barcode data
-      if (!data || data.trim() === '') {
-        throw new Error('Invalid barcode data');
-      }
-
-      const result = await patientAPI.scanMedicationBarcode(data);
-      dispatch(setScannedBarcodeData(result));
-      showMedicationDialog(result);
-    } catch (error: any) {
-      console.error('Barcode scan error:', error);
-      dispatch(setError(error.message));
-      
-      Alert.alert(
-        'Scan Failed',
-        error.message || 'Failed to scan barcode. Please try again.',
-        [
-          { text: 'Retry', onPress: resetScanner },
-          { text: 'Cancel', onPress: () => navigation.goBack() }
-        ]
-      );
-    } finally {
-      dispatch(setScanningBarcode(false));
-    }
-  };
-
-  const showMedicationDialog = (data: any) => {
-    const { medication } = data;
+    // Call API with the trimmed barcode data
+    const result = await patientAPI.scanMedicationBarcode(trimmedData);
+    dispatch(setScannedBarcodeData(result));
+    showMedicationDialog(result);
+  } catch (error: any) {
+    console.error('Barcode scan error:', error);
+    dispatch(setError(error.message));
     
     Alert.alert(
-      'Medication Found',
-      `${medication.name} (${medication.dosage}${medication.dosageUnit})\n\nInstructions: ${medication.instructions || 'No special instructions'}\n\nDays left: ${medication.daysLeft}\n\nTake this medication now?`,
+      'Scan Failed',
+      error.message || 'Failed to scan barcode. Please try again.',
+      [
+        { text: 'Retry', onPress: resetScanner },
+        { text: 'Cancel', onPress: () => navigation.goBack() }
+      ]
+    );
+  } finally {
+    dispatch(setScanningBarcode(false));
+  }
+};
+
+const showMedicationDialog = (data: any) => {
+  const { medication, dosingSafety } = data;
+  
+  if (!dosingSafety.canTake) {
+    // RED LIGHT - Cannot take medication
+    Alert.alert(
+      '🔴 STOP - Do Not Take',
+      `${medication.name} (${medication.dosage}${medication.dosageUnit})\n\n❌ ${dosingSafety.reason}\n\n` +
+      `${dosingSafety.nextDoseTime ? 
+        `Next dose: ${new Date(dosingSafety.nextDoseTime).toLocaleTimeString()}\n` +
+        `Time remaining: ${dosingSafety.hoursRemaining} hours` 
+        : ''}\n\n` +
+      `Last taken: ${medication.lastTaken ? 
+        new Date(medication.lastTaken).toLocaleString() : 'Never'}\n\n` +
+      `⚠️ Taking this medication now could be dangerous.`,
+      [
+        {
+          text: 'I Understand',
+          style: 'default',
+          onPress: resetScanner,
+        },
+        {
+          text: 'Emergency Override',
+          style: 'destructive',
+          onPress: () => showEmergencyOverride(medication),
+        },
+      ]
+    );
+  } else {
+    // GREEN LIGHT - Safe to take medication
+    Alert.alert(
+      '🟢 SAFE TO TAKE',
+      `${medication.name} (${medication.dosage}${medication.dosageUnit})\n\n` +
+      `✅ Safe to take now\n\n` +
+      `Frequency: ${medication.frequency} times daily\n` +
+      `Timing: ${dosingSafety.recommendedTiming}\n` +
+      `Instructions: ${medication.instructions || 'Take as directed'}\n\n` +
+      `Days left: ${medication.daysLeft}\n\n` +
+      `Take this medication now?`,
       [
         {
           text: 'Not Now',
@@ -137,38 +192,66 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
           onPress: resetScanner,
         },
         {
-          text: 'Take Now',
+          text: '✅ Take Medication',
           style: 'default',
           onPress: () => confirmMedicationTaken(medication),
         },
       ]
     );
-  };
+  }
+};
 
-  const confirmMedicationTaken = async (medication: any) => {
-    try {
-      await patientAPI.logMedicationTaken(medication.id, {
-        takenAt: new Date().toISOString(),
-        notes: 'Taken via barcode scan'
-      });
+const showEmergencyOverride = (medication: any) => {
+  Alert.alert(
+    '⚠️ Emergency Override',
+    'This should only be used in medical emergencies or under doctor supervision.\n\nAre you sure you want to record this dose?',
+    [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+        onPress: resetScanner,
+      },
+      {
+        text: 'Emergency Take',
+        style: 'destructive',
+        onPress: () => confirmMedicationTaken(medication, true),
+      },
+    ]
+  );
+};
 
-      Alert.alert(
-        'Dose Recorded',
-        `Your ${medication.name} dose has been logged successfully.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              resetScanner();
-              navigation.navigate('Home');
-            },
+const confirmMedicationTaken = async (medication: any, isEmergency = false) => {
+  try {
+    await patientAPI.recordMedicationTaken(medication.id, {
+      notes: isEmergency ? 'Emergency override dose' : 'Taken via barcode scan',
+      takenAt: new Date().toISOString()
+    });
+
+    Alert.alert(
+      '✅ Dose Recorded',
+      `Your ${medication.name} dose has been logged successfully.\n\n` +
+      `Taken at: ${new Date().toLocaleTimeString()}\n` +
+      `Remaining quantity: ${medication.remainingQuantity - 1}\n` +
+      `Days left: ${Math.floor((medication.remainingQuantity - 1) / medication.frequency)}`,
+      [
+        {
+          text: 'OK',
+          onPress: () => {
+            resetScanner();
+            navigation.navigate('Home');
           },
-        ]
-      );
-    } catch (error: any) {
-      Alert.alert('Error', error.message, [{ text: 'OK', onPress: resetScanner }]);
-    }
-  };
+        },
+      ]
+    );
+  } catch (error: any) {
+    Alert.alert(
+      'Error', 
+      error.message || 'Failed to record medication. Please try again.',
+      [{ text: 'OK', onPress: resetScanner }]
+    );
+  }
+};
+  
 
   const resetScanner = () => {
     setScanned(false);
@@ -336,6 +419,13 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
                   <Ionicons name="refresh" size={20} color="#FFFFFF" />
                   <Text style={styles.controlButtonText}>Reset</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+  style={[styles.controlButton, styles.resetButton, { backgroundColor: 'orange' }]}
+  onPress={testSpecificBarcode}
+>
+  <Text style={styles.controlButtonText}>Test MT6A569929</Text>
+</TouchableOpacity>
 
                 <TouchableOpacity
                   style={[styles.controlButton, styles.flipButton]}

@@ -77,12 +77,6 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation, permission]);
-
-  const testSpecificBarcode = () => {
-  const testData = 'MT6A569929'; // Your exact barcode from screenshot
-  console.log('Testing barcode manually:', testData);
-  handleBarCodeScanned({ type: 'manual', data: testData });
-};
   
   const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
   if (scanned || isScanningBarcode || !isActive) return;
@@ -424,13 +418,6 @@ const confirmMedicationTaken = async (medication: any, isEmergency = false) => {
                   <Ionicons name="refresh" size={20} color="#FFFFFF" />
                   <Text style={styles.controlButtonText}>Reset</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-  style={[styles.controlButton, styles.resetButton, { backgroundColor: 'orange' }]}
-  onPress={testSpecificBarcode}
->
-  <Text style={styles.controlButtonText}>Test MT6A569929</Text>
-</TouchableOpacity>
 
                 <TouchableOpacity
                   style={[styles.controlButton, styles.flipButton]}

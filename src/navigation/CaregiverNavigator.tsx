@@ -43,6 +43,7 @@ const PatientsStack: React.FC = () => (
     <Stack.Screen name="AddPatient" component={AddPatientScreen} />
     <Stack.Screen name="PatientDetails" component={PatientDetailsScreen} />
     <Stack.Screen name="AddMedication" component={AddMedicationScreen} />
+    <Stack.Screen name="BarcodeGenerator" component={BarcodeGeneratorScreen} />
   </Stack.Navigator>
 );
 

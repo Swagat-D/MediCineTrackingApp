@@ -408,7 +408,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         {/* Today's Medications */}
         <View style={styles.medicationsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Today&s Medications</Text>
+            <Text style={styles.sectionTitle}>Today&apos;s Medications</Text>
             <TouchableOpacity onPress={() => navigation.navigate('Medications')}>
               <Text style={[styles.viewAllText, { color: theme.primary }]}>View All</Text>
             </TouchableOpacity>

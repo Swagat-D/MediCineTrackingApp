@@ -1,5 +1,4 @@
-// src/components/caregiver/CaregiverNavbar.tsx
-import React from 'react';
+import React, {useEffect} from 'react';
 import {
   View,
   Text,
@@ -10,6 +9,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TYPOGRAPHY, SPACING  } from '../../constants/themes/theme';
+import { useAppDispatch, useAppSelector } from '../../store';
+import { fetchNotificationCount } from '../../store/slices/notificationSlice';
 
 interface NavbarProps {
   title?: string;
@@ -27,9 +28,28 @@ const CaregiverNavbar: React.FC<NavbarProps> = ({
   onBackPress,
   onNotificationPress,
   onSettingsPress,
-  notificationCount = 0,
+  notificationCount,
   rightActions,
 }) => {
+
+  const dispatch = useAppDispatch();
+  const { unreadCount } = useAppSelector(state => state.notification);
+  const { user } = useAppSelector(state => state.auth);
+
+  useEffect(() => {
+    // Fetch notification count when component mounts
+    if (user?.role === 'caregiver') {
+      dispatch(fetchNotificationCount('caregiver'));
+    }
+  }, [dispatch, user?.role]);
+
+  // Add this function to handle notification press
+  const handleNotificationPress = () => {
+    if (onNotificationPress) {
+      onNotificationPress();
+    }
+  };
+
   return (
     <View style={styles.navbarContainer}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -65,16 +85,15 @@ const CaregiverNavbar: React.FC<NavbarProps> = ({
               )}
               
               {onNotificationPress && (
-                <TouchableOpacity
-                  style={[styles.navButton, notificationCount > 0 && styles.notificationActive]}
-                  onPress={onNotificationPress}
-                  activeOpacity={0.7}
+                <TouchableOpacity 
+                  style={styles.navButton} 
+                  onPress={handleNotificationPress}
                 >
-                  <Ionicons name="notifications-outline" size={22} color="#475569" />
-                  {notificationCount > 0 && (
+                  <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
+                  {unreadCount > 0 && (
                     <View style={styles.notificationBadge}>
-                      <Text style={styles.badgeText}>
-                        {notificationCount > 9 ? '9+' : notificationCount}
+                      <Text style={styles.notificationBadgeText}>
+                        {unreadCount > 99 ? '99+' : unreadCount}
                       </Text>
                     </View>
                   )}
@@ -180,10 +199,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
-  badgeText: {
-    fontSize: 10,
+  notificationBadgeText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
 

@@ -1,4 +1,3 @@
-// src/screens/shared/NotificationsScreen.tsx
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -18,109 +17,35 @@ import CaregiverSecondaryNavbar from '../../components/common/SecondaryNavbar';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import { useAppDispatch, useAppSelector } from '../../store';
-import { markAsRead, markAllAsRead, removeNotification } from '../../store/slices/notificationSlice';
+import { 
+  fetchNotifications, 
+  markNotificationAsRead, 
+  markAllNotificationsAsRead,
+  removeNotification,
+  clearError
+} from '../../store/slices/notificationSlice';
 
 const { width } = Dimensions.get('window');
 
 interface Notification {
   id: string;
-  type: 'medication_reminder' | 'refill_reminder' | 'sos_alert' | 'missed_dose' | 'low_stock' | 'system' | 'adherence_report' | 'dose_taken';
+  type: string;
   title: string;
   message: string;
-  timestamp: string;
   isRead: boolean;
   priority: 'low' | 'medium' | 'high' | 'critical';
-  relatedId?: string;
-  actionable?: boolean;
+  createdAt: string;
+  data?: any;
 }
 
 const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector(state => state.auth);
-  const isCaregiver = user?.role === 'caregiver';
+  const { notifications, unreadCount, isLoading, error } = useAppSelector(state => state.notification);
   
-  const [isLoading, setIsLoading] = useState(true);
+  const isCaregiver = user?.role === 'caregiver';
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'sos_alert',
-      title: isCaregiver ? 'Emergency Alert from Mary Johnson' : 'Emergency Alert Sent',
-      message: isCaregiver 
-        ? 'Patient triggered emergency alert and needs immediate assistance'
-        : 'Your emergency alert has been sent to your caregivers successfully',
-      timestamp: '2024-08-05T14:30:00Z',
-      isRead: false,
-      priority: 'critical',
-      relatedId: 'patient-2',
-      actionable: isCaregiver,
-    },
-    {
-      id: '2',
-      type: isCaregiver ? 'missed_dose' : 'medication_reminder',
-      title: isCaregiver ? 'Missed Medication Alert' : 'Medication Reminder',
-      message: isCaregiver 
-        ? 'John Smith missed morning Metformin dose. Last taken 18 hours ago'
-        : 'Time to take your Metformin 500mg. Remember to take it with food',
-      timestamp: '2024-08-05T12:15:00Z',
-      isRead: false,
-      priority: 'high',
-      relatedId: 'med-1',
-      actionable: true,
-    },
-    {
-      id: '3',
-      type: 'refill_reminder',
-      title: isCaregiver ? 'Medication Refill Required' : 'Medication Running Low',
-      message: isCaregiver 
-        ? 'Sarah Wilson\'s Atorvastatin supply is running low - only 3 days remaining'
-        : 'Your Atorvastatin is running low. Only 3 days remaining. Contact your pharmacy soon',
-      timestamp: '2024-08-05T09:45:00Z',
-      isRead: false,
-      priority: 'medium',
-      relatedId: 'med-3',
-      actionable: true,
-    },
-    {
-      id: '4',
-      type: isCaregiver ? 'dose_taken' : 'medication_reminder',
-      title: isCaregiver ? 'Medication Successfully Taken' : 'Next Dose Reminder',
-      message: isCaregiver 
-        ? 'Robert Davis successfully took Lisinopril 10mg at 2:30 PM today'
-        : 'Your next Lisinopril dose is due in 30 minutes at 3:00 PM',
-      timestamp: '2024-08-05T14:30:00Z',
-      isRead: true,
-      priority: 'low',
-      relatedId: 'med-2',
-      actionable: false,
-    },
-    {
-      id: '5',
-      type: 'adherence_report',
-      title: isCaregiver ? 'Weekly Patient Report' : 'Your Weekly Progress',
-      message: isCaregiver 
-        ? 'Your patients achieved 94% average medication adherence this week - great progress!'
-        : 'Excellent work! You achieved 94% medication adherence this week',
-      timestamp: '2024-08-05T08:00:00Z',
-      isRead: true,
-      priority: 'low',
-      relatedId: undefined,
-      actionable: false,
-    },
-    {
-      id: '6',
-      type: 'system',
-      title: 'App Update Available',
-      message: 'MediTracker version 1.2.0 is now available with improved barcode scanning and new features',
-      timestamp: '2024-08-04T16:20:00Z',
-      isRead: true,
-      priority: 'low',
-      relatedId: undefined,
-      actionable: true,
-    },
-  ]);
 
   const themeColors = {
     primary: isCaregiver ? '#059669' : '#2563EB',
@@ -131,17 +56,22 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   useEffect(() => {
     loadNotifications();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (error) {
+      Alert.alert('Error', error);
+      dispatch(clearError());
+    }
+  }, [error, dispatch]);
 
   const loadNotifications = async () => {
     try {
-      setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setIsLoading(false);
-    } catch (error) {
+      await dispatch(fetchNotifications(user?.role || 'patient')).unwrap();
+    } catch (error: any) {
       console.error('Error loading notifications:', error);
-      setIsLoading(false);
-      Alert.alert('Error', 'Failed to load notifications.');
+      // Error is handled by the slice
     }
   };
 
@@ -151,13 +81,16 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  const handleMarkAsRead = (notificationId: string) => {
-    setNotifications(prev =>
-      prev.map(notif =>
-        notif.id === notificationId ? { ...notif, isRead: true } : notif
-      )
-    );
-    dispatch(markAsRead(notificationId));
+  const handleMarkAsRead = async (notificationId: string) => {
+    try {
+      await dispatch(markNotificationAsRead({ 
+        notificationId, 
+        userRole: user?.role || 'patient' 
+      })).unwrap();
+    } catch (error: any) {
+      console.error('Error marking notification as read:', error);
+      Alert.alert('Error', 'Failed to mark notification as read');
+    }
   };
 
   const handleMarkAllAsRead = () => {
@@ -168,11 +101,13 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Mark All',
-          onPress: () => {
-            setNotifications(prev =>
-              prev.map(notif => ({ ...notif, isRead: true }))
-            );
-            dispatch(markAllAsRead());
+          onPress: async () => {
+            try {
+              await dispatch(markAllNotificationsAsRead(user?.role || 'patient')).unwrap();
+            } catch (error: any) {
+              console.error('Error marking all as read:', error);
+              Alert.alert('Error', 'Failed to mark all notifications as read');
+            }
           }
         }
       ]
@@ -189,7 +124,6 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            setNotifications(prev => prev.filter(notif => notif.id !== notificationId));
             dispatch(removeNotification(notificationId));
           }
         }
@@ -198,104 +132,163 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   };
 
   const handleNotificationAction = (notification: Notification) => {
-    if (!notification.actionable) {
+    // Mark as read first
+    if (!notification.isRead) {
       handleMarkAsRead(notification.id);
-      return;
     }
 
-    switch (notification.type) {
-      case 'sos_alert':
-        if (isCaregiver) {
+    // Handle different notification types based on user role
+    if (isCaregiver) {
+      // Caregiver-specific actions
+      switch (notification.type) {
+        case 'sos_alert':
           Alert.alert(
             'Emergency Alert',
-            'Critical emergency - contact patient immediately',
+            `Critical emergency from ${(notification as any).patient?.name || 'patient'} - contact immediately`,
             [
-              { text: 'Call Now', onPress: () => Alert.alert('Calling...', 'Feature coming soon') },
-              { text: 'View Details', onPress: () => Alert.alert('Patient Details', 'Feature coming soon') },
-              { text: 'Dismiss', style: 'cancel', onPress: () => handleMarkAsRead(notification.id) },
+              { text: 'Call Patient', onPress: () => Alert.alert('Calling...', 'Feature coming soon') },
+              { text: 'View Patient', onPress: () => {
+                if ((notification as any).patient?.id) {
+                  navigation.navigate('PatientDetails', { patientId: (notification as any).patient.id });
+                }
+              }},
+              { text: 'Dismiss', style: 'cancel' },
             ]
           );
-        }
-        break;
-        
-      case 'missed_dose':
-        if (isCaregiver) {
+          break;
+          
+        case 'dose_missed':
           Alert.alert(
             'Missed Dose Alert',
-            'Send reminder to patient?',
+            `${(notification as any).patient?.name || 'Patient'} missed a medication dose`,
             [
               { text: 'Send Reminder', onPress: () => Alert.alert('Sent', 'Patient reminder sent') },
-              { text: 'View Details', onPress: () => Alert.alert('Medication', 'Feature coming soon') },
-              { text: 'Dismiss', style: 'cancel', onPress: () => handleMarkAsRead(notification.id) },
+              { text: 'View Patient', onPress: () => {
+                if ((notification as any).patient?.id) {
+                  navigation.navigate('PatientDetails', { patientId: (notification as any).patient.id });
+                }
+              }},
+              { text: 'Dismiss', style: 'cancel' },
             ]
           );
-        }
-        break;
+          break;
 
-      case 'medication_reminder':
-        if (!isCaregiver) {
+        case 'dose_taken':
           Alert.alert(
-            'Take Medication',
-            'Time for your medication. Scan barcode?',
+            'Medication Taken',
+            `${(notification as any).patient?.name || 'Patient'} has successfully taken their medication`,
             [
-              { text: 'Scan Now', onPress: () => navigation.navigate('BarcodeScanner') },
-              { text: 'Mark Taken', onPress: () => Alert.alert('Marked', 'Medication marked as taken') },
-              { text: 'Snooze 10min', style: 'cancel', onPress: () => Alert.alert('Snoozed', 'Reminder snoozed') },
+              { text: 'View Patient', onPress: () => {
+                if ((notification as any).patient?.id) {
+                  navigation.navigate('PatientDetails', { patientId: (notification as any).patient.id });
+                }
+              }},
+              { text: 'OK' }
             ]
           );
-        }
-        break;
-        
-      case 'refill_reminder':
-        Alert.alert(
-          'Refill Required',
-          'Medication running low. Contact pharmacy?',
-          [
-            { text: 'Call Pharmacy', onPress: () => Alert.alert('Calling', 'Feature coming soon') },
-            { text: 'View Details', onPress: () => Alert.alert('Medication', 'Feature coming soon') },
-            { text: 'Dismiss', style: 'cancel', onPress: () => handleMarkAsRead(notification.id) },
-          ]
-        );
-        break;
+          break;
 
-      case 'system':
-        Alert.alert(
-          'App Update',
-          'New version available. Update now?',
-          [
-            { text: 'Update', onPress: () => Alert.alert('Updating...', 'Feature coming soon') },
-            { text: 'Later', style: 'cancel', onPress: () => handleMarkAsRead(notification.id) },
-          ]
-        );
-        break;
-        
-      default:
-        handleMarkAsRead(notification.id);
+        case 'low_stock':
+          Alert.alert(
+            'Low Stock Alert',
+            `${(notification as any).patient?.name || 'Patient'}'s medication is running low`,
+            [
+              { text: 'View Medications', onPress: () => {
+                if ((notification as any).patient?.id) {
+                  navigation.navigate('PatientDetails', { patientId: (notification as any).patient.id });
+                }
+              }},
+              { text: 'Dismiss', style: 'cancel' },
+            ]
+          );
+          break;
+
+        case 'medication_added':
+          Alert.alert(
+            'Medication Added',
+            `New medication added for ${(notification as any).patient?.name || 'patient'}`,
+            [
+              { text: 'View Patient', onPress: () => {
+                if ((notification as any).patient?.id) {
+                  navigation.navigate('PatientDetails', { patientId: (notification as any).patient.id });
+                }
+              }},
+              { text: 'OK' }
+            ]
+          );
+          break;
+          
+        default:
+          // Just mark as read for other notification types
+          break;
+      }
+    } else {
+      // Patient-specific actions
+      switch (notification.type) {
+        case 'sos_alert':
+          Alert.alert(
+            'Emergency Alert',
+            'Your emergency alert has been sent to your caregivers',
+            [{ text: 'OK' }]
+          );
+          break;
+
+        case 'dose_taken':
+          Alert.alert(
+            'Medication Taken',
+            'Your medication dose has been recorded',
+            [{ text: 'OK' }]
+          );
+          break;
+
+        case 'low_stock':
+          Alert.alert(
+            'Low Stock Alert',
+            'Your medication is running low. Contact pharmacy?',
+            [
+              { text: 'Call Pharmacy', onPress: () => Alert.alert('Calling', 'Feature coming soon') },
+              { text: 'View Medications', onPress: () => navigation.navigate('Medications') },
+              { text: 'Dismiss', style: 'cancel' },
+            ]
+          );
+          break;
+
+        case 'medication_added':
+          Alert.alert(
+            'New Medication',
+            'A new medication has been added to your treatment plan',
+            [
+              { text: 'View Medications', onPress: () => navigation.navigate('Medications') },
+              { text: 'OK' },
+            ]
+          );
+          break;
+          
+        default:
+          // Just mark as read for other notification types
+          break;
+      }
     }
   };
 
-  const getNotificationIcon = (type: Notification['type'], priority: Notification['priority']) => {
+  const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'sos_alert':
         return 'alert-circle';
-      case 'missed_dose':
+      case 'dose_missed':
         return 'time-outline';
-      case 'refill_reminder':
+      case 'low_stock':
         return 'medkit-outline';
-      case 'medication_reminder':
-        return 'notifications-outline';
       case 'dose_taken':
         return 'checkmark-circle-outline';
-      case 'adherence_report':
-        return 'analytics-outline';
-      case 'system':
-        return 'settings-outline';
+      case 'medication_added':
+        return 'add-circle-outline';
       default:
         return 'information-circle-outline';
     }
   };
 
-  const getPriorityColor = (priority: Notification['priority']) => {
+  const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'critical':
         return '#EF4444';
@@ -318,7 +311,46 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     if (diffInMinutes < 1) return 'Just now';
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+    if (diffInMinutes < 10080) return `${Math.floor(diffInMinutes / 1440)}d ago`;
     return date.toLocaleDateString();
+  };
+
+  const getCaregiverNotificationTitle = (type: string): string => {
+    switch (type) {
+      case 'dose_taken': 
+        return 'Patient Took Medication';
+      case 'dose_missed': 
+        return 'Patient Missed Dose';
+      case 'low_stock': 
+        return 'Low Medication Stock';
+      case 'sos_alert': 
+        return 'Emergency Alert from Patient';
+      case 'medication_added': 
+        return 'Medication Added Successfully';
+      default: 
+        return 'Notification';
+    }
+  };
+
+  const getPatientNotificationTitle = (type: string): string => {
+    switch (type) {
+      case 'dose_taken': 
+        return 'Dose Recorded';
+      case 'dose_missed': 
+        return 'Missed Dose';
+      case 'low_stock': 
+        return 'Low Stock Alert';
+      case 'sos_alert': 
+        return 'Emergency Alert Sent';
+      case 'medication_added': 
+        return 'New Medication Added';
+      default: 
+        return 'Notification';
+    }
+  };
+
+  const getNotificationTitle = (type: string): string => {
+    return isCaregiver ? getCaregiverNotificationTitle(type) : getPatientNotificationTitle(type);
   };
 
   const filteredNotifications = notifications.filter(notification => {
@@ -326,10 +358,13 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     return true;
   });
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
-
-  const NotificationItem = ({ notification, index }: { notification: Notification, index: number }) => {
+  const NotificationItem = ({ notification }: { notification: Notification }) => {
     const priorityColor = getPriorityColor(notification.priority);
+    const displayTitle = notification.title || getNotificationTitle(notification.type);
+    
+    // Show patient name for caregiver notifications
+    const patientName = isCaregiver && (notification as any).patient?.name;
+    const fullTitle = patientName ? `${displayTitle} - ${patientName}` : displayTitle;
     
     return (
       <TouchableOpacity
@@ -347,7 +382,7 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           {/* Icon */}
           <View style={[styles.notificationIconContainer, { backgroundColor: priorityColor + '15' }]}>
             <Ionicons
-              name={getNotificationIcon(notification.type, notification.priority)}
+              name={getNotificationIcon(notification.type)}
               size={22}
               color={priorityColor}
             />
@@ -360,11 +395,11 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 styles.notificationTitle,
                 !notification.isRead && styles.unreadTitle
               ]} numberOfLines={1}>
-                {notification.title}
+                {fullTitle}
               </Text>
               <View style={styles.notificationMeta}>
                 <Text style={styles.notificationTime}>
-                  {formatTimestamp(notification.timestamp)}
+                  {formatTimestamp(notification.createdAt)}
                 </Text>
                 {!notification.isRead && (
                   <View style={[styles.unreadDot, { backgroundColor: themeColors.primary }]} />
@@ -376,12 +411,10 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               {notification.message}
             </Text>
             
-            {notification.actionable && (
-              <View style={styles.actionIndicator}>
-                <Ionicons name="chevron-forward" size={14} color={themeColors.primary} />
-                <Text style={[styles.actionText, { color: themeColors.primary }]}>Tap to respond</Text>
-              </View>
-            )}
+            <View style={styles.actionIndicator}>
+              <Ionicons name="chevron-forward" size={14} color={themeColors.primary} />
+              <Text style={[styles.actionText, { color: themeColors.primary }]}>Tap to view</Text>
+            </View>
           </View>
         </View>
 
@@ -390,7 +423,7 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           style={styles.deleteButton}
           onPress={(e) => {
             e.stopPropagation();
-            handleDeleteNotification(notification.id, notification.title);
+            handleDeleteNotification(notification.id, fullTitle);
           }}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
@@ -400,7 +433,7 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     );
   };
 
-  if (isLoading) {
+  if (isLoading && notifications.length === 0) {
     return (
       <View style={styles.container}>
         {isCaregiver ? (
@@ -545,8 +578,8 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             </View>
           ) : (
             <View style={styles.notificationsList}>
-              {filteredNotifications.map((notification, index) => (
-                <NotificationItem key={notification.id} notification={notification} index={index} />
+              {filteredNotifications.map((notification) => (
+                <NotificationItem key={notification.id} notification={notification} />
               ))}
             </View>
           )}

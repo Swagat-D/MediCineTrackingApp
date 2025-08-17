@@ -346,7 +346,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             >
               <View style={styles.statContent}>
                 <View style={styles.statHeader}>
-                  <Ionicons name="medical" size={20} color={theme.primary} />
+                  <Image 
+                  source={require('../../../assets/images/patientmedication.png')} 
+                  style={styles.medIcon}
+                  resizeMode="contain"
+                />
                   <Text style={styles.statLabel}>Total Medications</Text>
                 </View>
                 <Text style={[styles.statValue, { color: theme.primary }]}>{dashboardStats.totalMedications}</Text>
@@ -426,7 +430,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                 >
                   <View style={styles.medicationHeader}>
                     <View style={[styles.medicationIcon, { backgroundColor: theme.primaryLight }]}>
-                      <Ionicons name="medical" size={20} color={theme.primary} />
+                      <Image 
+                        source={require('../../../assets/images/patientmedication.png')} 
+                        style={styles.medicineicon}
+                        resizeMode="contain"
+                      />
                     </View>
                     <View style={styles.medicationInfo}>
                       <Text style={styles.medicationName}>{medication.name}</Text>
@@ -890,6 +898,11 @@ const styles = StyleSheet.create({
     marginTop: SPACING[3],
     marginBottom: SPACING[1],
   },
+  medIcon:{
+    height:24,
+    width:24,
+    borderRadius: RADIUS.full
+  },
   emptyActivitySubtext: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: '#94A3B8',
@@ -973,6 +986,11 @@ const styles = StyleSheet.create({
   },
   modalScrollView: {
     flex: 1,
+  },
+  medicineicon:{
+    height:36,
+    width:36,
+    borderRadius: RADIUS.full
   },
   modalScrollContent: {
     paddingHorizontal: SPACING[5],

@@ -1,5 +1,5 @@
-// src/components/common/PatientNavbar.tsx
-import React from 'react';
+// src/components/common/PatientNavbar.tsx - Fixed version
+import React, {useEffect} from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TYPOGRAPHY, SPACING } from '../../constants/themes/theme';
+import { useAppDispatch, useAppSelector } from '../../store';
+import { fetchNotificationCount } from '../../store/slices/notificationSlice';
 
 interface PatientNavbarProps {
   title?: string;
@@ -30,6 +32,24 @@ const PatientNavbar: React.FC<PatientNavbarProps> = ({
   notificationCount = 0,
   rightActions,
 }) => {
+
+  const dispatch = useAppDispatch();
+  const { unreadCount } = useAppSelector(state => state.notification);
+  const { user } = useAppSelector(state => state.auth);
+
+  useEffect(() => {
+    // Fetch notification count when component mounts
+    if (user?.role === 'patient') {
+      dispatch(fetchNotificationCount('patient'));
+    }
+  }, [dispatch, user?.role]);
+
+  const handleNotificationPress = () => {
+    if (onNotificationPress) {
+      onNotificationPress();
+    }
+  };
+
   return (
     <View style={styles.navbarContainer}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -54,6 +74,32 @@ const PatientNavbar: React.FC<PatientNavbarProps> = ({
         <View style={styles.navRight}>
           {rightActions || (
             <>
+              {/* Notification Button - FIXED */}
+              {onNotificationPress && (
+                <TouchableOpacity 
+                  style={[
+                    styles.navButton,
+                    unreadCount > 0 && styles.notificationActive
+                  ]} 
+                  onPress={handleNotificationPress}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name={unreadCount > 0 ? "notifications" : "notifications-outline"} 
+                    size={22} 
+                    color={unreadCount > 0 ? "#2563EB" : "#64748B"} 
+                  />
+                  {unreadCount > 0 && (
+                    <View style={styles.notificationBadge}>
+                      <Text style={styles.notificationBadgeText}>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              {/* SOS Button */}
               {onSOSPress && (
                 <TouchableOpacity
                   style={styles.sosButton}
@@ -62,23 +108,6 @@ const PatientNavbar: React.FC<PatientNavbarProps> = ({
                 >
                   <Ionicons name="alert-circle" size={20} color="#FFFFFF" />
                   <Text style={styles.sosText}>SOS</Text>
-                </TouchableOpacity>
-              )}
-              
-              {onNotificationPress && (
-                <TouchableOpacity
-                  style={[styles.navButton, notificationCount > 0 && styles.notificationActive]}
-                  onPress={onNotificationPress}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="notifications-outline" size={22} color="#475569" />
-                  {notificationCount > 0 && (
-                    <View style={styles.notificationBadge}>
-                      <Text style={styles.badgeText}>
-                        {notificationCount > 9 ? '9+' : notificationCount}
-                      </Text>
-                    </View>
-                  )}
                 </TouchableOpacity>
               )}
             </>
@@ -200,10 +229,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
-  badgeText: {
-    fontSize: 10,
+  notificationBadgeText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
 

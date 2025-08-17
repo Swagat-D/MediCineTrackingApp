@@ -90,6 +90,20 @@ export interface Barcode {
   downloadCount: number;
 }
 
+// Add CaregiverNotification interface
+export interface CaregiverNotification {
+  id: string;
+  type: 'dose_taken' | 'dose_missed' | 'sos_alert' | 'low_stock' | 'medication_added';
+  message: string;
+  patientId?: string;
+  patientName?: string;
+  medicationId?: string;
+  medicationName?: string;
+  timestamp: string;
+  read: boolean;
+  priority?: string;
+}
+
 class CaregiverAPI {
   // Dashboard
   async getDashboardStats(): Promise<{ stats: DashboardStats; recentActivities: RecentActivity[] }> {
@@ -116,6 +130,40 @@ class CaregiverAPI {
   async sendPatientOTP(patientId: string): Promise<{ message: string; patientEmail: string }> {
   const response = await apiClient.post('/caregiver/patients/send-otp', { patientId });
   return response.data;
+}
+
+async getNotifications(params?: {
+  type?: 'dose_taken' | 'dose_missed' | 'sos_alert' | 'low_stock' | 'medication_added';
+  read?: boolean;
+}): Promise<{
+  notifications: CaregiverNotification[];
+  unreadCount: number;
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalCount: number;
+  };
+}> {
+  const response = await apiClient.get('/caregiver/notifications', { params });
+  return response.data.data;
+}
+
+// Mark notification as read
+async markNotificationAsRead(notificationId: string): Promise<{ success: boolean }> {
+  const response = await apiClient.patch(`/caregiver/notifications/${notificationId}/read`);
+  return response.data;
+}
+
+// Mark all notifications as read
+async markAllNotificationsAsRead(): Promise<{ success: boolean; message: string }> {
+  const response = await apiClient.patch('/caregiver/notifications/read-all');
+  return response.data;
+}
+
+// Get dashboard notifications (for navbar count)
+async getDashboardNotifications(): Promise<{ unreadCount: number }> {
+  const response = await apiClient.get('/caregiver/notifications/count');
+  return response.data.data;
 }
 
 async verifyPatientOTP(patientId: string, otp: string): Promise<Patient> {

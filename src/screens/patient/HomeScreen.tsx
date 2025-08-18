@@ -24,6 +24,7 @@ import {
   setError 
 } from '../../store/slices/patientSlice';
 import { patientAPI } from '../../services/api/patientAPI';
+import { apiClient } from '../../services/api/apiClient';
 import { useFocusEffect } from '@react-navigation/native';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientNavbar from '../../components/common/PatientNavbar';
@@ -68,7 +69,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [allActivities, setAllActivities] = useState<RecentActivity[]>([]);
-  
+  const [showDoseModal, setShowDoseModal] = useState(false);
+const [selectedMedication, setSelectedMedication] = useState<any>(null);
+const [isRightTime, setIsRightTime] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
     totalMedications: 0,
     activeMedications: 0,
@@ -156,17 +159,46 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleDoseTaken = async (medicationId: string) => {
     try {
-      await patientAPI.logMedicationTaken(medicationId, {
+      await patientAPI.recordMedicationTaken(medicationId, {
         takenAt: new Date().toISOString(),
-        notes: 'Taken via home screen'
+        notes: 'Taken via home screen - manual confirmation'
       });
       
       Alert.alert('Success', 'Dose recorded successfully');
-      loadData(); // Refresh data
+      loadData();
     } catch (error: any) {
       Alert.alert('Error', error.message);
     }
   };
+
+  const checkTimingAndShowModal = async (medication: any) => {
+  try {
+    console.log('Checking timing for medication:', medication); // Debug log
+    
+    // Check if medication has ID
+    if (!medication.id && !medication._id) {
+      console.error('Medication ID is missing:', medication);
+      setSelectedMedication(medication);
+      setIsRightTime(true); // Default to allow
+      setShowDoseModal(true);
+      return;
+    }
+    
+    const medicationId = medication.id || medication._id;
+    const response = await apiClient.get(`/patient/medications/${medicationId}/timing-check`);
+    
+    setSelectedMedication(medication);
+    setIsRightTime(response.data.data.canTake);
+    setShowDoseModal(true);
+    
+  } catch (error: any) {
+    console.error('Error checking medication timing:', error);
+    // If timing check fails, assume it's the right time
+    setSelectedMedication(medication);
+    setIsRightTime(true);
+    setShowDoseModal(true);
+  }
+};
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -442,7 +474,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     </View>
                     <TouchableOpacity 
                       style={[styles.takeButton, { backgroundColor: theme.success }]}
-                      onPress={() => handleDoseTaken(medication.id)}
+                      onPress={() => checkTimingAndShowModal(medication)}
                     >
                       <Text style={styles.takeButtonText}>Take</Text>
                     </TouchableOpacity>
@@ -568,9 +600,178 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* Activity Modal */}
       <ActivityModal />
+      {showDoseModal && (
+  <Modal
+    visible={showDoseModal}
+    transparent={true}
+    animationType="fade"
+    onRequestClose={() => setShowDoseModal(false)}
+  >
+    <View style={simpleModalStyles.overlay}>
+      <View style={simpleModalStyles.container}>
+        {/* Header */}
+        <View style={simpleModalStyles.header}>
+          <Text style={simpleModalStyles.title}>
+            {isRightTime ? '🟢 Right Time' : '🔴 Wrong Time'}
+          </Text>
+        </View>
+
+        {/* Medication Info */}
+        <View style={simpleModalStyles.medicationInfo}>
+          <Text style={simpleModalStyles.medicationName}>{selectedMedication?.name}</Text>
+          <Text style={simpleModalStyles.medicationDosage}>
+            {selectedMedication?.dosage} {selectedMedication?.dosageUnit}
+          </Text>
+        </View>
+
+        {/* Message */}
+        <Text style={simpleModalStyles.message}>
+          {isRightTime 
+            ? 'It\'s the right time to take this medication'
+            : 'It\'s not the right time. Please scan barcode for details'
+          }
+        </Text>
+
+        {/* Buttons */}
+        <View style={simpleModalStyles.buttonContainer}>
+          <TouchableOpacity
+            style={simpleModalStyles.cancelButton}
+            onPress={() => setShowDoseModal(false)}
+          >
+            <Text style={simpleModalStyles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+
+          {isRightTime ? (
+            <TouchableOpacity
+              style={simpleModalStyles.takeButton}
+              onPress={() => {
+                setShowDoseModal(false);
+                handleDoseTaken(selectedMedication.id);
+              }}
+            >
+              <Text style={simpleModalStyles.takeButtonText}>Take Medication</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={simpleModalStyles.scanButton}
+              onPress={() => {
+                setShowDoseModal(false);
+                navigation.navigate('Scanner');
+              }}
+            >
+              <Text style={simpleModalStyles.scanButtonText}>Scan Barcode</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
     </View>
+  </Modal>
+)}
+</View>
   );
 };
+
+const simpleModalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  container: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 350,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    textAlign: 'center',
+  },
+  medicationInfo: {
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingVertical: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+  },
+  medicationName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  medicationDosage: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  messageContainer: {
+    marginBottom: 24,
+  },
+  message: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  takeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#059669',
+    alignItems: 'center',
+  },
+  takeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  scanButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+  },
+  scanButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+});
+    
 
 const styles = StyleSheet.create({
   container: {

@@ -52,7 +52,7 @@ const medicationSchema: yup.ObjectSchema<MedicationFormData> = yup.object({
     .number()
     .required('Frequency is required')
     .min(1, 'Frequency must be at least 1')
-    .max(6, 'Frequency cannot exceed 6 times daily'),
+    .max(4, 'Frequency cannot exceed 4 times daily'),
   timingRelation: yup
     .mixed<'before_food' | 'after_food' | 'with_food' | 'empty_stomach' | 'anytime'>()
     .oneOf(['before_food', 'after_food', 'with_food', 'empty_stomach', 'anytime'])

@@ -97,14 +97,6 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   try {
-    // DETAILED LOGGING
-    console.log('=== BARCODE SCAN DEBUG ===');
-    console.log('Raw scanned data:', JSON.stringify(data));
-    console.log('Data length:', data.length);
-    console.log('Starts with MT:', data.startsWith('MT'));
-    console.log('Character codes:', data.split('').map(char => `${char}:${char.charCodeAt(0)}`));
-    console.log('=========================');
-    
     // Check for hidden characters or whitespace
     const trimmedData = data.trim();
     console.log('Trimmed data:', JSON.stringify(trimmedData));
@@ -112,10 +104,7 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
     
     // Validate barcode format - use trimmed data
     if (!trimmedData || !trimmedData.startsWith('MT') || trimmedData.length !== 10) {
-      console.log('VALIDATION FAILED:');
-      console.log('- Has data:', !!trimmedData);
-      console.log('- Starts with MT:', trimmedData.startsWith('MT'));
-      console.log('- Length is 10:', trimmedData.length === 10);
+      
       throw new Error(`Invalid medication barcode. Please scan a valid MediTracker barcode. Got: "${trimmedData}" (length: ${trimmedData.length})`);
     }
 
@@ -140,20 +129,36 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
   }
 };
 
+// REPLACE your showMedicationDialog function in BarcodeScannerScreen.tsx with this:
+
 const showMedicationDialog = (data: any) => {
   const { medication, dosingSafety } = data;
   
   if (!dosingSafety.canTake) {
-    // RED LIGHT - Cannot take medication
+    // 🔴 RED - Cannot take medication
+    
+    let primaryReason = dosingSafety.reason;
+    let detailsText = '';
+    
+    // Add timing window details if available
+    if (dosingSafety.nextWindow) {
+      detailsText += `\nNext window: ${dosingSafety.nextWindow.mealType} `;
+      detailsText += `(${dosingSafety.nextWindow.windowStart} - ${dosingSafety.nextWindow.windowEnd})`;
+      
+      if (dosingSafety.timeUntilNextWindow) {
+        detailsText += `\nTime until window: ${dosingSafety.timeUntilNextWindow}`;
+      }
+    }
+    
+    // Add last taken info if available
+    if (medication.lastTaken) {
+      detailsText += `\nLast taken: ${new Date(medication.lastTaken).toLocaleString()}`;
+    }
+    
     Alert.alert(
       '🔴 STOP - Do Not Take',
-      `${medication.name} (${medication.dosage}${medication.dosageUnit})\n\n❌ ${dosingSafety.reason}\n\n` +
-      `${dosingSafety.nextDoseTime ? 
-        `Next dose: ${new Date(dosingSafety.nextDoseTime).toLocaleTimeString()}\n` +
-        `Time remaining: ${dosingSafety.hoursRemaining} hours` 
-        : ''}\n\n` +
-      `Last taken: ${medication.lastTaken ? 
-        new Date(medication.lastTaken).toLocaleString() : 'Never'}\n\n` +
+      `${medication.name} (${medication.dosage}${medication.dosageUnit})\n\n` +
+      `❌ ${primaryReason}${detailsText}\n\n` +
       `⚠️ Taking this medication now could be dangerous.`,
       [
         {
@@ -169,14 +174,25 @@ const showMedicationDialog = (data: any) => {
       ]
     );
   } else {
-    // GREEN LIGHT - Safe to take medication
+    // 🟢 GREEN - Safe to take medication
+    
+    let timingInfo = '';
+    
+    // Add current window info if available
+    if (dosingSafety.currentWindows && dosingSafety.currentWindows.length > 0) {
+      const currentWindow = dosingSafety.currentWindows[0];
+      timingInfo = `\n✅ Perfect timing for ${currentWindow.mealType}!`;
+      timingInfo += `\nWindow: ${currentWindow.windowStart} - ${currentWindow.windowEnd}`;
+    } else if (dosingSafety.timingRelation === 'anytime') {
+      timingInfo = '\n✅ This medication can be taken anytime';
+    }
+    
     Alert.alert(
       '🟢 SAFE TO TAKE',
       `${medication.name} (${medication.dosage}${medication.dosageUnit})\n\n` +
-      `✅ Safe to take now\n\n` +
+      `✅ Safe to take now${timingInfo}\n\n` +
       `Frequency: ${medication.frequency} times daily\n` +
-      `Timing: ${dosingSafety.recommendedTiming}\n` +
-      `Instructions: ${medication.instructions || 'Take as directed'}\n\n` +
+      `Instructions: ${medication.instructions || 'Take as directed'}\n` +
       `Days left: ${medication.daysLeft}\n\n` +
       `Take this medication now?`,
       [

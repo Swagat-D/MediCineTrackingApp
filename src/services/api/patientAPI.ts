@@ -133,19 +133,36 @@ class PatientAPI {
   }
 }
 
-  async recordMedicationTaken(medicationId: string, data: { notes?: string; takenAt: string }) {
+async recordMedicationTaken(medicationId: string, data: { notes?: string, override?: boolean }): Promise<{ message: string; success: boolean }> {
   try {
-    console.log('API: Recording medication taken via barcode:', medicationId, data);
-    // Keep using barcode endpoint but with same logic as home screen
-    const response = await apiClient.post(`/barcode/record/${medicationId}`, data);
-    console.log('API: Record successful:', response.data);
+    const response = await apiClient.post(`/patient/medications/${medicationId}/log`, data);
     return response.data;
   } catch (error: any) {
-    console.error('API: Record error:', error);
+    if(error.response?.status === 400){
+      throw error;
+    }
     if (error.response?.data?.message) {
       throw new Error(error.response.data.message);
+    }else if (error.message){
+      throw new Error(error.message)
+    }else{
+      throw new Error('Failed to record medication dose');
     }
-    throw new Error('Failed to record medication. Please try again.');
+  }
+}
+
+async checkMedicationTiming(medicationId: string): Promise<{message: string;  success: boolean }> {
+  try{
+    const response = await apiClient.get(`/patient/medications/${medicationId}/timing-check`);
+    return response.data;
+  }catch(error:any){
+    if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Failed to check medication timing');
+      }
   }
 }
 

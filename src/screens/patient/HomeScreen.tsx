@@ -70,8 +70,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [allActivities, setAllActivities] = useState<RecentActivity[]>([]);
   const [showDoseModal, setShowDoseModal] = useState(false);
-const [selectedMedication, setSelectedMedication] = useState<any>(null);
-const [isRightTime, setIsRightTime] = useState(false);
+  const [selectedMedication, setSelectedMedication] = useState<any>(null);
+  const [isRightTime, setIsRightTime] = useState(false);
+  const [timingInfo, setTimingInfo] = useState<any>(null);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
     totalMedications: 0,
     activeMedications: 0,
@@ -157,43 +158,127 @@ const [isRightTime, setIsRightTime] = useState(false);
     setRefreshing(false);
   };
 
-  const handleDoseTaken = async (medicationId: string) => {
-    try {
-      await patientAPI.recordMedicationTaken(medicationId, {
-        takenAt: new Date().toISOString(),
-        notes: 'Taken via home screen - manual confirmation'
-      });
+  const handleDoseTaken = async (medicationId: string, override: boolean = false) => {
+  try {
+    
+    const response = await patientAPI.recordMedicationTaken(medicationId, {
+      notes: 'Taken via home screen',
+      override
+    }) as { message: string; success: boolean; data?: { wasOverridden?: boolean; medicationName?: string } };
+    
+    if (response.success) {
+      const wasOverridden = response.data?.wasOverridden;
       
-      Alert.alert('Success', 'Dose recorded successfully');
-      loadData();
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
+      Alert.alert(
+        'Success', 
+        wasOverridden 
+          ? `${response.data?.medicationName} recorded with safety override`
+          : `${response.data?.medicationName} recorded successfully`,
+        [
+          {
+            text: 'OK',
+            onPress: () => loadData()
+          }
+        ]
+      );
     }
-  };
+    
+  } catch (error: any) {
+    console.error('Handle dose taken error:', error);
+    
+    // Check if it's a safety warning (400 status)
+    if (error.response?.status === 400 && error.response?.data?.data) {
+      const safetyData = error.response.data.data;
+      showSafetyWarningModal(safetyData, medicationId);
+    } else {
+      Alert.alert('Error', error.message || 'Failed to record medication dose');
+    }
+  }
+};
+
+const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
+  const { reason, warnings, timingInfo } = safetyData;
+  
+  let warningMessage = `${reason}\n\n`;
+  if (warnings && warnings.length > 0) {
+    warningMessage += warnings.join('\n');
+  }
+  
+  // Add timing info if available
+  if (timingInfo?.nextWindow) {
+    warningMessage += `\n\nNext recommended time: ${timingInfo.timeUntilNextWindow}`;
+  }
+
+  Alert.alert(
+    '⚠️ Safety Warning',
+    warningMessage,
+    [
+      {
+        text: 'Cancel',
+        style: 'cancel'
+      },
+      {
+        text: 'Take Anyway',
+        style: 'destructive',
+        onPress: () => {
+          // Show confirmation for override
+          Alert.alert(
+            'Override Safety Check?',
+            'Are you sure you want to take this medication despite the safety warning? This should only be done in consultation with your healthcare provider.',
+            [
+              {
+                text: 'Cancel',
+                style: 'cancel'
+              },
+              {
+                text: 'Yes, Take Medication',
+                style: 'destructive',
+                onPress: () => handleDoseTaken(medicationId, true) // Override = true
+              }
+            ]
+          );
+        }
+      }
+    ]
+  );
+};
 
   const checkTimingAndShowModal = async (medication: any) => {
   try {
-    console.log('Checking timing for medication:', medication); // Debug log
+    console.log('Checking detailed timing for medication:', medication);
     
-    // Check if medication has ID
     if (!medication.id && !medication._id) {
       console.error('Medication ID is missing:', medication);
       setSelectedMedication(medication);
-      setIsRightTime(true); // Default to allow
+      setIsRightTime(true);
       setShowDoseModal(true);
       return;
     }
     
     const medicationId = medication.id || medication._id;
+    
+    // Use the enhanced timing check endpoint
     const response = await apiClient.get(`/patient/medications/${medicationId}/timing-check`);
+    const timingData = response.data.data;
+    
+    console.log('Detailed timing check response:', timingData);
     
     setSelectedMedication(medication);
-    setIsRightTime(response.data.data.canTake);
+    setIsRightTime(timingData.canTake);
+    
+    // Store additional safety info for the modal
+    setTimingInfo({
+      canTake: timingData.canTake,
+      reason: timingData.reason,
+      warnings: timingData.warnings || [],
+      nextDoseTime: timingData.dosing?.nextDoseTime,
+      hoursRemaining: timingData.dosing?.hoursRemaining
+    });
+    
     setShowDoseModal(true);
     
   } catch (error: any) {
     console.error('Error checking medication timing:', error);
-    // If timing check fails, assume it's the right time
     setSelectedMedication(medication);
     setIsRightTime(true);
     setShowDoseModal(true);
@@ -609,11 +694,20 @@ const [isRightTime, setIsRightTime] = useState(false);
   >
     <View style={simpleModalStyles.overlay}>
       <View style={simpleModalStyles.container}>
-        {/* Header */}
+        {/* Header with enhanced safety info */}
         <View style={simpleModalStyles.header}>
           <Text style={simpleModalStyles.title}>
-            {isRightTime ? '🟢 Right Time' : '🔴 Wrong Time'}
+            {isRightTime ? '🟢 Safe to Take' : '🔴 Safety Warning'}
           </Text>
+          {timingInfo?.warnings && timingInfo.warnings.length > 0 && (
+            <View style={simpleModalStyles.warningsContainer}>
+              {timingInfo.warnings.map((warning: string, index: number) => (
+                <Text key={index} style={simpleModalStyles.warningText}>
+                  ⚠️ {warning}
+                </Text>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Medication Info */}
@@ -624,13 +718,20 @@ const [isRightTime, setIsRightTime] = useState(false);
           </Text>
         </View>
 
-        {/* Message */}
+        {/* Enhanced Message */}
         <Text style={simpleModalStyles.message}>
           {isRightTime 
-            ? 'It\'s the right time to take this medication'
-            : 'It\'s not the right time. Please scan barcode for details'
+            ? 'It\'s safe to take this medication now'
+            : timingInfo?.reason || 'Please check timing before taking this medication'
           }
         </Text>
+
+        {/* Next dose info if not right time */}
+        {!isRightTime && timingInfo?.hoursRemaining && (
+          <Text style={simpleModalStyles.nextDoseInfo}>
+            Next dose available in {timingInfo.hoursRemaining} hours
+          </Text>
+        )}
 
         {/* Buttons */}
         <View style={simpleModalStyles.buttonContainer}>
@@ -646,27 +747,45 @@ const [isRightTime, setIsRightTime] = useState(false);
               style={simpleModalStyles.takeButton}
               onPress={() => {
                 setShowDoseModal(false);
-                handleDoseTaken(selectedMedication.id);
+                const medicationId = selectedMedication?.id || selectedMedication?._id;
+                if (medicationId) {
+                  handleDoseTaken(medicationId, false); // No override needed
+                }
               }}
             >
               <Text style={simpleModalStyles.takeButtonText}>Take Medication</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity
-              style={simpleModalStyles.scanButton}
-              onPress={() => {
-                setShowDoseModal(false);
-                navigation.navigate('Scanner');
-              }}
-            >
-              <Text style={simpleModalStyles.scanButtonText}>Scan Barcode</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={simpleModalStyles.scanButton}
+                onPress={() => {
+                  setShowDoseModal(false);
+                  navigation.navigate('Scanner');
+                }}
+              >
+                <Text style={simpleModalStyles.scanButtonText}>Scan Barcode</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={simpleModalStyles.overrideButton}
+                onPress={() => {
+                  setShowDoseModal(false);
+                  const medicationId = selectedMedication?.id || selectedMedication?._id;
+                  if (medicationId) {
+                    showSafetyWarningModal(timingInfo, medicationId);
+                  }
+                }}
+              >
+                <Text style={simpleModalStyles.overrideButtonText}>Take Anyway</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </View>
     </View>
   </Modal>
-)}
+      )}
 </View>
   );
 };
@@ -766,6 +885,40 @@ const simpleModalStyles = StyleSheet.create({
     alignItems: 'center',
   },
   scanButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  warningsContainer: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  warningText: {
+    fontSize: 12,
+    color: '#DC2626',
+    marginBottom: 4,
+  },
+  nextDoseInfo: {
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  overrideButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    marginLeft: 6,
+  },
+  overrideButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',

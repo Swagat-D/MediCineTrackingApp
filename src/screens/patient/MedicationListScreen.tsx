@@ -29,6 +29,7 @@ import { patientAPI } from '../../services/api/patientAPI';
 import { useFocusEffect } from '@react-navigation/native';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
+import BarcodeDisplay from '@/components/common/BarcodeDisplay';
 
 interface Props {
   navigation: any;
@@ -42,7 +43,7 @@ interface MedicationDetails {
   frequency: number;
   remainingQuantity: number;
   totalQuantity: number;
-  status: 'active' | 'paused' | 'completed';
+  status: 'active' | 'completed' | 'paused';
   adherenceRate: number;
   expiryDate: string;
   instructions?: string;
@@ -60,7 +61,7 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
   
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'paused' | 'completed'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed'>('all');
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [selectedMedication, setSelectedMedication] = useState<MedicationDetails | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -141,7 +142,6 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return '#059669';
-      case 'paused': return '#F59E0B';
       case 'completed': return '#6B7280';
       default: return '#6B7280';
     }
@@ -157,7 +157,6 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
     return {
       all: medications.length,
       active: medications.filter((m: any) => m.status === 'active').length,
-      paused: medications.filter((m: any) => m.status === 'paused').length,
       completed: medications.filter((m: any) => m.status === 'completed').length,
     };
   };
@@ -165,7 +164,7 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
   const filterCounts = getFilterCounts();
 
   const FilterChip = ({ filterKey, label, count, isActive }: {
-    filterKey: 'all' | 'active' | 'paused' | 'completed';
+    filterKey: 'all' | 'active' | 'completed';
     label: string;
     count: number;
     isActive: boolean;
@@ -249,8 +248,6 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
               <View style={[styles.summaryIndicator, { backgroundColor: theme.primary }]} />
             </View>
             <View style={styles.summaryItem}>
-              <Text style={[styles.summaryNumber, { color: '#F59E0B' }]}>{filterCounts.paused}</Text>
-              <Text style={styles.summaryLabel}>Paused</Text>
               <View style={[styles.summaryIndicator, { backgroundColor: '#F59E0B' }]} />
             </View>
             <View style={styles.summaryItem}>
@@ -282,7 +279,6 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.filterContainer}>
             <FilterChip filterKey="all" label="All" count={filterCounts.all} isActive={filterStatus === 'all'} />
             <FilterChip filterKey="active" label="Active" count={filterCounts.active} isActive={filterStatus === 'active'} />
-            <FilterChip filterKey="paused" label="Paused" count={filterCounts.paused} isActive={filterStatus === 'paused'} />
             <FilterChip filterKey="completed" label="Completed" count={filterCounts.completed} isActive={filterStatus === 'completed'} />
           </View>
         </View>
@@ -405,10 +401,10 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
                     {medication.status === 'active' && (
                       <TouchableOpacity 
                         style={[styles.actionButton, styles.takeButton, { backgroundColor: theme.primary }]}
-                        onPress={() => handleMedicationAction('take_now', medication.id)}
+                        onPress={() => navigation.navigate('Scanner')}
                       >
-                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                        <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>Take Now</Text>
+                        <Ionicons name="scan-outline" size={16} color="#FFFFFF" />
+                        <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>Scan Barcode</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -573,7 +569,7 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
                         handleMedicationAction('take_now', selectedMedication.id);
                       }}
                     >
-                      <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+                      <Ionicons name="scan-outline" size={20} color="#FFFFFF" />
                       <Text style={styles.modalActionButtonText}>Take Now</Text>
                     </TouchableOpacity>
                   )}

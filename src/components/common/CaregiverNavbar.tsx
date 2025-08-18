@@ -86,10 +86,18 @@ const CaregiverNavbar: React.FC<NavbarProps> = ({
               
               {onNotificationPress && (
                 <TouchableOpacity 
-                  style={styles.navButton} 
+                  style={[
+                    styles.navButton,
+                    unreadCount > 0 && styles.notificationActive
+                  ]} 
                   onPress={handleNotificationPress}
+                  activeOpacity={0.7}
                 >
-                  <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
+                  <Ionicons 
+                    name={unreadCount > 0 ? "notifications" : "notifications-outline"} 
+                    size={22} 
+                    color={unreadCount > 0 ? "#059669" : "#64748B"} 
+                  />
                   {unreadCount > 0 && (
                     <View style={styles.notificationBadge}>
                       <Text style={styles.notificationBadgeText}>

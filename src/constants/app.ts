@@ -14,7 +14,7 @@ export interface APIConfig {
 }
 
 export const API_CONFIG: APIConfig = {
-  BASE_URL: __DEV__ ? 'http://192.168.145.210:5000/api' : 'https://your-production-api.com/api',
+  BASE_URL: __DEV__ ? 'http://192.168.145.210:5000/api' : 'https://meditrack-backend-d6sp.onrender.com/api',
   TIMEOUT: 10000,
   HEADERS: {
     'Content-Type': 'application/json',

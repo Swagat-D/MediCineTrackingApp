@@ -43,10 +43,15 @@ export default {
             compileSdkVersion: 35,
             targetSdkVersion: 35,
             buildToolsVersion: "35.0.0",
-            minSdkVersion: 24
+            minSdkVersion: 24,
+            enableProguardInReleaseBuilds: false,
+            enableShrinkResourcesInReleaseBuilds: false
           }
         }
       ]
+    ],
+    assetBundlePatterns: [
+      "assets/**/*"
     ],
     experiments: {
       typedRoutes: true

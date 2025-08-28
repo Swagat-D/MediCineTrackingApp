@@ -27,7 +27,7 @@ export default {
     },
     web: {
       bundler: "metro",
-      output: "static",
+      output: "single", 
       favicon: "./assets/images/favicon.png"
     },
     plugins: [
@@ -54,7 +54,7 @@ export default {
       "assets/**/*"
     ],
     experiments: {
-      typedRoutes: true
+      typedRoutes: true 
     },
     extra: {
       eas: {

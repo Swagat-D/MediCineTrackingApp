@@ -16,12 +16,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppSelector, useAppDispatch } from '../../store';
-import { 
-  setDashboardLoading, 
-  setDashboardData, 
-  setNotifications,
-  setConnectionStatus,
-  setError 
+import {
+  loadDashboardWithCache,
+  refreshDashboard
 } from '../../store/slices/patientSlice';
 import { patientAPI } from '../../services/api/patientAPI';
 import { apiClient } from '../../services/api/apiClient';
@@ -37,15 +34,6 @@ interface Props {
   navigation: any; 
 }
 
-interface DashboardStats {
-  totalMedications: number;
-  activeMedications: number;
-  adherenceRate: number;
-  todayReminders: number;
-  upcomingDoses: number;
-  missedDoses: number;
-}
-
 interface RecentActivity {
   id: string;
   type: 'dose_taken' | 'dose_missed' | 'reminder_sent' | 'medication_added';
@@ -58,8 +46,9 @@ interface RecentActivity {
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const dispatch = useAppDispatch();
   const { 
-    dashboardStats: reduxDashboardStats,
+    dashboardStats,
     todaysMedications,
+    recentActivities,
     isDashboardLoading,
     isConnected,
     unreadNotificationCount
@@ -68,21 +57,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   
   const [refreshing, setRefreshing] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
-  const [allActivities, setAllActivities] = useState<RecentActivity[]>([]);
   const [showDoseModal, setShowDoseModal] = useState(false);
   const [selectedMedication, setSelectedMedication] = useState<any>(null);
   const [isRightTime, setIsRightTime] = useState(false);
   const [timingInfo, setTimingInfo] = useState<any>(null);
-  const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
-    totalMedications: 0,
-    activeMedications: 0,
-    adherenceRate: 0,
-    todayReminders: 0,
-    upcomingDoses: 0,
-    missedDoses: 0,
-  });
-  
-  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
 
   // Blue theme for patient side
   const theme = {
@@ -104,59 +82,28 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   const loadData = async () => {
-    dispatch(setDashboardLoading(true));
     try {
-      const [dashboardData, notificationsData, activitiesData] = await Promise.all([
-        patientAPI.getDashboardData(),
-        patientAPI.getNotifications(),
-        patientAPI.getRecentActivities?.() || Promise.resolve([])
+      // Load from cache first - instant UI
+      await Promise.all([
+        dispatch(loadDashboardWithCache()),
       ]);
-      
-      dispatch(setDashboardData(dashboardData));
-      dispatch(setNotifications(notificationsData));
-      dispatch(setConnectionStatus(true));
-
-      // Update local dashboard stats
-      setDashboardStats({
-        totalMedications: dashboardData.stats.totalMedications || 0,
-        activeMedications: dashboardData.stats.activeMedications || 0,
-        adherenceRate: dashboardData.stats.adherenceRate || 0,
-        todayReminders: dashboardData.stats.todayReminders || 0,
-        upcomingDoses: dashboardData.stats.upcomingDoses || 0,
-        missedDoses: dashboardData.stats.missedDoses || 0,
-      });
-
-      // Set activities
-      if (activitiesData && activitiesData.length > 0) {
-        setRecentActivities(activitiesData.slice(0, 5));
-        setAllActivities(activitiesData);
-      }
-
     } catch (error: any) {
-      dispatch(setError(error.message));
-      dispatch(setConnectionStatus(false));
-      
-      // Fallback to Redux data
-      if (reduxDashboardStats) {
-        setDashboardStats({
-          totalMedications: reduxDashboardStats.totalMedications || 0,
-          activeMedications: reduxDashboardStats.activeMedications || 0,
-          adherenceRate: reduxDashboardStats.adherenceRate || 0,
-          todayReminders: 0,
-          upcomingDoses: 0,
-          missedDoses: 0,
-        });
-      }
-    } finally {
-      dispatch(setDashboardLoading(false));
+      console.error('Error loading cached data:', error);
     }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
+    try {
+      await dispatch(refreshDashboard()).unwrap();
+    } catch (error: any) {
+      console.error('Error refreshing dashboard:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
+
+
 
   const handleDoseTaken = async (medicationId: string, override: boolean = false) => {
   try {
@@ -340,12 +287,12 @@ const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.modalActivityList}>
-            {allActivities.map((activity, index) => (
+            {recentActivities.map((activity, index) => (
               <TouchableOpacity
                 key={activity.id}
                 style={[
                   styles.modalActivityItem,
-                  index === allActivities.length - 1 && styles.lastModalActivityItem
+                  index === recentActivities.length - 1 && styles.lastModalActivityItem
                 ]}
                 activeOpacity={0.7}
               >
@@ -374,7 +321,7 @@ const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
               </TouchableOpacity>
             ))}
             
-            {allActivities.length === 0 && (
+            {recentActivities.length === 0 && (
               <View style={styles.emptyState}>
                 <Ionicons name="time-outline" size={48} color="#94A3B8" />
                 <Text style={styles.emptyStateText}>No recent activities</Text>
@@ -387,7 +334,7 @@ const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
     </Modal>
   );
 
-  if (isDashboardLoading && !dashboardStats.totalMedications) {
+  if (isDashboardLoading && !dashboardStats.totalMedications || 0) {
     return (
       <View style={styles.container}>
         <PatientNavbar
@@ -623,7 +570,7 @@ const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
           
           <View style={styles.activityList}>
             {recentActivities.length > 0 ? (
-              recentActivities.map((activity, index) => (
+              recentActivities.slice(0,5).map((activity, index) => (
                 <TouchableOpacity
                   key={activity.id}
                   style={[
@@ -753,7 +700,7 @@ const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
                 }
               }}
             >
-              <Text style={simpleModalStyles.takeButtonText}>Take Medication</Text>
+              <Text style={simpleModalStyles.takeButtonText}>Take {'\n'} Medication</Text>
             </TouchableOpacity>
           ) : (
             <>
@@ -764,7 +711,7 @@ const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
                   navigation.navigate('Scanner');
                 }}
               >
-                <Text style={simpleModalStyles.scanButtonText}>Scan Barcode</Text>
+                <Text style={simpleModalStyles.scanButtonText}>Scan {'\n'} Barcode</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
@@ -875,6 +822,7 @@ const simpleModalStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
+    textAlign: 'center',
   },
   scanButton: {
     flex: 1,
@@ -888,6 +836,7 @@ const simpleModalStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
+    textAlign: 'center',
   },
   warningsContainer: {
     marginTop: 8,

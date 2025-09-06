@@ -31,6 +31,18 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'medications'>('info');
   const [patientData, setPatientData] = useState<PatientDetails | null>(null);
+  const [emergencyContact, setEmergencyContact] = useState<{
+  id: string;
+  name: string;
+  relationship: string;
+  phone: string;
+  isPrimary: boolean;
+} | null>(null);
+
+const [medicationHistory, setMedicationHistory] = useState<{
+  days: { date: string; displayDate: string }[];
+  medications: any[];
+} | null>(null);
 
   useEffect(() => {
     loadPatientDetails();
@@ -38,18 +50,23 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   }, []);
 
   const loadPatientDetails = async () => {
-    try {
-      setIsLoading(true);
-      const data = await caregiverAPI.getPatientDetails(patientId);
-      setPatientData(data);
-    } catch (error: any) {
-      console.error('Error loading patient details:', error);
-      Alert.alert('Error', error.message || 'Failed to load patient details. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  try {
+    setIsLoading(true);
+    const [patientData, emergencyContactData, historyData] = await Promise.all([
+      caregiverAPI.getPatientDetails(patientId),
+      caregiverAPI.getPatientEmergencyContact(patientId),
+      caregiverAPI.getPatientMedicationHistory(patientId)
+    ]);
+    setPatientData(patientData);
+    setEmergencyContact(emergencyContactData);
+    setMedicationHistory(historyData);
+  } catch (error: any) {
+    console.error('Error loading patient details:', error);
+    Alert.alert('Error', error.message || 'Failed to load patient details. Please try again.');
+  } finally {
+    setIsLoading(false);
+  }
+};
   const onRefresh = async () => {
     setRefreshing(true);
     await loadPatientDetails();
@@ -300,63 +317,113 @@ const PatientDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
 
             {/* Emergency Contact */}
-            {patient.emergencyContact && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Emergency Contact</Text>
-                <View style={styles.infoCard}>
-                  <View style={styles.infoRow}>
-                    <Ionicons name="person-circle-outline" size={20} color="#64748B" />
-                    <Text style={styles.infoLabel}>Name</Text>
-                    <Text style={styles.infoValue}>{patient.emergencyContact.name}</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <Ionicons name="heart-outline" size={20} color="#64748B" />
-                    <Text style={styles.infoLabel}>Relationship</Text>
-                    <Text style={styles.infoValue}>{patient.emergencyContact.relationship}</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <Ionicons name="call-outline" size={20} color="#64748B" />
-                    <Text style={styles.infoLabel}>Phone</Text>
-                    <Text style={styles.infoValue}>{patient.emergencyContact.phoneNumber}</Text>
-                  </View>
-                </View>
-              </View>
-            )}
+{(patient.emergencyContact || emergencyContact) && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Emergency Contact</Text>
+    <View style={styles.infoCard}>
+      {emergencyContact ? (
+        <>
+          <View style={styles.infoRow}>
+            <Ionicons name="person-circle-outline" size={20} color="#64748B" />
+            <Text style={styles.infoLabel}>Name</Text>
+            <Text style={styles.infoValue}>{emergencyContact.name}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Ionicons name="heart-outline" size={20} color="#64748B" />
+            <Text style={styles.infoLabel}>Relationship</Text>
+            <Text style={styles.infoValue}>{emergencyContact.relationship}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Ionicons name="call-outline" size={20} color="#64748B" />
+            <Text style={styles.infoLabel}>Phone</Text>
+            <Text style={styles.infoValue}>{emergencyContact.phone}</Text>
+          </View>
+        </>
+      ) : patient.emergencyContact ? (
+        <>
+          <View style={styles.infoRow}>
+            <Ionicons name="person-circle-outline" size={20} color="#64748B" />
+            <Text style={styles.infoLabel}>Name</Text>
+            <Text style={styles.infoValue}>{patient.emergencyContact.name}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Ionicons name="heart-outline" size={20} color="#64748B" />
+            <Text style={styles.infoLabel}>Relationship</Text>
+            <Text style={styles.infoValue}>{patient.emergencyContact.relationship}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Ionicons name="call-outline" size={20} color="#64748B" />
+            <Text style={styles.infoLabel}>Phone</Text>
+            <Text style={styles.infoValue}>{patient.emergencyContact.phoneNumber}</Text>
+          </View>
+        </>
+      ) : null}
+    </View>
+  </View>
+)}
 
-            {/* Medical Information */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Medical Information</Text>
-              <View style={styles.infoCard}>
-                {patient.medicalHistory && patient.medicalHistory.length > 0 && (
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoColumnTitle}>Medical History</Text>
-                    {patient.medicalHistory.map((condition, index) => (
-                      <View key={index} style={styles.conditionItem}>
-                        <Ionicons name="medical-outline" size={16} color="#059669" />
-                        <Text style={styles.conditionText}>{condition}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-                
-                {patient.allergies && patient.allergies.length > 0 && (
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoColumnTitle}>Allergies</Text>
-                    {patient.allergies.map((allergy, index) => (
-                      <View key={index} style={styles.conditionItem}>
-                        <Ionicons name="warning-outline" size={16} color="#EF4444" />
-                        <Text style={styles.conditionText}>{allergy}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-                
-                {(!patient.medicalHistory || patient.medicalHistory.length === 0) && 
-                 (!patient.allergies || patient.allergies.length === 0) && (
-                  <Text style={styles.noDataText}>No medical history or allergies recorded</Text>
-                )}
-              </View>
+          {/* Medication History */}
+{medicationHistory && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Medication Taking History (Last 7 Days)</Text>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <View style={styles.historyContainer}>
+        {/* Header with dates */}
+        <View style={styles.historyHeader}>
+          <View style={styles.medicationNameColumn}>
+            <Text style={styles.historyHeaderText}>Medication</Text>
+          </View>
+          {medicationHistory.days.map((day, index) => (
+            <View key={day.date} style={styles.dayColumn}>
+              <Text style={styles.dayHeaderText}>{day.displayDate}</Text>
             </View>
+          ))}
+        </View>
+
+        {/* Medication rows */}
+        {medicationHistory.medications.map((medication) => (
+          <View key={medication.id} style={styles.medicationRow}>
+            <View style={styles.medicationNameColumn}>
+              <Text style={styles.medicationRowName}>{medication.name}</Text>
+              <Text style={styles.medicationRowDosage}>{medication.dosage}</Text>
+              <Text style={styles.medicationRowFreq}>{medication.frequency}x daily</Text>
+            </View>
+            
+            {medication.dailyStatus.map(
+              (
+                day: {
+                  date: string;
+                  doses: { taken: boolean }[];
+                  adherenceRate: number;
+                }
+              ) => (
+                <View key={day.date} style={styles.dayColumn}>
+                  <View style={styles.dosesContainer}>
+                    {day.doses.map(
+                      (
+                        dose: { taken: boolean },
+                        doseIndex: number
+                      ) => (
+                        <View key={doseIndex} style={styles.doseIndicator}>
+                          <Ionicons 
+                            name={dose.taken ? "checkmark-circle" : "close-circle"} 
+                            size={20} 
+                            color={dose.taken ? "#059669" : "#EF4444"} 
+                          />
+                        </View>
+                      )
+                    )}
+                  </View>
+                  <Text style={styles.adherencePercentage}>{day.adherenceRate}%</Text>
+                </View>
+              )
+            )}
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  </View>
+)}
           </View>
         ) : (
           <View style={styles.tabContent}>
@@ -830,6 +897,79 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderColor: '#FECACA',
   },
+  historyContainer: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: RADIUS.xl,
+  padding: SPACING[4],
+  borderWidth: 1,
+  borderColor: '#E2E8F0',
+  minWidth: 600,
+},
+historyHeader: {
+  flexDirection: 'row',
+  borderBottomWidth: 2,
+  borderBottomColor: '#E2E8F0',
+  paddingBottom: SPACING[3],
+  marginBottom: SPACING[4],
+},
+medicationNameColumn: {
+  width: 140,
+  paddingRight: SPACING[3],
+},
+dayColumn: {
+  width: 70,
+  alignItems: 'center',
+  paddingHorizontal: SPACING[1],
+},
+historyHeaderText: {
+  fontSize: TYPOGRAPHY.fontSize.sm,
+  fontWeight: '600',
+  color: '#1E293B',
+},
+dayHeaderText: {
+  fontSize: TYPOGRAPHY.fontSize.xs,
+  fontWeight: '500',
+  color: '#64748B',
+  textAlign: 'center',
+},
+medicationRow: {
+  flexDirection: 'row',
+  paddingVertical: SPACING[4],
+  borderBottomWidth: 1,
+  borderBottomColor: '#F1F5F9',
+  alignItems: 'center',
+},
+medicationRowName: {
+  fontSize: TYPOGRAPHY.fontSize.sm,
+  fontWeight: '600',
+  color: '#1E293B',
+  marginBottom: SPACING[1],
+},
+medicationRowDosage: {
+  fontSize: TYPOGRAPHY.fontSize.xs,
+  color: '#64748B',
+  marginBottom: 2,
+},
+medicationRowFreq: {
+  fontSize: TYPOGRAPHY.fontSize.xs,
+  color: '#059669',
+  fontWeight: '500',
+},
+dosesContainer: {
+  flexDirection: 'row',
+  justifyContent: 'center',
+  marginBottom: SPACING[2],
+  flexWrap: 'wrap',
+},
+doseIndicator: {
+  margin: 1,
+},
+adherencePercentage: {
+  fontSize: TYPOGRAPHY.fontSize.xs,
+  color: '#64748B',
+  textAlign: 'center',
+  fontWeight: '500',
+},
 });
 
 export default PatientDetailsScreen;

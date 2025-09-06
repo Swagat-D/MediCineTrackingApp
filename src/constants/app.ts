@@ -14,7 +14,7 @@ export interface APIConfig {
 }
 
 export const API_CONFIG: APIConfig = {
-  BASE_URL: __DEV__ ? 'http://192.168.145.210:5000/api' : 'https://meditrack-backend-d6sp.onrender.com/api',
+  BASE_URL: __DEV__ ? 'http://192.168.68.210:5000/api' : 'https://meditrack-backend-d6sp.onrender.com/api',
   TIMEOUT: 10000,
   HEADERS: {
     'Content-Type': 'application/json',
@@ -30,6 +30,12 @@ export const STORAGE_KEYS = {
   SETTINGS: '@meditracker_settings',
   MEAL_TIMES: '@meditracker_meal_times',
   OFFLINE_DATA: '@meditracker_offline_data',
+  DASHBOARD_DATA: 'dashboard_data',
+  MEDICATIONS_DATA: 'medications_data',
+  PATIENTS_DATA: 'patients_data',
+  NOTIFICATIONS_DATA: 'notifications_data',
+  MEAL_TIMES_DATA: 'meal_times_data',
+  ACTIVITIES_DATA: 'activities_data',
 } as const;
 
 // Screen Names for Navigation

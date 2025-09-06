@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -13,23 +14,16 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAppSelector } from '../../store';
+import { useAppSelector, RootState,AppDispatch } from '../../store';
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import CaregiverNavbar from '../../components/common/CaregiverNavbar';
-import { caregiverAPI } from '../../services/api/caregiverAPI';
+import { useDispatch, useSelector } from 'react-redux';
+import { loadDashboardWithCache, refreshDashboard } from '../../store/slices/caregiverSlice';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { width, height } = Dimensions.get('window');
 
 type Props = CaregiverStackScreenProps<'Dashboard'>;
-
-interface DashboardStats {
-  totalPatients: number;
-  activeMedications: number;
-  todayReminders: number;
-  criticalAlerts: number;
-}
 
 interface RecentActivity {
   id: string;
@@ -44,40 +38,27 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAppSelector(state => state.auth);
   const [refreshing, setRefreshing] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
-  const [allActivities, setAllActivities] = useState<RecentActivity[]>([]);
-  
-  const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
-    totalPatients: 0,
-    activeMedications: 0,
-    todayReminders: 0,
-    criticalAlerts: 0,
-  });
-  
-  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+
+  const dispatch = useDispatch<AppDispatch>();
+const {
+  dashboardStats,
+  recentActivities,
+} = useSelector((state: RootState) => state.caregiver);
 
   const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      const data = await caregiverAPI.getDashboardStats();
-      setDashboardStats(data.stats);
-      
-      const activities = data.recentActivities.map((activity: any) => ({
-        ...activity,
-        type: activity.type as 'dose_taken' | 'dose_missed' | 'low_stock' | 'sos_alert',
-      }));
-      
-      // Limit recent activities to 10
-      setRecentActivities(activities.slice(0, 7));
-      setAllActivities(activities); // Store all activities for modal
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  setRefreshing(true);
+  try {
+    await dispatch(refreshDashboard()).unwrap();
+  } catch (error) {
+    console.error('Error refreshing dashboard data:', error);
+  } finally {
+    setRefreshing(false);
+  }
+};
 
   useEffect(() => {
-    onRefresh();
+    dispatch(loadDashboardWithCache());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getGreeting = () => {
@@ -130,18 +111,14 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
         </View>
 
         {/* Modal Content */}
-        <ScrollView
-          style={styles.modalScrollView}
-          contentContainerStyle={styles.modalScrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView>
           <View style={styles.modalActivityList}>
-            {allActivities.map((activity, index) => (
+            {recentActivities.map((activity, index) => (
               <TouchableOpacity
                 key={activity.id}
                 style={[
                   styles.modalActivityItem,
-                  index === allActivities.length - 1 && styles.lastModalActivityItem
+                  index === recentActivities.length - 1 && styles.lastModalActivityItem
                 ]}
                 activeOpacity={0.7}
                 onPress={() => {
@@ -176,7 +153,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
               </TouchableOpacity>
             ))}
             
-            {allActivities.length === 0 && (
+            {recentActivities.length === 0 && (
               <View style={styles.emptyState}>
                 <Ionicons name="time-outline" size={48} color="#94A3B8" />
                 <Text style={styles.emptyStateText}>No recent activities</Text>
@@ -194,7 +171,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
       <CaregiverNavbar
         onNotificationPress={() => navigation.navigate('Notifications')}
         onSettingsPress={() => navigation.navigate('Settings')}
-        notificationCount={dashboardStats.criticalAlerts}
+        notificationCount={dashboardStats?.criticalAlerts || 0}
       />
       
       <ScrollView
@@ -244,7 +221,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                   <Ionicons name="people" size={20} color="#059669" />
                   <Text style={styles.statLabel}>Total Patients</Text>
                 </View>
-                <Text style={styles.statValue}>{dashboardStats.totalPatients}</Text>
+                <Text style={styles.statValue}>{dashboardStats?.totalPatients || 0}</Text>
               </View>
             </TouchableOpacity>
 
@@ -261,7 +238,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                 />
                   <Text style={styles.statLabel}>Medications</Text>
                 </View>
-                <Text style={styles.statValue}>{dashboardStats.activeMedications}</Text>
+                <Text style={styles.statValue}>{dashboardStats?.activeMedications || 0}</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -276,7 +253,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                   <Ionicons name="time" size={20} color="#F59E0B" />
                   <Text style={styles.statLabel}>Reminders</Text>
                 </View>
-                <Text style={styles.statValue}>{dashboardStats.todayReminders}</Text>
+                <Text style={styles.statValue}>{dashboardStats?.todayReminders || 0}</Text>
               </View>
             </TouchableOpacity>
 
@@ -297,7 +274,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
                   styles.statValue,
                   dashboardStats.criticalAlerts > 0 && styles.alertValue
                 ]}>
-                  {dashboardStats.criticalAlerts}
+                  {dashboardStats?.criticalAlerts || 0}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -347,7 +324,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           
           <View style={styles.activityList}>
-            {recentActivities.map((activity, index) => (
+            {recentActivities.slice(0, 5).map((activity, index) => (
               <TouchableOpacity
                 key={activity.id}
                 style={[

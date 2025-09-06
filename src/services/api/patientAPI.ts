@@ -1,4 +1,6 @@
 import { apiClient } from './apiClient';
+import { cacheService } from '../cache/cacheService';
+import { STORAGE_KEYS } from '@/constants/app';
 
 export interface PatientDashboardStats {
   totalMedications: number;
@@ -300,6 +302,111 @@ async updateProfile(data: {
 }): Promise<{ message: string; success: boolean }> {
   const response = await apiClient.put('/patient/profile', data);
   return response.data;
+}
+
+async getDashboardDataWithCache(): Promise<{
+  stats: PatientDashboardStats;
+  todaysMedications: TodayMedication[];
+  upcomingReminders: UpcomingReminder[];
+}> {
+  // Try cache first
+  const cachedData = await cacheService.getAppData(STORAGE_KEYS.DASHBOARD_DATA);
+  if (
+    cachedData &&
+    typeof cachedData === 'object' &&
+    'stats' in cachedData &&
+    'todaysMedications' in cachedData &&
+    'upcomingReminders' in cachedData
+  ) {
+    console.log('📱 Loading dashboard from cache');
+    // Background refresh
+    this.refreshDashboardInBackground();
+    return cachedData as {
+      stats: PatientDashboardStats;
+      todaysMedications: TodayMedication[];
+      upcomingReminders: UpcomingReminder[];
+    };
+  }
+  
+  // No cache, fetch fresh
+  return this.fetchAndCacheDashboard();
+}
+
+private async fetchAndCacheDashboard() {
+  const response = await apiClient.get('/patient/dashboard');
+  const data = response.data.data;
+  // Cache it
+  await cacheService.setAppData(STORAGE_KEYS.DASHBOARD_DATA, data);
+  return data;
+}
+
+private async refreshDashboardInBackground() {
+  try {
+    await this.fetchAndCacheDashboard();
+  } catch (error) {
+    console.error(error);
+    console.log('Background refresh failed');
+  }
+}
+
+async getMedicationsWithCache(): Promise<PatientMedication[]> {
+  const cachedMeds = await cacheService.getAppData(STORAGE_KEYS.MEDICATIONS_DATA);
+  if (Array.isArray(cachedMeds)) {
+    this.refreshMedicationsInBackground();
+    return cachedMeds as PatientMedication[];
+  }
+  
+  const response = await apiClient.get('/patient/medications');
+  const data = response.data.data;
+  await cacheService.setAppData(STORAGE_KEYS.MEDICATIONS_DATA, data);
+  return data;
+}
+
+private async refreshMedicationsInBackground() {
+  try {
+    const response = await apiClient.get('/patient/medications');
+    await cacheService.setAppData(STORAGE_KEYS.MEDICATIONS_DATA, response.data.data);
+  } catch (error) {
+    console.error(error);
+    console.log('Background refresh failed');
+  }
+}
+
+async getRecentActivitiesWithCache(): Promise<{
+  id: string;
+  type: 'dose_taken' | 'dose_missed' | 'reminder_sent' | 'medication_added';
+  medicationName: string;
+  message: string;
+  timestamp: string;
+  priority: 'low' | 'medium' | 'high';
+}[]> {
+  // Try cache first
+  const cachedActivities = await cacheService.getAppData(STORAGE_KEYS.ACTIVITIES_DATA);
+  if (Array.isArray(cachedActivities)) {
+    console.log('📱 Loading activities from cache');
+    // Background refresh
+    this.refreshActivitiesInBackground();
+    return cachedActivities;
+  }
+  
+  // No cache, fetch fresh
+  return this.fetchAndCacheActivities();
+}
+
+private async fetchAndCacheActivities() {
+  const response = await apiClient.get('/patient/activities');
+  const data = response.data.data;
+  // Cache it
+  await cacheService.setAppData(STORAGE_KEYS.ACTIVITIES_DATA, data);
+  return data;
+}
+
+private async refreshActivitiesInBackground() {
+  try {
+    await this.fetchAndCacheActivities();
+  } catch (error) {
+    console.error('Background activities refresh failed:', error);
+  }
 }
 
 async addEmergencyContact(contactData: {

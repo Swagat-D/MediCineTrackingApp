@@ -1,3 +1,5 @@
+import { STORAGE_KEYS } from '@/constants/app';
+import { cacheService } from '../cache/cacheService';
 import { apiClient } from './apiClient';
 
 export interface DashboardStats {
@@ -227,11 +229,94 @@ async verifyPatientOTP(patientId: string, otp: string): Promise<Patient> {
   await apiClient.delete(`/caregiver/medications/${medicationId}`);
 }
 
+async getPatientEmergencyContact(patientId: string): Promise<{
+  id: string;
+  name: string;
+  relationship: string;
+  phone: string;
+  isPrimary: boolean;
+} | null> {
+  const response = await apiClient.get(`/caregiver/patients/${patientId}/emergency-contacts`);
+  return response.data.data;
+}
+
+async getPatientMedicationHistory(patientId: string): Promise<{
+  days: { date: string; displayDate: string }[];
+  medications: {
+    id: string;
+    name: string;
+    dosage: string;
+    frequency: number;
+    timingRelation: string;
+    dailyStatus: {
+      date: string;
+      displayDate: string;
+      doses: { taken: boolean; time?: string }[];
+      adherenceRate: number;
+    }[];
+  }[];
+}> {
+  const response = await apiClient.get(`/caregiver/patients/${patientId}/medication-history`);
+  return response.data.data;
+}
+
   // Barcodes
   async getBarcodes(): Promise<Barcode[]> {
     const response = await apiClient.get('/caregiver/barcodes');
     return response.data.data;
   }
+
+  // Add to caregiverAPI.ts class
+async getDashboardStatsWithCache(): Promise<{ stats: DashboardStats; recentActivities: RecentActivity[] }> {
+  const cachedData = await cacheService.getAppData(STORAGE_KEYS.DASHBOARD_DATA);
+  if (
+    cachedData &&
+    typeof cachedData === 'object' &&
+    'stats' in cachedData &&
+    'recentActivities' in cachedData
+  ) {
+    this.refreshDashboardInBackground();
+    return cachedData as { stats: DashboardStats; recentActivities: RecentActivity[] };
+  }
+  
+  const response = await apiClient.get('/caregiver/dashboard/stats');
+  const data = response.data.data;
+  await cacheService.setAppData(STORAGE_KEYS.DASHBOARD_DATA, data);
+  return data;
+}
+
+private async refreshDashboardInBackground() {
+  try {
+    const response = await apiClient.get('/caregiver/dashboard/stats');
+    await cacheService.setAppData(STORAGE_KEYS.DASHBOARD_DATA, response.data.data);
+  } catch (error) {
+    console.error(error)
+    console.log('Background refresh failed');
+  }
+}
+
+async getPatientsWithCache(): Promise<Patient[]> {
+  const cachedPatients = await cacheService.getAppData(STORAGE_KEYS.PATIENTS_DATA);
+  if (cachedPatients) {
+    this.refreshPatientsInBackground();
+    return Array.isArray(cachedPatients) ? cachedPatients : [];
+  }
+  
+  const response = await apiClient.get('/caregiver/patients');
+  const data = response.data.data;
+  await cacheService.setAppData(STORAGE_KEYS.PATIENTS_DATA, data);
+  return data;
+}
+
+private async refreshPatientsInBackground() {
+  try {
+    const response = await apiClient.get('/caregiver/patients');
+    await cacheService.setAppData(STORAGE_KEYS.PATIENTS_DATA, response.data.data);
+  } catch (error) {
+    console.error(error)
+    console.log('Background refresh failed');
+  }
+}
 }
 
 export const caregiverAPI = new CaregiverAPI();

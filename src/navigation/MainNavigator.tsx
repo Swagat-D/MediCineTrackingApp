@@ -15,7 +15,7 @@ const Stack = createStackNavigator<RootStackParamList>();
 
 const MainNavigator: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, user } = useAppSelector((state: any) => state.auth);
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {

@@ -535,34 +535,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Preferences */}
-        <View style={styles.preferencesSection}>
-          <Text style={styles.sectionTitle}>Preferences</Text>
-          
-          <View style={styles.preferenceCard}>
-            <View style={styles.preferenceItem}>
-              <View style={styles.preferenceInfo}>
-                <View style={[styles.preferenceIcon, { backgroundColor: theme.primaryLight }]}>
-                  <Ionicons name="notifications-outline" size={20} color={theme.primary} />
-                </View>
-                <View style={styles.preferenceText}>
-                  <Text style={styles.preferenceLabel}>Push Notifications</Text>
-                  <Text style={styles.preferenceDescription}>
-                    Get medication reminders and updates
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={notifications}
-                onValueChange={setNotifications}
-                trackColor={{ false: '#E2E8F0', true: theme.primaryLight }}
-                thumbColor={notifications ? theme.primary : '#94A3B8'}
-                ios_backgroundColor="#E2E8F0"
-              />
-            </View>
-          </View>
-        </View>
-
         {/* Quick Actions */}
         <View style={styles.actionsSection}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>

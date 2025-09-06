@@ -6,11 +6,11 @@ export default {
     slug: "meditracker-app",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/images/icon.png",
+    icon: "./assets/images/logo.png",
     scheme: "medicinetrackingapp",
     userInterfaceStyle: "light",
     splash: {
-      image: "./assets/images/splash-icon.png",
+      image: "./assets/images/logo.png",
       resizeMode: "contain",
       backgroundColor: "#ffffff"
     },
@@ -20,7 +20,7 @@ export default {
     android: {
       package: "com.swagat1212.meditrackerapp",
       adaptiveIcon: {
-        foregroundImage: "./assets/images/adaptive-icon.png",
+        foregroundImage: "./assets/images/logo.png",
         backgroundColor: "#ffffff",
       },
       edgeToEdgeEnabled: true,
@@ -28,7 +28,7 @@ export default {
     web: {
       bundler: "metro",
       output: "single", 
-      favicon: "./assets/images/favicon.png"
+      favicon: "./assets/images/logo.png"
     },
     plugins: [
       "expo-splash-screen",

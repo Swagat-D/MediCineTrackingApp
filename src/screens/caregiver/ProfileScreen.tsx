@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Switch,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,10 +42,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     name: '',
     phoneNumber: '',
   });
-
-  // Essential settings only
-  const [notifications, setNotifications] = useState(true);
-
   useEffect(() => {
     loadProfile();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -333,34 +328,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
               </>
             )}
-          </View>
-        </View>
-
-        {/* Preferences */}
-        <View style={styles.preferencesSection}>
-          <Text style={styles.sectionTitle}>Preferences</Text>
-          
-          <View style={styles.preferenceCard}>
-            <View style={styles.preferenceItem}>
-              <View style={styles.preferenceInfo}>
-                <View style={styles.preferenceIcon}>
-                  <Ionicons name="notifications-outline" size={20} color="#059669" />
-                </View>
-                <View style={styles.preferenceText}>
-                  <Text style={styles.preferenceLabel}>Push Notifications</Text>
-                  <Text style={styles.preferenceDescription}>
-                    Get notified about patient updates and reminders
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={notifications}
-                onValueChange={setNotifications}
-                trackColor={{ false: '#E2E8F0', true: '#BBF7D0' }}
-                thumbColor={notifications ? '#059669' : '#94A3B8'}
-                ios_backgroundColor="#E2E8F0"
-              />
-            </View>
           </View>
         </View>
 

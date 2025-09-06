@@ -3,6 +3,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Screens
 import HomeScreen from '../screens/patient/HomeScreen';
@@ -66,6 +67,7 @@ const ProfileStack: React.FC = () => (
 );
 
 const PatientNavigator: React.FC = () => {
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={({
@@ -106,8 +108,8 @@ const PatientNavigator: React.FC = () => {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E2E8F0',
-          height: 70,
-          paddingBottom: 8,
+          height: 65 + insets.bottom,
+          paddingBottom: 8 + insets.bottom,
           paddingTop: 8,
           shadowColor: '#64748B',
           shadowOffset: { width: 0, height: -2 },
@@ -115,6 +117,7 @@ const PatientNavigator: React.FC = () => {
           shadowRadius: 8,
           elevation: 8,
         },
+        tabBarSafeAreaInset: { bottom: 'always' },
         headerShown: false,
       })}
     >

@@ -32,7 +32,7 @@ class AuthAPI {
         otpSent: response.data.otpSent
       };
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Signup failed');
+      throw new Error(error.response?.data?.message || error.response?.data?.error || error.message || 'Signup failed');
     }
   }
 

@@ -11,11 +11,10 @@ import {
   Linking,
   Clipboard,
   Alert,
-  ColorValue
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import SecondaryNavbar from '../../components/common/SecondaryNavbar';
+import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 
 interface PrivacyPolicyScreenProps {
@@ -25,7 +24,7 @@ interface PrivacyPolicyScreenProps {
 
 const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = ({ 
   navigation, 
-  userRole = 'caregiver' 
+  userRole
 }) => {
   const [expandedSections, setExpandedSections] = useState<{ [key: number]: boolean }>({});
   const [animatedValues] = useState(
@@ -33,14 +32,16 @@ const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = ({
   );
 
   const theme = {
-    primary: userRole === 'caregiver' ? '#059669' : '#2196F3',
-    primaryLight: userRole === 'caregiver' ? '#F0FDF4' : '#E3F2FD',
-    primaryDark: userRole === 'caregiver' ? '#047857' : '#1976D2',
-    gradient: userRole === 'caregiver'
-      ? ['#F0FDF4', '#FFFFFF'] as [ColorValue, ColorValue]
-      : ['#E3F2FD', '#FFFFFF'] as [ColorValue, ColorValue],
-    accent: userRole === 'caregiver' ? '#10B981' : '#42A5F5',
-  };
+  primary: userRole === 'caregiver' ? '#059669' : '#2563EB', // Changed patient blue to match login
+  primaryLight: userRole === 'caregiver' ? '#ECFDF5' : '#EFF6FF', // Lighter backgrounds
+  primaryDark: userRole === 'caregiver' ? '#047857' : '#1D4ED8', // Darker variants
+  gradient: userRole === 'caregiver'
+    ? ['#ECFDF5', '#FFFFFF'] as const // Softer green gradient
+    : ['#EFF6FF', '#FFFFFF'] as const, // Softer blue gradient
+  accent: userRole === 'caregiver' ? '#10B981' : '#3B82F6', // Better accent colors
+  text: userRole === 'caregiver' ? '#065F46' : '#1E40AF', // Darker text colors for better contrast
+  border: userRole === 'caregiver' ? '#A7F3D0' : '#BFDBFE', // Subtle border colors
+};
 
   const toggleSection = (index: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -155,338 +156,338 @@ const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = ({
   ];
 
   return (
-    <View style={styles.container}>
-      <SecondaryNavbar
-        title="Privacy Policy"
-        onBackPress={() => navigation.goBack()}
-      />
+  <View style={styles.container}>
+    <PatientSecondaryNavbar
+      title="Privacy Policy"
+      onBackPress={() => navigation.goBack()}
+    />
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Header */}
+      <LinearGradient
+        colors={theme.gradient}
+        style={styles.headerSection}
       >
-        {/* Header */}
-        <LinearGradient
-          colors={theme.gradient}
-          style={styles.headerSection}
-        >
-          <View style={styles.headerContent}>
-            <View style={[styles.headerIcon, { shadowColor: theme.primary }]}>
-              <Ionicons name="shield-checkmark" size={48} color={theme.primary} />
-            </View>
-            <Text style={styles.headerTitle}>Privacy Policy</Text>
-            <Text style={styles.headerSubtitle}>
-              Your privacy and data security are our top priorities
-            </Text>
-            <View style={[styles.lastUpdatedBadge, { backgroundColor: theme.primaryLight }]}>
-              <Text style={[styles.lastUpdated, { color: theme.primary }]}>
-                Last updated: December 15, 2024
-              </Text>
-            </View>
+        <View style={styles.headerContent}>
+          <View style={[styles.headerIcon, { shadowColor: theme.primary }]}>
+            <Ionicons name="shield-checkmark" size={48} color={theme.primary} />
           </View>
-        </LinearGradient>
-
-        {/* Introduction */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Introduction</Text>
-          <View style={styles.introCard}>
-            <Text style={styles.bodyText}>
-              MediTracker Technologies (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is committed to protecting your privacy and 
-              ensuring the security of your personal health information. This Privacy Policy explains how 
-              we collect, use, disclose, and safeguard your information when you use our MediTracker mobile 
-              application and related services.
+          <Text style={styles.headerTitle}>Privacy Policy</Text>
+          <Text style={styles.headerSubtitle}>
+            Your privacy and data security are our top priorities
+          </Text>
+          <View style={[styles.lastUpdatedBadge, { backgroundColor: theme.primaryLight }]}>
+            <Text style={[styles.lastUpdated, { color: theme.primary }]}>
+              Last updated: December 15, 2024
             </Text>
           </View>
         </View>
+      </LinearGradient>
 
-        {/* HIPAA Compliance Highlight */}
-        <View style={styles.section}>
-          <View style={[styles.highlightBox, { 
-            backgroundColor: theme.primaryLight,
-            borderColor: theme.primary + '30'
-          }]}>
-            <LinearGradient
-              colors={[theme.primaryLight, theme.primaryLight + '80']}
-              style={styles.highlightGradient}
-            >
-              <View style={styles.highlightHeader}>
-                <View style={[styles.highlightIconContainer, { backgroundColor: theme.primary + '20' }]}>
-                  <Ionicons name="shield-checkmark" size={24} color={theme.primary} />
-                </View>
-                <Text style={[styles.highlightTitle, { color: theme.primaryDark }]}>
-                  HIPAA Compliance Guarantee
-                </Text>
+      {/* Introduction */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Introduction</Text>
+        <View style={styles.introCard}>
+          <Text style={styles.bodyText}>
+            MediTracker Technologies (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is committed to protecting your privacy and 
+            ensuring the security of your personal health information. This Privacy Policy explains how 
+            we collect, use, disclose, and safeguard your information when you use our MediTracker mobile 
+            application and related services.
+          </Text>
+        </View>
+      </View>
+
+      {/* HIPAA Compliance Highlight */}
+      <View style={styles.section}>
+        <View style={[styles.highlightBox, { 
+          backgroundColor: theme.primaryLight,
+          borderColor: theme.primary + '30'
+        }]}>
+          <LinearGradient
+            colors={[theme.primaryLight, theme.primaryLight + '80']}
+            style={styles.highlightGradient}
+          >
+            <View style={styles.highlightHeader}>
+              <View style={[styles.highlightIconContainer, { backgroundColor: theme.primary + '20' }]}>
+                <Ionicons name="shield-checkmark" size={24} color={theme.primary} />
               </View>
-              <Text style={[styles.highlightText, { color: theme.primaryDark }]}>
-                MediTracker is fully HIPAA compliant. We implement administrative, physical, and technical 
-                safeguards to protect your Protected Health Information (PHI) in accordance with federal 
-                health information privacy laws.
+              <Text style={[styles.highlightTitle, { color: theme.primaryDark }]}>
+                HIPAA Compliance Guarantee
               </Text>
+            </View>
+            <Text style={[styles.highlightText, { color: theme.primaryDark }]}>
+              MediTracker is fully HIPAA compliant. We implement administrative, physical, and technical 
+              safeguards to protect your Protected Health Information (PHI) in accordance with federal 
+              health information privacy laws.
+            </Text>
+          </LinearGradient>
+        </View>
+      </View>
+
+      {/* Collapsible Sections */}
+      {collapsibleSections.map((section, index) => (
+        <View key={index} style={styles.section}>
+          <TouchableOpacity
+            style={[
+              styles.collapsibleHeader,
+              expandedSections[index] && { backgroundColor: theme.primaryLight }
+            ]}
+            onPress={() => toggleSection(index)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.collapsibleHeaderContent}>
+              <View style={[
+                styles.collapsibleIcon,
+                { backgroundColor: expandedSections[index] ? theme.primary : theme.primaryLight }
+              ]}>
+                <Ionicons 
+                  name={section.icon as any} 
+                  size={20} 
+                  color={expandedSections[index] ? '#FFFFFF' : theme.primary} 
+                />
+              </View>
+              <Text style={[
+                styles.collapsibleTitle,
+                expandedSections[index] && { color: theme.primary }
+              ]}>
+                {section.title}
+              </Text>
+              <Animated.View style={{
+                transform: [{
+                  rotate: animatedValues[index].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '180deg'],
+                  })
+                }]
+              }}>
+                <Ionicons 
+                  name="chevron-down" 
+                  size={20} 
+                  color={expandedSections[index] ? theme.primary : '#94A3B8'} 
+                />
+              </Animated.View>
+            </View>
+          </TouchableOpacity>
+
+          {expandedSections[index] && (
+            <Animated.View style={[
+              styles.collapsibleContent,
+              {
+                opacity: animatedValues[index],
+                transform: [{
+                  scale: animatedValues[index].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.95, 1],
+                  })
+                }]
+              }
+            ]}>
+              <Text style={styles.contentIntro}>{section.content.intro}</Text>
+              
+              {section.content.subsections ? (
+                section.content.subsections.map((subsection, subIndex) => (
+                  <View key={subIndex} style={styles.subsection}>
+                    <Text style={styles.subsectionTitle}>{subsection.title}</Text>
+                    <View style={styles.bulletList}>
+                      {subsection.items.map((item, itemIndex) => (
+                        <View key={itemIndex} style={styles.bulletItem}>
+                          <View style={[styles.bullet, { backgroundColor: theme.primary }]} />
+                          <Text style={styles.bulletText}>{item}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ))
+              ) : section.content.rights ? (
+                <View style={styles.rightsGrid}>
+                  {section.content.rights.map((right, rightIndex) => (
+                    <View key={rightIndex} style={styles.rightItem}>
+                      <View style={[styles.rightIcon, { backgroundColor: theme.primaryLight }]}>
+                        <Ionicons name={right.icon as any} size={16} color={theme.primary} />
+                      </View>
+                      <Text style={styles.rightText}>{right.text}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.bulletList}>
+                  {section.content.items?.map((item, itemIndex) => (
+                    <View key={itemIndex} style={styles.bulletItem}>
+                      <View style={[styles.bullet, { backgroundColor: theme.primary }]} />
+                      <Text style={styles.bulletText}>{item}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </Animated.View>
+          )}
+        </View>
+      ))}
+
+      {/* Data Security */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Data Security</Text>
+        <Text style={styles.bodyText}>
+          We implement industry-leading security measures to protect your information:
+        </Text>
+        
+        <View style={styles.securityGrid}>
+          <View style={styles.securityItem}>
+            <LinearGradient
+              colors={[theme.primaryLight, '#FFFFFF']}
+              style={styles.securityGradient}
+            >
+              <View style={[styles.securityIcon, { backgroundColor: theme.primary + '20' }]}>
+                <Ionicons name="lock-closed" size={20} color={theme.primary} />
+              </View>
+              <Text style={styles.securityTitle}>Encryption</Text>
+              <Text style={styles.securityDescription}>End-to-end encryption for all data transmission</Text>
+            </LinearGradient>
+          </View>
+          
+          <View style={styles.securityItem}>
+            <LinearGradient
+              colors={[theme.primaryLight, '#FFFFFF']}
+              style={styles.securityGradient}
+            >
+              <View style={[styles.securityIcon, { backgroundColor: theme.primary + '20' }]}>
+                <Ionicons name="server" size={20} color={theme.primary} />
+              </View>
+              <Text style={styles.securityTitle}>Secure Storage</Text>
+              <Text style={styles.securityDescription}>HIPAA-compliant cloud infrastructure</Text>
+            </LinearGradient>
+          </View>
+          
+          <View style={styles.securityItem}>
+            <LinearGradient
+              colors={[theme.primaryLight, '#FFFFFF']}
+              style={styles.securityGradient}
+            >
+              <View style={[styles.securityIcon, { backgroundColor: theme.primary + '20' }]}>
+                <Ionicons name="shield-checkmark" size={20} color={theme.primary} />
+              </View>
+              <Text style={styles.securityTitle}>Access Control</Text>
+              <Text style={styles.securityDescription}>Multi-factor authentication and role-based access</Text>
             </LinearGradient>
           </View>
         </View>
+      </View>
 
-        {/* Collapsible Sections */}
-        {collapsibleSections.map((section, index) => (
-          <View key={index} style={styles.section}>
-            <TouchableOpacity
-              style={[
-                styles.collapsibleHeader,
-                expandedSections[index] && { backgroundColor: theme.primaryLight }
-              ]}
-              onPress={() => toggleSection(index)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.collapsibleHeaderContent}>
-                <View style={[
-                  styles.collapsibleIcon,
-                  { backgroundColor: expandedSections[index] ? theme.primary : theme.primaryLight }
-                ]}>
-                  <Ionicons 
-                    name={section.icon as any} 
-                    size={20} 
-                    color={expandedSections[index] ? '#FFFFFF' : theme.primary} 
-                  />
-                </View>
-                <Text style={[
-                  styles.collapsibleTitle,
-                  expandedSections[index] && { color: theme.primary }
-                ]}>
-                  {section.title}
-                </Text>
-                <Animated.View style={{
-                  transform: [{
-                    rotate: animatedValues[index].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0deg', '180deg'],
-                    })
-                  }]
-                }}>
-                  <Ionicons 
-                    name="chevron-down" 
-                    size={20} 
-                    color={expandedSections[index] ? theme.primary : '#94A3B8'} 
-                  />
-                </Animated.View>
-              </View>
-            </TouchableOpacity>
-
-            {expandedSections[index] && (
-              <Animated.View style={[
-                styles.collapsibleContent,
-                {
-                  opacity: animatedValues[index],
-                  transform: [{
-                    scale: animatedValues[index].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.95, 1],
-                    })
-                  }]
-                }
-              ]}>
-                <Text style={styles.contentIntro}>{section.content.intro}</Text>
-                
-                {section.content.subsections ? (
-                  section.content.subsections.map((subsection, subIndex) => (
-                    <View key={subIndex} style={styles.subsection}>
-                      <Text style={styles.subsectionTitle}>{subsection.title}</Text>
-                      <View style={styles.bulletList}>
-                        {subsection.items.map((item, itemIndex) => (
-                          <View key={itemIndex} style={styles.bulletItem}>
-                            <View style={[styles.bullet, { backgroundColor: theme.primary }]} />
-                            <Text style={styles.bulletText}>{item}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  ))
-                ) : section.content.rights ? (
-                  <View style={styles.rightsGrid}>
-                    {section.content.rights.map((right, rightIndex) => (
-                      <View key={rightIndex} style={styles.rightItem}>
-                        <View style={[styles.rightIcon, { backgroundColor: theme.primaryLight }]}>
-                          <Ionicons name={right.icon as any} size={16} color={theme.primary} />
-                        </View>
-                        <Text style={styles.rightText}>{right.text}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <View style={styles.bulletList}>
-                    {section.content.items?.map((item, itemIndex) => (
-                      <View key={itemIndex} style={styles.bulletItem}>
-                        <View style={[styles.bullet, { backgroundColor: theme.primary }]} />
-                        <Text style={styles.bulletText}>{item}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </Animated.View>
-            )}
+      {/* Additional Policies */}
+      <View style={styles.section}>
+        <View style={styles.additionalPolicies}>
+          <View style={styles.policyCard}>
+            <View style={[styles.policyIcon, { backgroundColor: theme.primaryLight }]}>
+              <Ionicons name="time" size={20} color={theme.primary} />
+            </View>
+            <View style={styles.policyContent}>
+              <Text style={styles.policyTitle}>Data Retention</Text>
+              <Text style={styles.policyText}>
+                We retain your information only as long as necessary. Medication logs older than 1 year are automatically archived.
+              </Text>
+            </View>
           </View>
-        ))}
 
-        {/* Data Security */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data Security</Text>
-          <Text style={styles.bodyText}>
-            We implement industry-leading security measures to protect your information:
+          <View style={styles.policyCard}>
+            <View style={[styles.policyIcon, { backgroundColor: theme.primaryLight }]}>
+              <Ionicons name="people" size={20} color={theme.primary} />
+            </View>
+            <View style={styles.policyContent}>
+              <Text style={styles.policyTitle}>Children&apos;s Privacy</Text>
+              <Text style={styles.policyText}>
+                MediTracker is not intended for children under 13. We do not knowingly collect personal information from children.
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.policyCard}>
+            <View style={[styles.policyIcon, { backgroundColor: theme.primaryLight }]}>
+              <Ionicons name="globe" size={20} color={theme.primary} />
+            </View>
+            <View style={styles.policyContent}>
+              <Text style={styles.policyTitle}>International Users</Text>
+              <Text style={styles.policyText}>
+                Your information may be transferred to, stored, and processed in the United States where our servers are located.
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Contact Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Questions? Contact Our Privacy Team</Text>
+        
+        <View style={styles.contactCard}>
+          <Text style={styles.contactIntro}>
+            If you have questions about this Privacy Policy or our privacy practices, please contact us:
           </Text>
           
-          <View style={styles.securityGrid}>
-            <View style={styles.securityItem}>
-              <LinearGradient
-                colors={[theme.primaryLight, '#FFFFFF']}
-                style={styles.securityGradient}
-              >
-                <View style={[styles.securityIcon, { backgroundColor: theme.primary + '20' }]}>
-                  <Ionicons name="lock-closed" size={20} color={theme.primary} />
-                </View>
-                <Text style={styles.securityTitle}>Encryption</Text>
-                <Text style={styles.securityDescription}>End-to-end encryption for all data transmission</Text>
-              </LinearGradient>
-            </View>
+          <View style={styles.contactActions}>
+            <TouchableOpacity
+              style={[styles.contactButton, { backgroundColor: theme.primary }]}
+              onPress={() => handleContactPress('email')}
+            >
+              <Ionicons name="mail" size={20} color="#FFFFFF" />
+              <Text style={styles.contactButtonText}>Email Privacy Team</Text>
+            </TouchableOpacity>
             
-            <View style={styles.securityItem}>
-              <LinearGradient
-                colors={[theme.primaryLight, '#FFFFFF']}
-                style={styles.securityGradient}
-              >
-                <View style={[styles.securityIcon, { backgroundColor: theme.primary + '20' }]}>
-                  <Ionicons name="server" size={20} color={theme.primary} />
-                </View>
-                <Text style={styles.securityTitle}>Secure Storage</Text>
-                <Text style={styles.securityDescription}>HIPAA-compliant cloud infrastructure</Text>
-              </LinearGradient>
+            <TouchableOpacity
+              style={[styles.contactButtonSecondary, { borderColor: theme.primary }]}
+              onPress={handleCopyEmail}
+            >
+              <Ionicons name="copy" size={18} color={theme.primary} />
+              <Text style={[styles.contactButtonSecondaryText, { color: theme.primary }]}>
+                Copy Email
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.contactInfo}>
+            <View style={styles.contactItem}>
+              <Ionicons name="mail" size={16} color="#64748B" />
+              <Text style={styles.contactText}>privacy@meditracker.com</Text>
             </View>
-            
-            <View style={styles.securityItem}>
-              <LinearGradient
-                colors={[theme.primaryLight, '#FFFFFF']}
-                style={styles.securityGradient}
-              >
-                <View style={[styles.securityIcon, { backgroundColor: theme.primary + '20' }]}>
-                  <Ionicons name="shield-checkmark" size={20} color={theme.primary} />
-                </View>
-                <Text style={styles.securityTitle}>Access Control</Text>
-                <Text style={styles.securityDescription}>Multi-factor authentication and role-based access</Text>
-              </LinearGradient>
+            <View style={styles.contactItem}>
+              <Ionicons name="call" size={16} color="#64748B" />
+              <Text style={styles.contactText}>1-800-MEDITRACK</Text>
+            </View>
+            <View style={styles.contactItem}>
+              <Ionicons name="location" size={16} color="#64748B" />
+              <Text style={styles.contactText}>
+                MediTracker Technologies{'\n'}Privacy Officer{'\n'}123 Healthcare Blvd{'\n'}Medical City, MC 12345
+              </Text>
             </View>
           </View>
         </View>
+      </View>
 
-        {/* Additional Policies */}
-        <View style={styles.section}>
-          <View style={styles.additionalPolicies}>
-            <View style={styles.policyCard}>
-              <View style={[styles.policyIcon, { backgroundColor: theme.primaryLight }]}>
-                <Ionicons name="time" size={20} color={theme.primary} />
-              </View>
-              <View style={styles.policyContent}>
-                <Text style={styles.policyTitle}>Data Retention</Text>
-                <Text style={styles.policyText}>
-                  We retain your information only as long as necessary. Medication logs older than 1 year are automatically archived.
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.policyCard}>
-              <View style={[styles.policyIcon, { backgroundColor: theme.primaryLight }]}>
-                <Ionicons name="people" size={20} color={theme.primary} />
-              </View>
-              <View style={styles.policyContent}>
-                <Text style={styles.policyTitle}>Children&apos;s Privacy</Text>
-                <Text style={styles.policyText}>
-                  MediTracker is not intended for children under 13. We do not knowingly collect personal information from children.
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.policyCard}>
-              <View style={[styles.policyIcon, { backgroundColor: theme.primaryLight }]}>
-                <Ionicons name="globe" size={20} color={theme.primary} />
-              </View>
-              <View style={styles.policyContent}>
-                <Text style={styles.policyTitle}>International Users</Text>
-                <Text style={styles.policyText}>
-                  Your information may be transferred to, stored, and processed in the United States where our servers are located.
-                </Text>
-              </View>
-            </View>
+      {/* Compliance Footer */}
+      <View style={styles.complianceSection}>
+        <LinearGradient
+          colors={[theme.primaryLight, theme.primaryLight + '80']}
+          style={styles.complianceBadge}
+        >
+          <View style={[styles.complianceIcon, { backgroundColor: theme.primary }]}>
+            <Ionicons name="shield-checkmark" size={24} color="#FFFFFF" />
           </View>
-        </View>
-
-        {/* Contact Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Questions? Contact Our Privacy Team</Text>
-          
-          <View style={styles.contactCard}>
-            <Text style={styles.contactIntro}>
-              If you have questions about this Privacy Policy or our privacy practices, please contact us:
+          <View style={styles.complianceTextContainer}>
+            <Text style={[styles.complianceTitle, { color: theme.primaryDark }]}>
+              HIPAA Compliant & SOC 2 Certified
             </Text>
-            
-            <View style={styles.contactActions}>
-              <TouchableOpacity
-                style={[styles.contactButton, { backgroundColor: theme.primary }]}
-                onPress={() => handleContactPress('email')}
-              >
-                <Ionicons name="mail" size={20} color="#FFFFFF" />
-                <Text style={styles.contactButtonText}>Email Privacy Team</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.contactButtonSecondary, { borderColor: theme.primary }]}
-                onPress={handleCopyEmail}
-              >
-                <Ionicons name="copy" size={18} color={theme.primary} />
-                <Text style={[styles.contactButtonSecondaryText, { color: theme.primary }]}>
-                  Copy Email
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.contactInfo}>
-              <View style={styles.contactItem}>
-                <Ionicons name="mail" size={16} color="#64748B" />
-                <Text style={styles.contactText}>privacy@meditracker.com</Text>
-              </View>
-              <View style={styles.contactItem}>
-                <Ionicons name="call" size={16} color="#64748B" />
-                <Text style={styles.contactText}>1-800-MEDITRACK</Text>
-              </View>
-              <View style={styles.contactItem}>
-                <Ionicons name="location" size={16} color="#64748B" />
-                <Text style={styles.contactText}>
-                  MediTracker Technologies{'\n'}Privacy Officer{'\n'}123 Healthcare Blvd{'\n'}Medical City, MC 12345
-                </Text>
-              </View>
-            </View>
+            <Text style={[styles.complianceSubtext, { color: theme.primary }]}>
+              Your health data is protected by the highest security standards
+            </Text>
           </View>
-        </View>
-
-        {/* Compliance Footer */}
-        <View style={styles.complianceSection}>
-          <LinearGradient
-            colors={[theme.primaryLight, theme.primaryLight + '80']}
-            style={styles.complianceBadge}
-          >
-            <View style={[styles.complianceIcon, { backgroundColor: theme.primary }]}>
-              <Ionicons name="shield-checkmark" size={24} color="#FFFFFF" />
-            </View>
-            <View style={styles.complianceTextContainer}>
-              <Text style={[styles.complianceTitle, { color: theme.primaryDark }]}>
-                HIPAA Compliant & SOC 2 Certified
-              </Text>
-              <Text style={[styles.complianceSubtext, { color: theme.primary }]}>
-                Your health data is protected by the highest security standards
-              </Text>
-            </View>
-          </LinearGradient>
-        </View>
-      </ScrollView>
-    </View>
-  );
+        </LinearGradient>
+      </View>
+    </ScrollView>
+  </View>
+);
 };
 
 const styles = StyleSheet.create({

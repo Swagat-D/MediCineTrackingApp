@@ -19,7 +19,7 @@ import NotificationsScreen from '../screens/shared/NotificationsScreen';
 // Types
 import { PatientTabParamList, PatientStackParamList } from '../types/navigation.types';
 import { TYPOGRAPHY } from '../constants/themes/theme';
-import AboutScreen from '@/screens/shared/AboutScree';
+import PatientAboutScreen from '@/screens/shared/PatientAboutScreen';
 import HelpSupportScreen from '@/screens/shared/HelpSupportScreen';
 import PrivacyPolicyScreen from '@/screens/shared/PrivacyPolicyScree';
 
@@ -59,7 +59,7 @@ const ProfileStack: React.FC = () => (
     <Stack.Screen name="Notifications" component={NotificationsScreen} />
     <Stack.Screen name="SOS" component={SOSScreen} />
     <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
-    <Stack.Screen name="About" component={AboutScreen} />
+    <Stack.Screen name="About" component={PatientAboutScreen} />
     <Stack.Screen name="Privacy" component={PrivacyPolicyScreen} />
   </Stack.Navigator>
 );

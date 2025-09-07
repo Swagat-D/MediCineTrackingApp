@@ -317,7 +317,7 @@ const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.modalActivityList}>
-            {recentActivities.map((activity, index) => (
+            {recentActivities.slice(0,12).map((activity, index) => (
               <TouchableOpacity
                 key={activity.id}
                 style={[

@@ -22,6 +22,10 @@ import { CaregiverStackScreenProps } from '../../types/navigation.types';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../constants/themes/theme';
 import { caregiverAPI, Patient as PatientType } from '../../services/api/caregiverAPI';
 
+import * as XLSX from 'xlsx';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+
 const { width } = Dimensions.get('window');
 
 type Props = CaregiverStackScreenProps<'Patients'>;
@@ -57,7 +61,32 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
       sortBy: 'name',
       sortOrder: 'asc'
     });
-    setPatients(data);
+    
+    // Transform the data to include calculated fields like in PatientDetails
+    const patientsWithStats = await Promise.all(
+      data.map(async (patient: PatientType) => {
+        try {
+          // Get detailed patient data similar to PatientDetails
+          const patientDetails = await caregiverAPI.getPatientDetails(patient.id);
+          return {
+            ...patient,
+            medicationsCount: patientDetails.medications?.length || 0,
+            adherenceRate: patientDetails.patient?.adherenceRate || 0,
+            alerts: 0, // Calculate based on your logic
+          };
+        } catch (error) {
+          console.error(`Error fetching details for patient ${patient.id}:`, error);
+          return {
+            ...patient,
+            medicationsCount: 0,
+            adherenceRate: 0,
+            alerts: 0,
+          };
+        }
+      })
+    );
+    
+    setPatients(patientsWithStats);
   } catch (error) {
     console.error('Error fetching patients:', error);
   } finally {
@@ -128,6 +157,110 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
     };
   };
 
+  const exportPatientList = async () => {
+  try {
+    // Show loading state if needed
+    setIsLoading(true);
+
+    // Prepare data for export
+    const exportData = filteredPatients.map((patient, index) => ({
+      'S.No': index + 1,
+      'Patient Name': patient.name,
+      'Email': patient.email,
+      'Phone Number': patient.phoneNumber,
+      'Age': patient.age,
+      'Gender': patient.gender,
+      'Status': patient.status.charAt(0).toUpperCase() + patient.status.slice(1),
+      'Number of Medications': patient.medicationsCount,
+      'Adherence Rate (%)': patient.adherenceRate,
+      'Last Activity': patient.lastActivity,
+      'Alerts': patient.alerts,
+    }));
+
+    // Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+    // Set column widths for better formatting
+    const columnWidths = [
+      { wch: 8 },   // S.No
+      { wch: 20 },  // Patient Name
+      { wch: 25 },  // Email
+      { wch: 15 },  // Phone Number
+      { wch: 8 },   // Age
+      { wch: 10 },  // Gender
+      { wch: 12 },  // Status
+      { wch: 18 },  // Number of Medications
+      { wch: 15 },  // Adherence Rate
+      { wch: 20 },  // Last Activity
+      { wch: 10 },  // Alerts
+    ];
+    worksheet['!cols'] = columnWidths;
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Patient List');
+
+    // Generate Excel file buffer
+    const excelBuffer = XLSX.write(workbook, {
+      type: 'base64',
+      bookType: 'xlsx',
+    });
+
+    // Create file name with current date
+    const currentDate = new Date().toISOString().split('T')[0];
+    const fileName = `patient_list_${currentDate}.xlsx`;
+    
+    // For Android - save to Downloads folder
+    if (Platform.OS === 'android') {
+      const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      
+      if (permissions.granted) {
+        // Create file in Downloads directory
+        const base64 = excelBuffer;
+        const fileString = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64}`;
+        
+        await FileSystem.StorageAccessFramework.createFileAsync(permissions.directoryUri, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+          .then(async (uri) => {
+            await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
+            Alert.alert(
+              'Download Complete',
+              `Patient list has been downloaded successfully as ${fileName}`,
+              [{ text: 'OK' }]
+            );
+          })
+          .catch((error) => {
+            console.error(error);
+            Alert.alert('Download Failed', 'Unable to save file to Downloads folder.');
+          });
+      } else {
+        Alert.alert('Permission Required', 'Please grant permission to save files to Downloads folder.');
+      }
+    } else {
+      // For iOS - save to app's document directory and use sharing
+      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+      
+      await FileSystem.writeAsStringAsync(fileUri, excelBuffer, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // For iOS, we need to use sharing as there's no direct Downloads folder access
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          dialogTitle: 'Save Patient List',
+          UTI: 'com.microsoft.excel.xlsx',
+        });
+      }
+    }
+
+  } catch (error) {
+    console.error('Error exporting patient list:', error);
+    Alert.alert('Export Failed', 'Unable to export patient list. Please try again.');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
   const filterCounts = getFilterCounts();
 
   const FilterChip = ({
@@ -160,7 +293,6 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
       <CaregiverNavbar
         title="My Patients"
         onNotificationPress={() => navigation.navigate('Notifications')}
-        onSettingsPress={() => navigation.navigate('Settings')}
         rightActions={
           <TouchableOpacity
             onPress={() => navigation.navigate('AddPatient')}
@@ -423,18 +555,25 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.quickActionText}>Add Patient</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.quickActionItem}
-              onPress={() => Alert.alert('Feature Coming Soon', 'Export functionality will be available soon')}
+              style={[styles.quickActionItem, isLoading && styles.disabledButton]}
+              onPress={exportPatientList}
+              disabled={isLoading}
             >
-              <Ionicons name="download-outline" size={20} color="#8B5CF6" />
-              <Text style={styles.quickActionText}>Export List</Text>
+              {isLoading ? (
+                <LoadingSpinner size="small" />
+              ) : (
+                <Ionicons name="download-outline" size={20} color="#8B5CF6" />
+              )}
+              <Text style={styles.quickActionText}>
+                {isLoading ? 'Exporting...' : 'Export List'}
+              </Text>
             </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
-    </View>
-  );
-};
+                      </View>
+                    </View>
+                  </ScrollView>
+                </View>
+              );
+            };
 
 const styles = StyleSheet.create({
   container: {
@@ -812,6 +951,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING[3],
   },
+  disabledButton: {
+  opacity: 0.5,
+},
   quickActionItem: {
     flex: 1,
     backgroundColor: '#FFFFFF',

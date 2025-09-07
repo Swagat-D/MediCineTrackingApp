@@ -32,7 +32,7 @@
     "expo-camera": "^16.1.11",
     "expo-constants": "~17.1.7",
     "expo-dev-client": "~5.2.4",
-    "expo-file-system": "^18.1.11",
+    "expo-file-system": "~18.1.11",
     "expo-font": "~13.3.2",
     "expo-haptics": "~14.1.4",
     "expo-image": "~2.4.0",
@@ -42,6 +42,7 @@
     "expo-media-library": "~17.1.7",
     "expo-notifications": "^0.31.4",
     "expo-print": "~14.1.4",
+    "expo-sharing": "~13.1.5",
     "expo-splash-screen": "~0.30.10",
     "expo-status-bar": "~2.2.3",
     "expo-symbols": "~0.4.5",
@@ -68,8 +69,8 @@
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5",
     "react-redux": "^9.2.0",
-    "yup": "^1.7.0",
-    "expo-sharing": "~13.1.5"
+    "xlsx": "^0.18.5",
+    "yup": "^1.7.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

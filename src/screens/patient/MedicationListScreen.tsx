@@ -65,6 +65,9 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [selectedMedication, setSelectedMedication] = useState<MedicationDetails | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [sortModalVisible, setSortModalVisible] = useState(false);
+  const [currentSortBy, setCurrentSortBy] = useState<'name' | 'status' | 'adherence' | 'daysLeft'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const theme = {
     primary: '#2563EB',
@@ -152,6 +155,48 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
     if (rate >= 75) return '#F59E0B';
     return '#EF4444';
   };
+
+  const sortMedications = (medications: any[], sortBy: string, order: 'asc' | 'desc') => {
+  return [...medications].sort((a, b) => {
+    let aValue, bValue;
+    
+    switch (sortBy) {
+      case 'name':
+        aValue = a.name.toLowerCase();
+        bValue = b.name.toLowerCase();
+        break;
+      case 'status':
+        const statusOrder = { 'active': 1, 'paused': 2, 'completed': 3 };
+        aValue = statusOrder[a.status as keyof typeof statusOrder] || 4;
+        bValue = statusOrder[b.status as keyof typeof statusOrder] || 4;
+        break;
+      case 'adherence':
+        aValue = a.adherenceRate;
+        bValue = b.adherenceRate;
+        break;
+      case 'daysLeft':
+        aValue = Math.ceil(a.remainingQuantity / a.frequency);
+        bValue = Math.ceil(b.remainingQuantity / b.frequency);
+        break;
+      default:
+        return 0;
+    }
+    
+    if (aValue < bValue) return order === 'asc' ? -1 : 1;
+    if (aValue > bValue) return order === 'asc' ? 1 : -1;
+    return 0;
+  });
+};
+
+const handleSort = (sortBy: string, order: 'asc' | 'desc') => {
+  setCurrentSortBy(sortBy as any);
+  setSortOrder(order);
+  setSortModalVisible(false);
+  
+  // Apply sorting to medications
+  const sortedMeds = sortMedications(medications, sortBy, order);
+  dispatch(setMedications(sortedMeds));
+};
 
   const getFilterCounts = () => {
     return {
@@ -291,14 +336,7 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
             </Text>
             <TouchableOpacity
               style={[styles.sortButton, { backgroundColor: theme.primaryLight }]}
-              onPress={() => {
-                Alert.alert('Sort Options', 'Choose how to sort medications', [
-                  { text: 'By Name', onPress: () => {} },
-                  { text: 'By Status', onPress: () => {} },
-                  { text: 'By Adherence', onPress: () => {} },
-                  { text: 'Cancel', style: 'cancel' },
-                ]);
-              }}
+              onPress={() => setSortModalVisible(true)}
             >
               <Ionicons name="funnel-outline" size={18} color={theme.primary} />
               <Text style={[styles.sortButtonText, { color: theme.primary }]}>Sort</Text>
@@ -564,10 +602,7 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
                   {selectedMedication.status === 'active' && (
                     <TouchableOpacity
                       style={[styles.modalActionButton, { backgroundColor: theme.primary }]}
-                      onPress={() => {
-                        setDetailsModalVisible(false);
-                        handleMedicationAction('take_now', selectedMedication.id);
-                      }}
+                      onPress={() => navigation.navigate('Scanner')}
                     >
                       <Ionicons name="scan-outline" size={20} color="#FFFFFF" />
                       <Text style={styles.modalActionButtonText}>Take Now</Text>
@@ -585,6 +620,109 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
           ) : null}
         </View>
       </Modal>
+
+      {/* Sort Modal */}
+<Modal
+  visible={sortModalVisible}
+  animationType="slide"
+  presentationStyle="pageSheet"
+  onRequestClose={() => setSortModalVisible(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.modalHeader}>
+      <Text style={styles.modalTitle}>Sort Medications</Text>
+      <TouchableOpacity
+        style={styles.modalCloseButton}
+        onPress={() => setSortModalVisible(false)}
+      >
+        <Ionicons name="close" size={24} color="#64748B" />
+      </TouchableOpacity>
+    </View>
+
+    <View style={styles.sortModalContent}>
+      <Text style={styles.sortSectionTitle}>Sort by</Text>
+      
+      <View style={styles.sortOptions}>
+        {[
+          { key: 'name', label: 'Medication Name', icon: 'medical-outline' },
+          { key: 'status', label: 'Status', icon: 'checkmark-circle-outline' },
+          { key: 'adherence', label: 'Adherence Rate', icon: 'trending-up-outline' },
+          { key: 'daysLeft', label: 'Days Remaining', icon: 'calendar-outline' },
+        ].map((option) => (
+          <View key={option.key} style={styles.sortOptionGroup}>
+            <View style={styles.sortOptionHeader}>
+              <View style={styles.sortOptionInfo}>
+                <Ionicons name={option.icon as any} size={20} color={theme.primary} />
+                <Text style={styles.sortOptionLabel}>{option.label}</Text>
+              </View>
+              {currentSortBy === option.key && (
+                <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
+              )}
+            </View>
+            
+            <View style={styles.sortDirections}>
+              <TouchableOpacity
+                style={[
+                  styles.sortDirectionButton,
+                  currentSortBy === option.key && sortOrder === 'asc' && {
+                    backgroundColor: theme.primaryLight,
+                    borderColor: theme.primary
+                  }
+                ]}
+                onPress={() => handleSort(option.key, 'asc')}
+              >
+                <Ionicons 
+                  name="arrow-up-outline" 
+                  size={16} 
+                  color={currentSortBy === option.key && sortOrder === 'asc' ? theme.primary : '#64748B'} 
+                />
+                <Text style={[
+                  styles.sortDirectionText,
+                  currentSortBy === option.key && sortOrder === 'asc' && { color: theme.primary, fontWeight: '600' }
+                ]}>
+                  {option.key === 'name' ? 'A to Z' : 'Low to High'}
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.sortDirectionButton,
+                  currentSortBy === option.key && sortOrder === 'desc' && {
+                    backgroundColor: theme.primaryLight,
+                    borderColor: theme.primary
+                  }
+                ]}
+                onPress={() => handleSort(option.key, 'desc')}
+              >
+                <Ionicons 
+                  name="arrow-down-outline" 
+                  size={16} 
+                  color={currentSortBy === option.key && sortOrder === 'desc' ? theme.primary : '#64748B'} 
+                />
+                <Text style={[
+                  styles.sortDirectionText,
+                  currentSortBy === option.key && sortOrder === 'desc' && { color: theme.primary, fontWeight: '600' }
+                ]}>
+                  {option.key === 'name' ? 'Z to A' : 'High to Low'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.sortModalActions}>
+        <TouchableOpacity
+          style={[styles.sortResetButton, { borderColor: theme.primary }]}
+          onPress={() => handleSort('name', 'asc')}
+        >
+          <Ionicons name="refresh-outline" size={20} color={theme.primary} />
+          <Text style={[styles.sortResetButtonText, { color: theme.primary }]}>Reset to Default</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
     </View>
   );
 };
@@ -1142,6 +1280,85 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  sortModalContent: {
+  flex: 1,
+  paddingHorizontal: SPACING[5],
+  paddingTop: SPACING[6],
+},
+sortSectionTitle: {
+  fontSize: TYPOGRAPHY.fontSize.lg,
+  fontWeight: '600',
+  color: '#1E293B',
+  marginBottom: SPACING[4],
+},
+sortOptions: {
+  gap: SPACING[5],
+},
+sortOptionGroup: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: RADIUS.xl,
+  padding: SPACING[4],
+  borderWidth: 1,
+  borderColor: '#E2E8F0',
+},
+sortOptionHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: SPACING[3],
+},
+sortOptionInfo: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: SPACING[3],
+},
+sortOptionLabel: {
+  fontSize: TYPOGRAPHY.fontSize.md,
+  fontWeight: '600',
+  color: '#1E293B',
+},
+sortDirections: {
+  flexDirection: 'row',
+  gap: SPACING[3],
+},
+sortDirectionButton: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: SPACING[3],
+  paddingHorizontal: SPACING[4],
+  borderRadius: RADIUS.lg,
+  backgroundColor: '#F8FAFC',
+  borderWidth: 1,
+  borderColor: '#E2E8F0',
+  gap: SPACING[2],
+},
+sortDirectionText: {
+  fontSize: TYPOGRAPHY.fontSize.sm,
+  color: '#64748B',
+  fontWeight: '500',
+},
+sortModalActions: {
+  paddingVertical: SPACING[6],
+  borderTopWidth: 1,
+  borderTopColor: '#E2E8F0',
+  marginTop: SPACING[6],
+},
+sortResetButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: SPACING[4],
+  borderRadius: RADIUS.lg,
+  backgroundColor: '#FFFFFF',
+  borderWidth: 1,
+  gap: SPACING[2],
+},
+sortResetButtonText: {
+  fontSize: TYPOGRAPHY.fontSize.md,
+  fontWeight: '600',
+},
 });
 
 export default MedicationListScreen;

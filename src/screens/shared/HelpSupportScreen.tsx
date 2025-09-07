@@ -8,25 +8,40 @@ import {
   Linking,
   Alert,
   Platform,
-  Image,
   Clipboard,
   Animated,
   LayoutAnimation,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import SecondaryNavbar from '../../components/common/SecondaryNavbar';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
+import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
 
 interface HelpSupportScreenProps {
   navigation: any;
+  userRole?: 'caregiver' | 'patient';
 }
 
-const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => {
+const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ 
+  navigation, 
+  userRole
+}) => {
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
   const [animatedValues] = useState(
     Array(5).fill(0).map(() => new Animated.Value(0))
   );
+
+  const theme = {
+    primary: userRole === 'caregiver' ? '#059669' : '#2563EB',
+    primaryLight: userRole === 'caregiver' ? '#ECFDF5' : '#EFF6FF',
+    primaryDark: userRole === 'caregiver' ? '#047857' : '#1D4ED8',
+    gradient: userRole === 'caregiver'
+      ? ['#ECFDF5', '#FFFFFF'] as const
+      : ['#EFF6FF', '#FFFFFF'] as const,
+    accent: userRole === 'caregiver' ? '#10B981' : '#3B82F6',
+    text: userRole === 'caregiver' ? '#065F46' : '#1E40AF',
+    border: userRole === 'caregiver' ? '#A7F3D0' : '#BFDBFE',
+  };
 
   const handleContactPress = (type: 'email' | 'phone') => {
     switch (type) {
@@ -107,7 +122,7 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
 
   return (
     <View style={styles.container}>
-      <SecondaryNavbar
+      <PatientSecondaryNavbar
         title="Help & Support"
         onBackPress={() => navigation.goBack()}
       />
@@ -119,15 +134,13 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
       >
         {/* Header */}
         <LinearGradient
-          colors={['#F0FDF4', '#FFFFFF']}
+          colors={theme.gradient}
           style={styles.headerSection}
         >
           <View style={styles.headerContent}>
-            <Image 
-              source={require('../../../assets/images/hep.png')} 
-              style={styles.helpIcon}
-              resizeMode="contain"
-            />
+            <View style={[styles.headerIcon, { shadowColor: theme.primary }]}>
+              <Ionicons name="help-circle" size={48} color={theme.primary} />
+            </View>
             <Text style={styles.headerTitle}>We&apos;re Here to Help</Text>
             <Text style={styles.headerSubtitle}>
               Get assistance with MediTracker features and troubleshooting
@@ -143,8 +156,8 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
             {/* Email Support Card */}
             <View style={styles.contactCard}>
               <View style={styles.contactHeader}>
-                <View style={styles.contactIcon}>
-                  <Ionicons name="mail" size={24} color="#059669" />
+                <View style={[styles.contactIcon, { backgroundColor: theme.primaryLight }]}>
+                  <Ionicons name="mail" size={24} color={theme.primary} />
                 </View>
                 <View style={styles.contactInfo}>
                   <Text style={styles.contactTitle}>Email Support</Text>
@@ -154,7 +167,7 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
               
               <View style={styles.contactActions}>
                 <TouchableOpacity
-                  style={styles.primaryButton}
+                  style={[styles.primaryButton, { backgroundColor: theme.primary }]}
                   onPress={() => handleContactPress('email')}
                 >
                   <Ionicons name="send" size={16} color="#FFFFFF" />
@@ -162,22 +175,30 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
                 </TouchableOpacity>
                 
                 <TouchableOpacity
-                  style={styles.secondaryButton}
+                  style={[styles.secondaryButton, { 
+                    backgroundColor: theme.primaryLight, 
+                    borderColor: theme.primary 
+                  }]}
                   onPress={() => handleCopyToClipboard('support@meditracker.com', 'Email address')}
                 >
-                  <Ionicons name="copy" size={16} color="#059669" />
-                  <Text style={styles.secondaryButtonText}>Copy</Text>
+                  <Ionicons name="copy" size={16} color={theme.primary} />
+                  <Text style={[styles.secondaryButtonText, { color: theme.primary }]}>Copy</Text>
                 </TouchableOpacity>
               </View>
               
-              <Text style={styles.contactDetail}>support@meditracker.com</Text>
+              <Text style={[styles.contactDetail, { 
+                color: theme.primary, 
+                backgroundColor: theme.primaryLight 
+              }]}>
+                support@meditracker.com
+              </Text>
             </View>
 
             {/* Phone Support Card */}
             <View style={styles.contactCard}>
               <View style={styles.contactHeader}>
-                <View style={styles.contactIcon}>
-                  <Ionicons name="call" size={24} color="#059669" />
+                <View style={[styles.contactIcon, { backgroundColor: theme.primaryLight }]}>
+                  <Ionicons name="call" size={24} color={theme.primary} />
                 </View>
                 <View style={styles.contactInfo}>
                   <Text style={styles.contactTitle}>Phone Support</Text>
@@ -187,7 +208,7 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
               
               <View style={styles.contactActions}>
                 <TouchableOpacity
-                  style={styles.primaryButton}
+                  style={[styles.primaryButton, { backgroundColor: theme.primary }]}
                   onPress={() => handleContactPress('phone')}
                 >
                   <Ionicons name="call" size={16} color="#FFFFFF" />
@@ -195,15 +216,23 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
                 </TouchableOpacity>
                 
                 <TouchableOpacity
-                  style={styles.secondaryButton}
+                  style={[styles.secondaryButton, { 
+                    backgroundColor: theme.primaryLight, 
+                    borderColor: theme.primary 
+                  }]}
                   onPress={() => handleCopyToClipboard('1-800-MEDITRACK', 'Phone number')}
                 >
-                  <Ionicons name="copy" size={16} color="#059669" />
-                  <Text style={styles.secondaryButtonText}>Copy</Text>
+                  <Ionicons name="copy" size={16} color={theme.primary} />
+                  <Text style={[styles.secondaryButtonText, { color: theme.primary }]}>Copy</Text>
                 </TouchableOpacity>
               </View>
               
-              <Text style={styles.contactDetail}>1-800-MEDITRACK</Text>
+              <Text style={[styles.contactDetail, { 
+                color: theme.primary, 
+                backgroundColor: theme.primaryLight 
+              }]}>
+                1-800-MEDITRACK
+              </Text>
             </View>
           </View>
         </View>
@@ -225,7 +254,7 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
                   <TouchableOpacity
                     style={[
                       styles.faqQuestion,
-                      isExpanded && styles.faqQuestionExpanded
+                      isExpanded && { backgroundColor: theme.primaryLight }
                     ]}
                     onPress={() => toggleFAQ(index)}
                     activeOpacity={0.8}
@@ -233,15 +262,15 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
                     <View style={styles.faqQuestionContent}>
                       <View style={[
                         styles.faqQuestionIcon,
-                        isExpanded && styles.faqQuestionIconExpanded
+                        { backgroundColor: isExpanded ? theme.primaryLight : theme.primaryLight + '80' }
                       ]}>
-                        <Ionicons name={faq.icon as any} size={20} color="#059669" />
+                        <Ionicons name={faq.icon as any} size={20} color={theme.primary} />
                       </View>
                       
                       <View style={styles.faqQuestionTextContainer}>
                         <Text style={[
                           styles.faqQuestionText,
-                          isExpanded && styles.faqQuestionTextExpanded
+                          isExpanded && { color: theme.primary, fontWeight: '600' }
                         ]}>
                           {faq.question}
                         </Text>
@@ -254,7 +283,7 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
                         <Ionicons 
                           name="chevron-down" 
                           size={20} 
-                          color={isExpanded ? "#059669" : "#94A3B8"} 
+                          color={isExpanded ? theme.primary : "#94A3B8"} 
                         />
                       </Animated.View>
                     </View>
@@ -274,12 +303,12 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
                       }
                     ]}>
                       <LinearGradient
-                        colors={['#F0FDF4', '#FFFFFF']}
+                        colors={theme.gradient}
                         style={styles.faqAnswerGradient}
                       >
                         <View style={styles.faqAnswerContent}>
-                          <View style={styles.faqAnswerIcon}>
-                            <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                          <View style={[styles.faqAnswerIcon, { backgroundColor: theme.primaryLight }]}>
+                            <Ionicons name="checkmark-circle" size={16} color={theme.primary} />
                           </View>
                           <Text style={styles.faqAnswerText}>{faq.answer}</Text>
                         </View>
@@ -357,10 +386,22 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation }) => 
 
         {/* App Version */}
         <View style={styles.versionSection}>
-          <View style={styles.versionCard}>
-            <Text style={styles.versionText}>MediTracker v1.0.0</Text>
-            <Text style={styles.versionSubtext}>Last Updated Aug 2025</Text>
-          </View>
+          <LinearGradient
+            colors={[theme.primaryLight, theme.primaryLight + '80']}
+            style={styles.versionCard}
+          >
+            <View style={[styles.versionIcon, { backgroundColor: theme.primary }]}>
+              <Ionicons name="information-circle" size={20} color="#FFFFFF" />
+            </View>
+            <View style={styles.versionTextContainer}>
+              <Text style={[styles.versionText, { color: theme.primaryDark }]}>
+                MediTracker v1.0.0
+              </Text>
+              <Text style={[styles.versionSubtext, { color: theme.primary }]}>
+                Last Updated Aug 2025
+              </Text>
+            </View>
+          </LinearGradient>
         </View>
       </ScrollView>
     </View>
@@ -388,11 +429,18 @@ const styles = StyleSheet.create({
   headerContent: {
     alignItems: 'center',
   },
-  helpIcon: {
-    height: 88,
-    width: 88,
-    borderRadius: RADIUS.full,
+  headerIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: SPACING[4],
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   headerTitle: {
     fontSize: TYPOGRAPHY.fontSize['2xl'],
@@ -412,10 +460,11 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING[6],
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: '600',
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: '700',
     color: '#1E293B',
     marginBottom: SPACING[4],
+    textAlign: 'center',
   },
   contactGrid: {
     gap: SPACING[4],
@@ -441,7 +490,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#F0FDF4',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING[3],
@@ -469,7 +517,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#059669',
     borderRadius: RADIUS.lg,
     paddingVertical: SPACING[3],
     paddingHorizontal: SPACING[4],
@@ -484,25 +531,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F0FDF4',
     borderRadius: RADIUS.lg,
     paddingVertical: SPACING[3],
     paddingHorizontal: SPACING[4],
     gap: SPACING[2],
     borderWidth: 1,
-    borderColor: '#059669',
   },
   secondaryButtonText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '600',
-    color: '#059669',
   },
   contactDetail: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#059669',
     fontWeight: '500',
     textAlign: 'center',
-    backgroundColor: '#F0FDF4',
     paddingVertical: SPACING[2],
     paddingHorizontal: SPACING[3],
     borderRadius: RADIUS.md,
@@ -522,9 +564,6 @@ const styles = StyleSheet.create({
     padding: SPACING[4],
     backgroundColor: '#FFFFFF',
   },
-  faqQuestionExpanded: {
-    backgroundColor: '#F8FAFC',
-  },
   faqQuestionContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -533,13 +572,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F0FDF4',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING[3],
-  },
-  faqQuestionIconExpanded: {
-    backgroundColor: '#DCFCE7',
   },
   faqQuestionTextContainer: {
     flex: 1,
@@ -548,10 +583,6 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '500',
     color: '#1E293B',
-  },
-  faqQuestionTextExpanded: {
-    color: '#059669',
-    fontWeight: '600',
   },
   faqChevron: {
     width: 32,
@@ -574,7 +605,6 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#DCFCE7',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING[3],
@@ -618,26 +648,36 @@ const styles = StyleSheet.create({
   },
   versionSection: {
     alignItems: 'center',
-    paddingVertical: SPACING[1],
+    paddingVertical: SPACING[6],
     paddingHorizontal: SPACING[5],
   },
   versionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: RADIUS.xl,
+    paddingHorizontal: SPACING[5],
     paddingVertical: SPACING[4],
-    paddingHorizontal: SPACING[6],
+    gap: SPACING[3],
     borderWidth: 1,
     borderColor: '#E2E8F0',
+  },
+  versionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
     alignItems: 'center',
   },
+  versionTextContainer: {
+    flex: 1,
+  },
   versionText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: '500',
-    color: '#64748B',
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '700',
   },
   versionSubtext: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: '#94A3B8',
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '500',
     marginTop: SPACING[1],
   },
 });

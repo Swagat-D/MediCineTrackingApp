@@ -113,7 +113,7 @@ const {
         {/* Modal Content */}
         <ScrollView>
           <View style={styles.modalActivityList}>
-            {recentActivities.map((activity, index) => (
+            {recentActivities.slice(0,12).map((activity, index) => (
               <TouchableOpacity
                 key={activity.id}
                 style={[
@@ -170,7 +170,6 @@ const {
     <View style={styles.container}>
       <CaregiverNavbar
         onNotificationPress={() => navigation.navigate('Notifications')}
-        onSettingsPress={() => navigation.navigate('Settings')}
         notificationCount={dashboardStats?.criticalAlerts || 0}
       />
       

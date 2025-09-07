@@ -150,7 +150,8 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
       if (signupUser.fulfilled.match(result)) {
         navigation.navigate('OTPVerification', { 
           email: data.email, 
-          type: 'signup' 
+          type: 'signup' ,
+          role: data.role
         });
         reset();
       } else {

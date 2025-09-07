@@ -17,7 +17,6 @@ interface NavbarProps {
   showBackButton?: boolean;
   onBackPress?: () => void;
   onNotificationPress?: () => void;
-  onSettingsPress?: () => void;
   notificationCount?: number;
   rightActions?: React.ReactNode;
 }
@@ -27,7 +26,6 @@ const CaregiverNavbar: React.FC<NavbarProps> = ({
   showBackButton = false,
   onBackPress,
   onNotificationPress,
-  onSettingsPress,
   notificationCount,
   rightActions,
 }) => {
@@ -73,17 +71,7 @@ const CaregiverNavbar: React.FC<NavbarProps> = ({
 
         <View style={styles.navRight}>
           {rightActions || (
-            <>
-              {onSettingsPress && (
-                <TouchableOpacity
-                  style={styles.navButton}
-                  onPress={onSettingsPress}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="settings-outline" size={22} color="#475569" />
-                </TouchableOpacity>
-              )}
-              
+            <>              
               {onNotificationPress && (
                 <TouchableOpacity 
                   style={[

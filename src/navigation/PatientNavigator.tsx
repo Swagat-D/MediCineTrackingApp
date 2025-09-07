@@ -15,7 +15,6 @@ import ProfileScreen from '../screens/patient/ProfileScreen';
 import MealSettingsScreen from '../screens/patient/MealSettingsScreen';
 import SOSScreen from '../screens/patient/SOSScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
-import SettingsScreen from '../screens/shared/SettingsScreen';
 
 // Types
 import { PatientTabParamList, PatientStackParamList } from '../types/navigation.types';
@@ -57,7 +56,6 @@ const ScannerStack: React.FC = () => (
 const ProfileStack: React.FC = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Profile" component={ProfileScreen} />
-    <Stack.Screen name="Settings" component={SettingsScreen} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} />
     <Stack.Screen name="SOS" component={SOSScreen} />
     <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />

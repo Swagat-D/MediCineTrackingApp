@@ -19,7 +19,7 @@ class AuthAPI {
         token: response.data.token
       };
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Login failed');
+      throw new Error(error.response?.data?.message || error.response?.data?.error || error.message || 'Login failed');
     }
   }
 

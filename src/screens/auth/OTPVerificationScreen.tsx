@@ -30,6 +30,7 @@ import { APP_CONFIG } from '../../constants/app';
 // Redux
 import { useAppDispatch, useAppSelector } from '../../store';
 import { verifyOTP, clearError } from '../../store/slices/authSlice';
+import { authAPI } from '@/services/api/authAPI';
 
 const { width, height } = Dimensions.get('window');
 const isSmallDevice = width < 375;
@@ -42,7 +43,7 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
   const { isLoading, error } = useAppSelector((state) => state.auth);
   const { email, type, role } = route.params;
   const [otp, setOTP] = useState(['', '', '', '', '', '']);
-  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes
+  const [timeLeft, setTimeLeft] = useState(30); 
   const [canResend, setCanResend] = useState(false);
   
   // Get role from params or default to patient
@@ -198,12 +199,11 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
 
     try {
       // Reset timer and state
-      setTimeLeft(300);
+      setTimeLeft(30);
       setCanResend(false);
       setOTP(['', '', '', '', '', '']);
       
-      // TODO: Implement resend OTP API call
-      // await authAPI.resendOTP(email);
+     await authAPI.resendOTP(email);
       
       Alert.alert(
         'OTP Sent',
@@ -421,12 +421,11 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
               <View style={styles.timerTextContainer}>
                 {timeLeft > 0 ? (
                   <>
-                    <Text style={styles.timerLabel}>Code expires in</Text>
+                    <Text style={styles.timerLabel}>You can request a new code in</Text>
                     <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
                   </>
                 ) : (
                   <>
-                    <Text style={styles.expiredLabel}>Code has expired</Text>
                     <Text style={styles.expiredText}>Request a new code</Text>
                   </>
                 )}

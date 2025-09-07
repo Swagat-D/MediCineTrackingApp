@@ -61,6 +61,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedMedication, setSelectedMedication] = useState<any>(null);
   const [isRightTime, setIsRightTime] = useState(false);
   const [timingInfo, setTimingInfo] = useState<any>(null);
+  const [showAdherenceModal, setShowAdherenceModal] = useState(false);
 
   // Blue theme for patient side
   const theme = {
@@ -257,6 +258,35 @@ const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
       default: return '#6B7280';
     }
   };
+
+  const adherenceTips = [
+  {
+    icon: "alarm",
+    title: "Set Medication Reminders",
+    description: "Use phone alarms or our app notifications to remind you when it's time to take your medication."
+  },
+  {
+    icon: "calendar",
+    title: "Create a Daily Routine",
+    description: "Link medication taking to daily activities like meals or bedtime for better consistency."
+  },
+  {
+    icon: "list",
+    title: "Use a Pill Organizer",
+    description: "Organize your weekly medications in advance to avoid missing doses."
+  },
+  {
+    icon: "people",
+    title: "Get Family Support",
+    description: "Ask family members to help remind you or check in about your medication schedule."
+  },
+  {
+    icon: "medkit",
+    title: "Understand Your Medications",
+    description: "Know why each medication is important for your health to stay motivated."
+  }
+];
+
 
   const ActivityModal = () => (
     <Modal
@@ -615,7 +645,9 @@ const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
 
         {/* Adherence Alert */}
         {dashboardStats.adherenceRate < 80 && (
-          <TouchableOpacity style={styles.adherenceAlert} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.adherenceAlert} activeOpacity={0.8}
+          onPress={() => setShowAdherenceModal(true)}  
+          >
             <View style={styles.adherenceContent}>
               <Ionicons name="warning" size={20} color={theme.warning} />
               <View style={styles.adherenceText}>
@@ -733,6 +765,49 @@ const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
     </View>
   </Modal>
       )}
+
+      {/* Adherence Tips Modal */}
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={showAdherenceModal}
+  onRequestClose={() => setShowAdherenceModal(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.adherenceModalContent}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>Tips to Improve Adherence</Text>
+        <TouchableOpacity 
+          onPress={() => setShowAdherenceModal(false)}
+          style={styles.closeButton}
+        >
+          <Ionicons name="close" size={24} color="#6B7280" />
+        </TouchableOpacity>
+      </View>
+      
+      <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+        {adherenceTips.map((tip, index) => (
+          <View key={index} style={styles.tipItem}>
+            <View style={[styles.tipIcon, { backgroundColor: theme.primaryLight }]}>
+              <Ionicons name={tip.icon as any} size={20} color={theme.primary} />
+            </View>
+            <View style={styles.tipContent}>
+              <Text style={styles.tipTitle}>{tip.title}</Text>
+              <Text style={styles.tipDescription}>{tip.description}</Text>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+      
+      <TouchableOpacity 
+        style={[styles.modalButton, { backgroundColor: theme.primary }]}
+        onPress={() => setShowAdherenceModal(false)}
+      >
+        <Text style={styles.modalButtonText}>Got it!</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
 </View>
   );
 };
@@ -1335,7 +1410,66 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 20,
-  }
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  adherenceModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  modalBody: {
+    maxHeight: 400,
+  },
+  tipItem: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    alignItems: 'flex-start',
+  },
+  tipIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  tipContent: {
+    flex: 1,
+  },
+  tipTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  tipDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  modalButton: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  modalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 })
 
 export default HomeScreen;

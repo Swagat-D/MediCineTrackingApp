@@ -39,9 +39,9 @@
     "expo-linear-gradient": "^14.1.5",
     "expo-linking": "~7.1.7",
     "expo-location": "^18.1.6",
-    "expo-media-library": "^17.1.7",
+    "expo-media-library": "~17.1.7",
     "expo-notifications": "^0.31.4",
-    "expo-print": "^14.1.4",
+    "expo-print": "~14.1.4",
     "expo-splash-screen": "~0.30.10",
     "expo-status-bar": "~2.2.3",
     "expo-symbols": "~0.4.5",
@@ -68,7 +68,8 @@
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5",
     "react-redux": "^9.2.0",
-    "yup": "^1.7.0"
+    "yup": "^1.7.0",
+    "expo-sharing": "~13.1.5"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

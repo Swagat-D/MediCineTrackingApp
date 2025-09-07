@@ -276,7 +276,7 @@ const confirmMedicationTaken = async (medication: any, isEmergency = false) => {
   };
 
   const toggleFlash = () => {
-    setFlashMode(current => current === 'off' ? 'on' : 'off');
+    setFlashMode(current => (current === 'off' ? 'on' : 'off'))
   };
 
   const flipCamera = () => {
@@ -415,9 +415,10 @@ const confirmMedicationTaken = async (medication: any, isEmergency = false) => {
               {/* Camera Controls */}
               <View style={styles.controlsContainer}>
                 <TouchableOpacity
-                  style={[styles.controlButton, styles.flashButton]}
+                  style={[styles.controlButton, styles.flashButton, flashMode === 'on' && { backgroundColor: 'rgba(245, 158, 11, 0.2)' } ]}
                   onPress={toggleFlash}
                   disabled={isScanningBarcode}
+                  activeOpacity={0.7}
                 >
                   <Ionicons 
                     name={flashMode === 'on' ? 'flash' : 'flash-off'} 

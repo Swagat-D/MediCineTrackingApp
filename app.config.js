@@ -37,6 +37,14 @@ export default {
       "expo-location",
       "expo-notifications",
       [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow MediTracker to access your photos to save barcodes.",
+          "savePhotosPermission": "Allow MediTracker to save barcodes to your photo library.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
         "expo-build-properties",
         {
           android: {
@@ -48,7 +56,7 @@ export default {
             enableShrinkResourcesInReleaseBuilds: false
           }
         }
-      ]
+      ],
     ],
     assetBundlePatterns: [
       "assets/**/*"

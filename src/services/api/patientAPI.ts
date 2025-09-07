@@ -135,7 +135,7 @@ class PatientAPI {
   }
 }
 
-async recordMedicationTaken(medicationId: string, data: { notes?: string, override?: boolean }): Promise<{ message: string; success: boolean }> {
+async recordMedicationTaken(medicationId: string, data: { notes?: string, override?: boolean, takenAt?: string }): Promise<{ message: string; success: boolean; data?: {remainingQuantity?: number; remainingDays?: number} }> {
   try {
     const response = await apiClient.post(`/patient/medications/${medicationId}/log`, data);
     return response.data;

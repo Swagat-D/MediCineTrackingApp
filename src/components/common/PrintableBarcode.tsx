@@ -11,10 +11,10 @@ import {
   Dimensions,
   ScrollView,
   Platform,
+  Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
-import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { Picker } from '@react-native-picker/picker';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
@@ -247,36 +247,64 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
   const handlePrint = async () => {
     try {
       let htmlContent: string;
+      let filename: string;
 
       if (isBulkPrint && barcodes.length > 1) {
-        htmlContent = generateBulkPrintHTML();
-      } else {
-        // Single barcode print
-        const paper = PAPER_SIZES.A4;
-        htmlContent = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <title>Medication Barcode - ${singleBarcode.patientName}</title>
-            <style>
-              body { 
-                font-family: Arial, sans-serif; 
-                margin: 0; 
-                padding: 20px; 
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
+      htmlContent = generateBulkPrintHTML();
+      filename = `MediTracker_BulkBarcodes_${new Date().toISOString().split('T')[0]}.pdf`;
+    } else {
+      const paper = PAPER_SIZES.A4;
+      htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Medication Barcode - ${singleBarcode.patientName}</title>
+          <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 0; 
+              padding: 20px; 
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              min-height: 100vh;
+            }
+          </style>
+        </head>
+        <body onload="generateBarcode()">
+          ${generateSingleBarcodeHTML(singleBarcode, 'large')}
+          <script>
+            function generateBarcode() {
+              if (typeof JsBarcode === 'undefined') {
+                setTimeout(generateBarcode, 100);
+                return;
               }
-            </style>
-          </head>
-          <body>
-            ${generateSingleBarcodeHTML(singleBarcode, 'large')}
-          </body>
-          </html>
-        `;
-      }
+              
+              const element = document.getElementById('barcode-${singleBarcode.barcodeData}');
+              if (element) {
+                try {
+                  JsBarcode(element, '${singleBarcode.barcodeData}', {
+                    format: "CODE128",
+                    width: 2,
+                    height: 40,
+                    displayValue: false,
+                    margin: 0,
+                    background: "#ffffff",
+                    lineColor: "#000000"
+                  });
+                } catch (e) {
+                  console.error('Failed to generate barcode:', e);
+                }
+              }
+            }
+          </script>
+        </body>
+        </html>
+      `;
+      filename = `MediTracker_${singleBarcode.patientName.replace(/[^a-zA-Z0-9]/g, '_')}_${singleBarcode.medicationName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+    }
 
       await Print.printAsync({ 
         html: htmlContent,
@@ -324,8 +352,9 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
             onPress: () => {
               // On Android, this will open app settings
               if (Platform.OS === 'android') {
-                // You might need to install expo-linking for this
-                // Linking.openSettings();
+                Linking.openSettings();
+              }else{
+                Linking.openURL('app-settings:');
               }
             }
           },
@@ -374,8 +403,12 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
     // Generate PDF
     const { uri } = await Print.printToFileAsync({ 
       html: htmlContent,
-      width: PAPER_SIZES[printSettings.paperSize].width,
-      height: PAPER_SIZES[printSettings.paperSize].height,
+      width: printSettings.orientation === 'landscape' ? 
+        PAPER_SIZES[printSettings.paperSize].height : 
+        PAPER_SIZES[printSettings.paperSize].width,
+      height: printSettings.orientation === 'landscape' ? 
+        PAPER_SIZES[printSettings.paperSize].width : 
+        PAPER_SIZES[printSettings.paperSize].height,
     });
 
     // Save to device
@@ -388,11 +421,22 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
         `Barcode downloaded as PDF successfully!\n\nSaved to: ${filename}`
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error downloading barcode:', error);
+
+    let errorMessage = 'Failed to download barcode. ';
+    if (error.message?.includes('permission')) {
+      errorMessage += 'Please check app permissions in settings.';
+    } else if (error.message?.includes('storage') || error.message?.includes('space')) {
+      errorMessage += 'Please check your storage space.';
+    } else {
+      errorMessage += 'Please try again.';
+    }
+
+
     Alert.alert(
       'Download Error', 
-      'Failed to download barcode. Please check your storage space and try again.',
+      errorMessage,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Try Again', onPress: () => handleDownload() }

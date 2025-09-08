@@ -19,6 +19,7 @@ import PrivacyPolicyScreen from '@/screens/shared/PrivacyPolicyScree';
 // Types
 import { CaregiverTabParamList, CaregiverStackParamList } from '../types/navigation.types';
 import { COLORS, TYPOGRAPHY } from '../constants/themes/theme';
+import { Pressable } from 'react-native';
 
 const Tab = createBottomTabNavigator<CaregiverTabParamList>();
 const Stack = createStackNavigator<CaregiverStackParamList>();
@@ -85,6 +86,15 @@ const CaregiverNavigator: React.FC = () => {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
+        tabBarButton: (props: React.ComponentProps<typeof Pressable> & { children: React.ReactNode }) => (
+          <Pressable
+            {...props}
+            android_ripple={{ color: 'transparent' }}
+            style={props.style}
+          >
+            {props.children}
+          </Pressable>
+        ),
         tabBarActiveTintColor: COLORS.secondary[500],
         tabBarInactiveTintColor: COLORS.gray[500],
         tabBarLabelStyle: {

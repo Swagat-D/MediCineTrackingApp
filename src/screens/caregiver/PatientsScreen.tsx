@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   Dimensions,
   Platform,
   Image,
+  Modal,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -44,86 +46,229 @@ interface Patient {
   alerts: number;
 }
 
+type SortField = 'name' | 'adherenceRate' | 'medicationsCount';
+type SortOrder = 'asc' | 'desc';
+
+interface SortConfig {
+  field: SortField;
+  order: SortOrder;
+}
+
+interface SortOption {
+  field: SortField;
+  label: string;
+  icon: string;
+  description: string;
+}
+
+const sortOptions: SortOption[] = [
+  {
+    field: 'name',
+    label: 'Patient Name',
+    icon: 'person-outline',
+    description: 'Sort alphabetically by patient name'
+  },
+  {
+    field: 'adherenceRate',
+    label: 'Adherence Rate',
+    icon: 'checkmark-circle-outline',
+    description: 'Sort by medication adherence percentage'
+  },
+  {
+    field: 'medicationsCount',
+    label: 'Medications Count',
+    icon: 'medkit-outline',
+    description: 'Sort by number of medications'
+  }
+];
+
 const PatientsScreen: React.FC<Props> = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'critical'>('all');
-  
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'name', order: 'asc' });
+  const [modalAnimation] = useState(new Animated.Value(0));
+
+  const loadPatients = async () => {
+    try {
+      setIsLoading(true);
+      const data = await caregiverAPI.getPatients({
+        search: '',
+        status: 'all',
+        sortBy: 'name',
+        sortOrder: 'asc'
+      });
+      
+      // Transform the data to include calculated fields
+      const patientsWithStats = await Promise.all(
+        data.map(async (patient: PatientType) => {
+          try {
+            const patientDetails = await caregiverAPI.getPatientDetails(patient.id);
+            return {
+              ...patient,
+              medicationsCount: patientDetails.medications?.length || 0,
+              adherenceRate: patientDetails.patient?.adherenceRate || 0,
+              alerts: 0,
+            };
+          } catch (error) {
+            console.error(`Error fetching details for patient ${patient.id}:`, error);
+            return {
+              ...patient,
+              medicationsCount: 0,
+              adherenceRate: 0,
+              alerts: 0,
+            };
+          }
+        })
+      );
+      
+      setPatients(patientsWithStats);
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const onRefresh = async () => {
-  setRefreshing(true);
-  try {
-    const data = await caregiverAPI.getPatients({
-      search: searchQuery,
-      status: filterStatus,
-      sortBy: 'name',
-      sortOrder: 'asc'
-    });
-    
-    // Transform the data to include calculated fields like in PatientDetails
-    const patientsWithStats = await Promise.all(
-      data.map(async (patient: PatientType) => {
-        try {
-          // Get detailed patient data similar to PatientDetails
-          const patientDetails = await caregiverAPI.getPatientDetails(patient.id);
-          return {
-            ...patient,
-            medicationsCount: patientDetails.medications?.length || 0,
-            adherenceRate: patientDetails.patient?.adherenceRate || 0,
-            alerts: 0, // Calculate based on your logic
-          };
-        } catch (error) {
-          console.error(`Error fetching details for patient ${patient.id}:`, error);
-          return {
-            ...patient,
-            medicationsCount: 0,
-            adherenceRate: 0,
-            alerts: 0,
-          };
-        }
-      })
-    );
-    
-    setPatients(patientsWithStats);
-  } catch (error) {
-    console.error('Error fetching patients:', error);
-  } finally {
+    setRefreshing(true);
+    await loadPatients();
     setRefreshing(false);
-  }
-};
+  };
 
   useEffect(() => {
-    onRefresh();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, filterStatus]);
+    loadPatients();
+  }, []);
+
+  // Filter and sort patients
+  const filteredAndSortedPatients = useMemo(() => {
+    let filtered = patients;
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(patient => 
+        patient.name.toLowerCase().includes(query) ||
+        patient.email.toLowerCase().includes(query) ||
+        patient.phoneNumber.includes(query)
+      );
+    }
+
+    // Apply status filter
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(patient => patient.status === filterStatus);
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      let aValue: string | number;
+      let bValue: string | number;
+
+      switch (sortConfig.field) {
+        case 'name':
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case 'adherenceRate':
+          aValue = a.adherenceRate;
+          bValue = b.adherenceRate;
+          break;
+        case 'medicationsCount':
+          aValue = a.medicationsCount;
+          bValue = b.medicationsCount;
+          break;
+        default:
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+      }
+
+      if (sortConfig.order === 'asc') {
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      } else {
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+      }
+    });
+
+    return sorted;
+  }, [patients, searchQuery, filterStatus, sortConfig]);
 
   const handlePatientPress = (patient: Patient) => {
     navigation.navigate('PatientDetails', { patientId: patient.id });
   };
 
   const handleDeletePatient = async (patientId: string, patientName: string) => {
-  Alert.alert(
-    'Remove Patient',
-    `Are you sure you want to remove ${patientName} from your patient list?`,
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await caregiverAPI.removePatient(patientId);
-            Alert.alert('Success', `${patientName} has been removed from your patient list`);
-            onRefresh();
-          } catch (error) {
-            Alert.alert('Error', 'Failed to remove patient');
-          }
+    Alert.alert(
+      'Remove Patient',
+      `Are you sure you want to remove ${patientName} from your patient list?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await caregiverAPI.removePatient(patientId);
+              Alert.alert('Success', `${patientName} has been removed from your patient list`);
+              await loadPatients();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to remove patient');
+            }
+          },
         },
-      },
-    ]
-  );
+      ]
+    );
+  };
+
+  const openSortModal = () => {
+  setShowSortModal(true);
+};
+
+useEffect(() => {
+  if (showSortModal) {
+    Animated.timing(modalAnimation, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  } else {
+    Animated.timing(modalAnimation, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [showSortModal]);
+
+  const closeSortModal = () => {
+  setShowSortModal(false);
+};
+
+  const handleSortSelect = (field: SortField, order: SortOrder) => {
+    setSortConfig({ field, order });
+    closeSortModal();
+  };
+
+  const getSortDisplayText = () => {
+  const option = sortOptions.find(opt => opt.field === sortConfig.field);
+
+  let orderText = '';
+  switch (sortConfig.field) {
+    case 'name':
+      orderText = sortConfig.order === 'asc' ? 'A-Z' : 'Z-A';
+      break;
+    case 'adherenceRate':
+    case 'medicationsCount':
+      orderText = sortConfig.order === 'asc' ? 'Low to High' : 'High to Low';
+      break;
+    default:
+      orderText = sortConfig.order === 'asc' ? 'A-Z' : 'Z-A';
+  }
+
+  return `${option?.label} (${orderText})`;
 };
 
   const getStatusColor = (status: Patient['status']) => {
@@ -141,13 +286,6 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
     return '#EF4444';
   };
 
-  const filteredPatients = patients.filter(patient => {
-    const matchesSearch = patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         patient.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || patient.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
-
   const getFilterCounts = () => {
     return {
       all: patients.length,
@@ -158,108 +296,87 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const exportPatientList = async () => {
-  try {
-    // Show loading state if needed
-    setIsLoading(true);
+    try {
+      setIsLoading(true);
 
-    // Prepare data for export
-    const exportData = filteredPatients.map((patient, index) => ({
-      'S.No': index + 1,
-      'Patient Name': patient.name,
-      'Email': patient.email,
-      'Phone Number': patient.phoneNumber,
-      'Age': patient.age,
-      'Gender': patient.gender,
-      'Status': patient.status.charAt(0).toUpperCase() + patient.status.slice(1),
-      'Number of Medications': patient.medicationsCount,
-      'Adherence Rate (%)': patient.adherenceRate,
-      'Last Activity': patient.lastActivity,
-      'Alerts': patient.alerts,
-    }));
+      const exportData = filteredAndSortedPatients.map((patient, index) => ({
+        'S.No': index + 1,
+        'Patient Name': patient.name,
+        'Email': patient.email,
+        'Phone Number': patient.phoneNumber,
+        'Age': patient.age,
+        'Gender': patient.gender,
+        'Status': patient.status.charAt(0).toUpperCase() + patient.status.slice(1),
+        'Number of Medications': patient.medicationsCount,
+        'Adherence Rate (%)': patient.adherenceRate,
+        'Last Activity': patient.lastActivity,
+        'Alerts': patient.alerts,
+      }));
 
-    // Create workbook and worksheet
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
 
-    // Set column widths for better formatting
-    const columnWidths = [
-      { wch: 8 },   // S.No
-      { wch: 20 },  // Patient Name
-      { wch: 25 },  // Email
-      { wch: 15 },  // Phone Number
-      { wch: 8 },   // Age
-      { wch: 10 },  // Gender
-      { wch: 12 },  // Status
-      { wch: 18 },  // Number of Medications
-      { wch: 15 },  // Adherence Rate
-      { wch: 20 },  // Last Activity
-      { wch: 10 },  // Alerts
-    ];
-    worksheet['!cols'] = columnWidths;
+      const columnWidths = [
+        { wch: 8 }, { wch: 20 }, { wch: 25 }, { wch: 15 }, { wch: 8 },
+        { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 15 }, { wch: 20 }, { wch: 10 },
+      ];
+      worksheet['!cols'] = columnWidths;
 
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Patient List');
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Patient List');
 
-    // Generate Excel file buffer
-    const excelBuffer = XLSX.write(workbook, {
-      type: 'base64',
-      bookType: 'xlsx',
-    });
-
-    // Create file name with current date
-    const currentDate = new Date().toISOString().split('T')[0];
-    const fileName = `patient_list_${currentDate}.xlsx`;
-    
-    // For Android - save to Downloads folder
-    if (Platform.OS === 'android') {
-      const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-      
-      if (permissions.granted) {
-        // Create file in Downloads directory
-        const base64 = excelBuffer;
-        const fileString = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64}`;
-        
-        await FileSystem.StorageAccessFramework.createFileAsync(permissions.directoryUri, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-          .then(async (uri) => {
-            await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
-            Alert.alert(
-              'Download Complete',
-              `Patient list has been downloaded successfully as ${fileName}`,
-              [{ text: 'OK' }]
-            );
-          })
-          .catch((error) => {
-            console.error(error);
-            Alert.alert('Download Failed', 'Unable to save file to Downloads folder.');
-          });
-      } else {
-        Alert.alert('Permission Required', 'Please grant permission to save files to Downloads folder.');
-      }
-    } else {
-      // For iOS - save to app's document directory and use sharing
-      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-      
-      await FileSystem.writeAsStringAsync(fileUri, excelBuffer, {
-        encoding: FileSystem.EncodingType.Base64,
+      const excelBuffer = XLSX.write(workbook, {
+        type: 'base64',
+        bookType: 'xlsx',
       });
 
-      // For iOS, we need to use sharing as there's no direct Downloads folder access
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          dialogTitle: 'Save Patient List',
-          UTI: 'com.microsoft.excel.xlsx',
+      const currentDate = new Date().toISOString().split('T')[0];
+      const fileName = `patient_list_${currentDate}.xlsx`;
+      
+      if (Platform.OS === 'android') {
+        const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        
+        if (permissions.granted) {
+          const base64 = excelBuffer;
+          
+          await FileSystem.StorageAccessFramework.createFileAsync(permissions.directoryUri, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            .then(async (uri) => {
+              await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
+              Alert.alert(
+                'Download Complete',
+                `Patient list has been downloaded successfully as ${fileName}`,
+                [{ text: 'OK' }]
+              );
+            })
+            .catch((error) => {
+              console.error(error);
+              Alert.alert('Download Failed', 'Unable to save file to Downloads folder.');
+            });
+        } else {
+          Alert.alert('Permission Required', 'Please grant permission to save files to Downloads folder.');
+        }
+      } else {
+        const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+        
+        await FileSystem.writeAsStringAsync(fileUri, excelBuffer, {
+          encoding: FileSystem.EncodingType.Base64,
         });
-      }
-    }
 
-  } catch (error) {
-    console.error('Error exporting patient list:', error);
-    Alert.alert('Export Failed', 'Unable to export patient list. Please try again.');
-  } finally {
-    setIsLoading(false);
-  }
-};
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            dialogTitle: 'Save Patient List',
+            UTI: 'com.microsoft.excel.xlsx',
+          });
+        }
+      }
+
+    } catch (error) {
+      console.error('Error exporting patient list:', error);
+      Alert.alert('Export Failed', 'Unable to export patient list. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filterCounts = getFilterCounts();
 
@@ -286,6 +403,114 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
         {label} ({count})
       </Text>
     </TouchableOpacity>
+  );
+
+  const SortModal = () => (
+    <Modal
+      visible={showSortModal}
+      transparent={true}
+      animationType="none"
+      onRequestClose={closeSortModal}
+    >
+      <View style={styles.modalOverlay}>
+        <TouchableOpacity 
+          style={styles.modalBackdrop} 
+          activeOpacity={1} 
+          onPress={closeSortModal}
+        />
+        <Animated.View 
+          style={[
+            styles.modalContainer,
+            {
+              opacity: modalAnimation,
+              transform: [{
+                translateY: modalAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [300, 0],
+                })
+              }]
+            }
+          ]}
+        >
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Sort Patients</Text>
+            <TouchableOpacity onPress={closeSortModal} style={styles.modalCloseButton}>
+              <Ionicons name="close" size={24} color="#64748B" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <Text style={styles.modalSubtitle}>Choose how to sort your patient list</Text>
+            
+            {sortOptions.map((option) => (
+              <View key={option.field} style={styles.sortOptionGroup}>
+                <View style={styles.sortOptionHeader}>
+                  <View style={styles.sortOptionTitleContainer}>
+                    <View style={styles.sortOptionIcon}>
+                      <Ionicons name={option.icon as any} size={20} color="#059669" />
+                    </View>
+                    <View>
+                      <Text style={styles.sortOptionTitle}>{option.label}</Text>
+                      <Text style={styles.sortOptionDescription}>{option.description}</Text>
+                    </View>
+                  </View>
+                </View>
+                
+                <View style={styles.sortOrderButtons}>
+                  <TouchableOpacity
+                    style={[
+                      styles.sortOrderButton,
+                      sortConfig.field === option.field && sortConfig.order === 'asc' && styles.sortOrderButtonActive
+                    ]}
+                    onPress={() => handleSortSelect(option.field, 'asc')}
+                  >
+                    <Ionicons 
+                      name="arrow-up" 
+                      size={16} 
+                      color={sortConfig.field === option.field && sortConfig.order === 'asc' ? '#FFFFFF' : '#64748B'} 
+                    />
+                    <Text style={[
+                      styles.sortOrderButtonText,
+                      sortConfig.field === option.field && sortConfig.order === 'asc' && styles.sortOrderButtonTextActive
+                    ]}>
+                      {option.field === 'name' ? 'A to Z' : 'Low to High'}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[
+                      styles.sortOrderButton,
+                      sortConfig.field === option.field && sortConfig.order === 'desc' && styles.sortOrderButtonActive
+                    ]}
+                    onPress={() => handleSortSelect(option.field, 'desc')}
+                  >
+                    <Ionicons 
+                      name="arrow-down" 
+                      size={16} 
+                      color={sortConfig.field === option.field && sortConfig.order === 'desc' ? '#FFFFFF' : '#64748B'} 
+                    />
+                    <Text style={[
+                      styles.sortOrderButtonText,
+                      sortConfig.field === option.field && sortConfig.order === 'desc' && styles.sortOrderButtonTextActive
+                    ]}>
+                      {option.field === 'name' ? 'Z to A' : 'High to Low'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+          
+          <View style={styles.modalFooter}>
+            <Button
+              title="Apply Sort"
+              onPress={closeSortModal}
+              style={styles.modalApplyButton}
+            />
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
   );
 
   return (
@@ -327,10 +552,10 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.headerContent}>
             <View style={styles.headerIcon}>
               <Image 
-                  source={require('../../../assets/images/patient.png')} 
-                  style={styles.patientIcon}
-                  resizeMode="contain"
-                />
+                source={require('../../../assets/images/patient.png')} 
+                style={styles.patientIcon}
+                resizeMode="contain"
+              />
             </View>
             <Text style={styles.headerTitle}>Patient Management</Text>
             <Text style={styles.headerSubtitle}>
@@ -345,7 +570,7 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
             <Ionicons name="search" size={20} color="#6B7280" />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search patients by name or email..."
+              placeholder="Search patients by name, email, or phone..."
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholderTextColor="#9CA3AF"
@@ -410,23 +635,22 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.patientsSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>
-              {searchQuery ? `Search Results (${filteredPatients.length})` : 'Patient List'}
+              {searchQuery ? `Search Results (${filteredAndSortedPatients.length})` : 'Patient List'}
             </Text>
             <TouchableOpacity
               style={styles.sortButton}
-              onPress={() => {
-                // Handle sort functionality
-                Alert.alert('Sort Options', 'Choose how to sort patients', [
-                  { text: 'By Name', onPress: () => {} },
-                  { text: 'By Status', onPress: () => {} },
-                  { text: 'By Adherence', onPress: () => {} },
-                  { text: 'Cancel', style: 'cancel' },
-                ]);
-              }}
+              onPress={openSortModal}
             >
               <Ionicons name="funnel-outline" size={18} color="#059669" />
               <Text style={styles.sortButtonText}>Sort</Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Current Sort Display */}
+          <View style={styles.currentSortContainer}>
+            <Text style={styles.currentSortText}>
+              Sorted by: {getSortDisplayText()}
+            </Text>
           </View>
 
           {isLoading ? (
@@ -434,7 +658,7 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
               <LoadingSpinner size="large" />
               <Text style={styles.loadingText}>Loading patients...</Text>
             </View>
-          ) : filteredPatients.length === 0 ? (
+          ) : filteredAndSortedPatients.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyIconContainer}>
                 <Ionicons name="people-outline" size={64} color="#D1D5DB" />
@@ -459,86 +683,86 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           ) : (
             <View style={styles.patientsList}>
-              {filteredPatients.map(patient => (
-  <TouchableOpacity
-    key={patient.id}
-    style={styles.patientCard}
-    onPress={() => handlePatientPress(patient)}
-    activeOpacity={0.9}
-  >
-    <View style={styles.patientHeader}>
-      <View style={styles.patientInfo}>
-        <View style={styles.patientNameRow}>
-          <Text style={styles.patientName}>{patient.name}</Text>
-          <View style={[
-            styles.statusBadge,
-            { backgroundColor: getStatusColor(patient.status) + '22' }
-          ]}>
-            <View style={[
-              styles.statusDot,
-              { backgroundColor: getStatusColor(patient.status) }
-            ]} />
-            <Text style={[
-              styles.statusText,
-              { color: getStatusColor(patient.status) }
-            ]}>
-              {patient.status.charAt(0).toUpperCase() + patient.status.slice(1)}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.patientMeta}>
-          <Text style={styles.patientDetails}>{patient.email} • {patient.gender}, {patient.age}</Text>
-          <Text style={styles.patientActivity}>Last activity: {patient.lastActivity}</Text>
-        </View>
-      </View>
-      {patient.alerts > 0 && (
-        <View style={styles.alertBadge}>
-          <Ionicons name="alert-circle" size={16} color="#EF4444" />
-          <Text style={styles.alertCount}>{patient.alerts}</Text>
-        </View>
-      )}
-    </View>
-    <View style={styles.patientStats}>
-      <View style={styles.statItem}>
-        <View style={styles.statIconContainer}>
-          <Ionicons name="medkit" size={16} color="#059669" />
-        </View>
-        <View style={styles.statContent}>
-          <Text style={styles.statValue}>{patient.medicationsCount}</Text>
-          <Text style={styles.statLabel}>Medications</Text>
-        </View>
-      </View>
-      <View style={styles.statDivider} />
-      <View style={styles.statItem}>
-        <View style={styles.statIconContainer}>
-          <Ionicons name="checkmark-circle" size={16} color={getAdherenceColor(patient.adherenceRate)} />
-        </View>
-        <View style={styles.statContent}>
-          <Text style={[styles.statValue, { color: getAdherenceColor(patient.adherenceRate) }]}>
-            {patient.adherenceRate}%
-          </Text>
-          <Text style={styles.statLabel}>Adherence</Text>
-        </View>
-      </View>
-    </View>
-    <View style={styles.patientActions}>
-      <TouchableOpacity
-        style={styles.actionButton}
-        onPress={() => navigation.navigate('PatientDetails', { patientId: patient.id })}
-      >
-        <Ionicons name="information-circle-outline" size={16} color="#059669" />
-        <Text style={styles.actionButtonText}>Details</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.actionButton, styles.deleteButton]}
-        onPress={() => handleDeletePatient(patient.id, patient.name)}
-      >
-        <Ionicons name="trash-outline" size={16} color="#EF4444" />
-        <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Remove</Text>
-      </TouchableOpacity>
-    </View>
-  </TouchableOpacity>
-))}
+              {filteredAndSortedPatients.map(patient => (
+                <TouchableOpacity
+                  key={patient.id}
+                  style={styles.patientCard}
+                  onPress={() => handlePatientPress(patient)}
+                  activeOpacity={0.9}
+                >
+                  <View style={styles.patientHeader}>
+                    <View style={styles.patientInfo}>
+                      <View style={styles.patientNameRow}>
+                        <Text style={styles.patientName}>{patient.name}</Text>
+                        <View style={[
+                          styles.statusBadge,
+                          { backgroundColor: getStatusColor(patient.status) + '22' }
+                        ]}>
+                          <View style={[
+                            styles.statusDot,
+                            { backgroundColor: getStatusColor(patient.status) }
+                          ]} />
+                          <Text style={[
+                            styles.statusText,
+                            { color: getStatusColor(patient.status) }
+                          ]}>
+                            {patient.status.charAt(0).toUpperCase() + patient.status.slice(1)}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.patientMeta}>
+                        <Text style={styles.patientDetails}>{patient.email} • {patient.gender}, {patient.age}</Text>
+                        <Text style={styles.patientActivity}>Last activity: {patient.lastActivity}</Text>
+                      </View>
+                    </View>
+                    {patient.alerts > 0 && (
+                      <View style={styles.alertBadge}>
+                        <Ionicons name="alert-circle" size={16} color="#EF4444" />
+                        <Text style={styles.alertCount}>{patient.alerts}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.patientStats}>
+                    <View style={styles.statItem}>
+                      <View style={styles.statIconContainer}>
+                        <Ionicons name="medkit" size={16} color="#059669" />
+                      </View>
+                      <View style={styles.statContent}>
+                        <Text style={styles.statValue}>{patient.medicationsCount}</Text>
+                        <Text style={styles.statLabel}>Medications</Text>
+                      </View>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statItem}>
+                      <View style={styles.statIconContainer}>
+                        <Ionicons name="checkmark-circle" size={16} color={getAdherenceColor(patient.adherenceRate)} />
+                      </View>
+                      <View style={styles.statContent}>
+                        <Text style={[styles.statValue, { color: getAdherenceColor(patient.adherenceRate) }]}>
+                          {patient.adherenceRate}%
+                        </Text>
+                        <Text style={styles.statLabel}>Adherence</Text>
+                      </View>
+                    </View>
+                  </View>
+                  <View style={styles.patientActions}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => navigation.navigate('PatientDetails', { patientId: patient.id })}
+                    >
+                      <Ionicons name="information-circle-outline" size={16} color="#059669" />
+                      <Text style={styles.actionButtonText}>Details</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.deleteButton]}
+                      onPress={() => handleDeletePatient(patient.id, patient.name)}
+                    >
+                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                      <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              ))}
             </View>
           )}
         </View>
@@ -568,12 +792,14 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
                 {isLoading ? 'Exporting...' : 'Export List'}
               </Text>
             </TouchableOpacity>
-                      </View>
-                    </View>
-                  </ScrollView>
-                </View>
-              );
-            };
+          </View>
+        </View>
+      </ScrollView>
+
+      <SortModal />
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -635,7 +861,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderRadius: RADIUS.lg,
     paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[3],
+    paddingVertical: SPACING[1],
     marginBottom: SPACING[4],
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -714,7 +940,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING[4],
+    marginBottom: SPACING[2],
   },
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.lg,
@@ -733,6 +959,20 @@ const styles = StyleSheet.create({
   sortButtonText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: '#059669',
+    fontWeight: '500',
+  },
+  currentSortContainer: {
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[2],
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING[4],
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  currentSortText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
     fontWeight: '500',
   },
   loadingContainer: {
@@ -919,7 +1159,6 @@ const styles = StyleSheet.create({
     height: 64, 
     width: 64,
     borderRadius: RADIUS.full,
-
   },
   emptyMessage: {
     fontSize: TYPOGRAPHY.fontSize.md,
@@ -944,7 +1183,7 @@ const styles = StyleSheet.create({
   },
   addpatientIcon: {
     width: 42,
-    height:42,
+    height: 42,
     borderRadius: RADIUS.full
   },
   quickActionsGrid: {
@@ -952,8 +1191,8 @@ const styles = StyleSheet.create({
     gap: SPACING[3],
   },
   disabledButton: {
-  opacity: 0.5,
-},
+    opacity: 0.5,
+  },
   quickActionItem: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -970,6 +1209,120 @@ const styles = StyleSheet.create({
     color: '#475569',
     textAlign: 'center',
   },
-});
+  // Sort Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    flex: 1,
+  },
+  modalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: RADIUS['2xl'],
+    borderTopRightRadius: RADIUS['2xl'],
+    maxHeight: '80%',
+    minHeight: '60%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING[6],
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  modalTitle: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  modalCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: SPACING[6],
+  },
+  modalSubtitle: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#64748B',
+    marginBottom: SPACING[6],
+    marginTop: SPACING[4],
+  },
+  sortOptionGroup: {
+    marginBottom: SPACING[6],
+  },
+  sortOptionHeader: {
+    marginBottom: SPACING[3],
+  },
+  sortOptionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[3],
+  },
+  sortOptionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F0FDF4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sortOptionTitle: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: SPACING[1],
+  },
+  sortOptionDescription: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+    lineHeight: 18,
+  },
+  sortOrderButtons: {
+    flexDirection: 'row',
+    gap: SPACING[3],
+  },
+  sortOrderButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING[4],
+    paddingHorizontal: SPACING[4],
+    borderRadius: RADIUS.lg,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    gap: SPACING[2],
+  },
+  sortOrderButtonActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  sortOrderButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  sortOrderButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  modalFooter: {
+    padding: SPACING[6],
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  modalApplyButton: {
+    width: '100%',
+  },
+})
 
 export default PatientsScreen;

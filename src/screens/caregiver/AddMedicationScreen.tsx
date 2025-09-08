@@ -33,7 +33,7 @@ import PrintableBarcode from '@/components/common/PrintableBarcode';
 
 type Props = CaregiverStackScreenProps<'AddMedication'>;
 
-// Validation schema
+// Updated validation schema - quantity allows empty during input
 const medicationSchema: yup.ObjectSchema<MedicationFormData> = yup.object({
   name: yup
     .string()
@@ -88,6 +88,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
     reset,
     setValue,
     watch,
+    trigger,
   } = useForm<MedicationFormData>({
     resolver: yupResolver(medicationSchema),
     mode: 'onChange',
@@ -195,6 +196,24 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
     return '#059669';
   };
 
+  // Enhanced quantity handler to allow complete clearing of field
+  const handleQuantityChange = async (text: string) => {
+    if (text === '') {
+      // Allow completely empty field - set to empty string, don't validate yet
+      setValue('quantity', '' as any, { shouldValidate: false });
+    } else {
+      const numValue = parseInt(text);
+      if (!isNaN(numValue)) {
+        setValue('quantity', numValue, { shouldValidate: false }); // Don't validate during input
+      }
+    }
+    
+    // Clear any existing quantity errors when user is actively typing
+    if (errors.quantity) {
+      await trigger('quantity');
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -300,9 +319,12 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
                         selectedValue={value}
                         onValueChange={onChange}
                         style={styles.picker}
+                        itemStyle={styles.pickerItem} // iOS specific
+                        dropdownIconColor="#059669" // Android specific
+                        dropdownIconRippleColor="#F0FDF4" // Android specific
                       >
                         {MEDICATION_CONSTANTS.DOSAGE_UNITS.map((unit) => (
-                          <Picker.Item key={unit} label={unit} value={unit} />
+                          <Picker.Item key={unit} label={unit} value={unit} color="#1E293B" />
                         ))}
                       </Picker>
                     </View>
@@ -346,12 +368,16 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
                         selectedValue={value}
                         onValueChange={onChange}
                         style={styles.picker}
+                        itemStyle={styles.pickerItem}
+                        dropdownIconColor="#059669"
+                        dropdownIconRippleColor="#F0FDF4"
                       >
                         {MEDICATION_CONSTANTS.FREQUENCIES.map((freq) => (
                           <Picker.Item 
                             key={freq.value} 
                             label={freq.label} 
-                            value={freq.value} 
+                            value={freq.value}
+                            color="#1E293B"
                           />
                         ))}
                       </Picker>
@@ -379,12 +405,16 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
                         selectedValue={value}
                         onValueChange={onChange}
                         style={styles.picker}
+                        itemStyle={styles.pickerItem}
+                        dropdownIconColor="#059669"
+                        dropdownIconRippleColor="#F0FDF4"
                       >
                         {MEDICATION_CONSTANTS.TIMING_RELATIONS.map((timing) => (
                           <Picker.Item 
                             key={timing.value} 
                             label={timing.label} 
-                            value={timing.value} 
+                            value={timing.value}
+                            color="#1E293B"
                           />
                         ))}
                       </Picker>
@@ -415,12 +445,12 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Controller
                   control={control}
                   name="quantity"
-                  render={({ field: { onChange, onBlur, value } }) => (
+                  render={({ field: { onBlur, value } }) => (
                     <Input
                       label="Total Quantity"
                       placeholder="30"
                       value={value?.toString() || ''}
-                      onChangeText={(text) => onChange(text ? parseInt(text) : undefined)}
+                      onChangeText={handleQuantityChange}
                       onBlur={onBlur}
                       error={errors.quantity?.message}
                       leftIcon="grid-outline"
@@ -692,6 +722,14 @@ const styles = StyleSheet.create({
   picker: {
     height: 48,
     color: '#1E293B',
+    backgroundColor: '#FFFFFF',
+  },
+  // iOS specific picker item styling
+  pickerItem: {
+    height: 44,
+    color: '#1E293B',
+    backgroundColor: '#FFFFFF',
+    fontSize: TYPOGRAPHY.fontSize.md,
   },
   errorText: {
     fontSize: TYPOGRAPHY.fontSize.xs,

@@ -139,13 +139,13 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const handleNavigation = (screen: string) => {
     switch (screen) {
       case 'help':
-        navigation.navigate('HelpSupport');
+        navigation.navigate('HelpSupport', { userRole: 'caregiver' });
         break;
       case 'about':
         navigation.navigate('About');
         break;
       case 'privacy':
-        navigation.navigate('Privacy');
+        navigation.navigate('Privacy', { userRole: 'caregiver' });
         break;
       default:
         break;

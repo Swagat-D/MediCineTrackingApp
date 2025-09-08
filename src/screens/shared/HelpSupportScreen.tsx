@@ -16,16 +16,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
+import SecondaryNavbar from '@/components/common/SecondaryNavbar';
 
 interface HelpSupportScreenProps {
   navigation: any;
   userRole?: 'caregiver' | 'patient';
+  route?: any
 }
 
 const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ 
   navigation, 
-  userRole
+  route
 }) => {
+  const userRole = route?.params?.userRole || 'patient';
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
   const [animatedValues] = useState(
     Array(5).fill(0).map(() => new Animated.Value(0))
@@ -122,10 +125,17 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({
 
   return (
     <View style={styles.container}>
+      {userRole === 'patient' ? (
       <PatientSecondaryNavbar
-        title="Help & Support"
+        title="Privacy Policy"
         onBackPress={() => navigation.goBack()}
       />
+    ) : (
+      <SecondaryNavbar
+        title="Privacy Policy"
+        onBackPress={() => navigation.goBack()}
+      />
+    )}
 
       <ScrollView
         style={styles.scrollView}

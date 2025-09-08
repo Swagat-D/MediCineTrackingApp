@@ -15,30 +15,33 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
+import SecondaryNavbar from '@/components/common/SecondaryNavbar';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 
 interface PrivacyPolicyScreenProps {
   navigation: any;
   userRole?: 'caregiver' | 'patient';
+  route?: any;
 }
 
 const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = ({ 
   navigation, 
-  userRole
+  route
 }) => {
+  const userRole = route?.params?.userRole || 'patient';
   const [expandedSections, setExpandedSections] = useState<{ [key: number]: boolean }>({});
   const [animatedValues] = useState(
     Array(10).fill(0).map(() => new Animated.Value(0))
   );
 
   const theme = {
-  primary: userRole === 'caregiver' ? '#059669' : '#2563EB', // Changed patient blue to match login
-  primaryLight: userRole === 'caregiver' ? '#ECFDF5' : '#EFF6FF', // Lighter backgrounds
-  primaryDark: userRole === 'caregiver' ? '#047857' : '#1D4ED8', // Darker variants
+  primary: userRole === 'caregiver' ? '#059669' : '#2563EB', 
+  primaryLight: userRole === 'caregiver' ? '#ECFDF5' : '#EFF6FF',
+  primaryDark: userRole === 'caregiver' ? '#047857' : '#1D4ED8', 
   gradient: userRole === 'caregiver'
-    ? ['#ECFDF5', '#FFFFFF'] as const // Softer green gradient
-    : ['#EFF6FF', '#FFFFFF'] as const, // Softer blue gradient
-  accent: userRole === 'caregiver' ? '#10B981' : '#3B82F6', // Better accent colors
+    ? ['#ECFDF5', '#FFFFFF'] as const 
+    : ['#EFF6FF', '#FFFFFF'] as const, 
+  accent: userRole === 'caregiver' ? '#10B981' : '#3B82F6',
   text: userRole === 'caregiver' ? '#065F46' : '#1E40AF', // Darker text colors for better contrast
   border: userRole === 'caregiver' ? '#A7F3D0' : '#BFDBFE', // Subtle border colors
 };
@@ -157,10 +160,17 @@ const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = ({
 
   return (
   <View style={styles.container}>
-    <PatientSecondaryNavbar
-      title="Privacy Policy"
-      onBackPress={() => navigation.goBack()}
-    />
+      {userRole === 'patient' ? (
+      <PatientSecondaryNavbar
+        title="Privacy Policy"
+        onBackPress={() => navigation.goBack()}
+      />
+    ) : (
+      <SecondaryNavbar
+        title="Privacy Policy"
+        onBackPress={() => navigation.goBack()}
+      />
+    )}
 
     <ScrollView
       style={styles.scrollView}

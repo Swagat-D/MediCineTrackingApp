@@ -22,6 +22,7 @@ import { TYPOGRAPHY } from '../constants/themes/theme';
 import PatientAboutScreen from '@/screens/shared/PatientAboutScreen';
 import HelpSupportScreen from '@/screens/shared/HelpSupportScreen';
 import PrivacyPolicyScreen from '@/screens/shared/PrivacyPolicyScree';
+import { Pressable } from 'react-native';
 
 const Tab = createBottomTabNavigator<PatientTabParamList>();
 const Stack = createStackNavigator<PatientStackParamList>();
@@ -96,6 +97,15 @@ const PatientNavigator: React.FC = () => {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
+        tabBarButton: (props: React.ComponentProps<typeof Pressable> & { children: React.ReactNode }) => (
+          <Pressable
+            {...props}
+            android_ripple={{ color: 'transparent' }}
+            style={props.style}
+          >
+            {props.children}
+          </Pressable>
+        ),
         tabBarActiveTintColor: '#2563EB',
         tabBarInactiveTintColor: '#6B7280',
         tabBarLabelStyle: {

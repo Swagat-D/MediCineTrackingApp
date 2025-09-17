@@ -5,7 +5,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Platform,
   StyleSheet,
   Switch,
@@ -31,6 +30,7 @@ import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientNavbar from '../../components/common/PatientNavbar';
 import Input from '../../components/common/Input/Input';
 import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 interface Props {
   navigation: any;
@@ -199,18 +199,18 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
       }));
       
       setIsEditing(false);
-      Alert.alert('Success', 'Profile updated successfully!');
+      CustomAlertStatic.alert('Success', 'Profile updated successfully!');
       
     } catch (error: any) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', error.message || 'Failed to update profile. Please try again.');
+      CustomAlertStatic.alert('Error', error.message || 'Failed to update profile. Please try again.');
     } finally {
       dispatch(setLoading(false));
     }
   };
 
   const handleLogout = () => {
-    Alert.alert(
+    CustomAlertStatic.alert(
       'Sign Out',
       'Are you sure you want to sign out?',
       [
@@ -229,7 +229,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleAddEmergencyContact = async () => {
   if (!newContact.name || !newContact.relationship || !newContact.phoneNumber) {
-    Alert.alert('Error', 'Please fill in all required fields');
+    CustomAlertStatic.alert('Error', 'Please fill in all required fields');
     return;
   }
 
@@ -245,24 +245,24 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         phoneNumber: result.data.phone,
         isPrimary: result.data.isPrimary,
       },
-      ...prev.filter(c => c.id !== '911')
+      ...prev.filter(c => c.id !== '108')
     ]);
     
     setNewContact({ name: '', relationship: '', phoneNumber: '', isPrimary: false });
     setAddContactModalVisible(false);
-    Alert.alert('Success', 'Emergency contact added successfully');
+    CustomAlertStatic.alert('Success', 'Emergency contact added successfully');
   } catch (error: any) {
-    Alert.alert('Error', error.message || 'Failed to add emergency contact');
+    CustomAlertStatic.alert('Error', error.message || 'Failed to add emergency contact');
   }
 };
 
   const handleRemoveEmergencyContact = async (contactId: string) => {
-  if (contactId === '911') {
-    Alert.alert('Error', 'Cannot remove emergency services');
+  if (contactId === '108') {
+    CustomAlertStatic.alert('Error', 'Cannot remove emergency services');
     return;
   }
 
-  Alert.alert(
+  CustomAlertStatic.alert(
     'Remove Contact',
     'Are you sure you want to remove this emergency contact?',
     [
@@ -274,9 +274,9 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           try {
             await patientAPI.removeEmergencyContact(contactId);
             setEmergencyContacts(prev => prev.filter(contact => contact.id !== contactId));
-            Alert.alert('Success', 'Emergency contact removed');
+            CustomAlertStatic.alert('Success', 'Emergency contact removed');
           } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to remove contact');
+            CustomAlertStatic.alert('Error', error.message || 'Failed to remove contact');
           }
         },
       },

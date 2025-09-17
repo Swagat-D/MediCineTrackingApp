@@ -1,35 +1,36 @@
+import { Ionicons } from '@expo/vector-icons';
+import { yupResolver } from '@hookform/resolvers/yup';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
 import React, { useState } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
+  Image,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
   TouchableOpacity,
-  Alert,
-  Image,
+  View,
 } from 'react-native';
-import { useForm, Controller } from 'react-hook-form';
-import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { Ionicons } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
 
 // Components
-import SecondaryNavbar from '../../components/common/SecondaryNavbar';
 import Button from '../../components/common/Button/Button';
 import Input from '../../components/common/Input/Input';
 import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
+import SecondaryNavbar from '../../components/common/SecondaryNavbar';
 
 // Types and Constants
-import { CaregiverStackScreenProps } from '../../types/navigation.types';
-import { MedicationFormData } from '../../types/medication.types';
-import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
-import { MEDICATION_CONSTANTS } from '../../constants/app';
-import { caregiverAPI } from '../../services/api/caregiverAPI';
 import PrintableBarcode from '@/components/common/PrintableBarcode';
+import { MEDICATION_CONSTANTS } from '../../constants/app';
+import { RADIUS, SPACING, TYPOGRAPHY } from '../../constants/themes/theme';
+import { caregiverAPI } from '../../services/api/caregiverAPI';
+import { MedicationFormData } from '../../types/medication.types';
+import { CaregiverStackScreenProps } from '../../types/navigation.types';
+import { formatDate } from '../../utils/dateUtils';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 type Props = CaregiverStackScreenProps<'AddMedication'>;
 
@@ -121,7 +122,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
     setBarcodeData(result.barcodeData);
     setPatientName(patientDetails.patient.name);
     
-    Alert.alert(
+    CustomAlertStatic.alert(
       'Success',
       'Medication has been added successfully! A barcode has been generated.',
       [
@@ -149,7 +150,7 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
     
   } catch (error: any) {
     console.error('Error adding medication:', error);
-    Alert.alert('Error', error.message || 'Failed to add medication. Please try again.');
+    CustomAlertStatic.alert('Error', error.message || 'Failed to add medication. Please try again.');
   } finally {
     setIsLoading(false);
   }
@@ -161,12 +162,6 @@ const AddMedicationScreen: React.FC<Props> = ({ navigation, route }) => {
       setSelectedDate(date);
       setValue('expiryDate', date.toISOString().split('T')[0]);
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
   };
 
   const getDaysUntilExpiry = (expiryDate: string) => {

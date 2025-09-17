@@ -434,6 +434,31 @@ async removeEmergencyContact(contactId: string): Promise<{ message: string; succ
   return response.data;
 }
 
+  // Add to your PatientAPI class
+async deleteNotification(notificationId: string): Promise<{ success: boolean; message: string }> {
+  const response = await apiClient.delete(`/patient/notifications/${notificationId}`);
+  return response.data;
+}
+
+async deleteMultipleNotifications(notificationIds: string[]): Promise<{
+  success: boolean;
+  message: string;
+  data: { deletedCount: number; requestedCount: number };
+}> {
+  const response = await apiClient.delete('/patient/notifications/delete-multiple', {
+    data: { notificationIds }
+  });
+  return response.data;
+}
+
+async deleteAllNotifications(): Promise<{
+  success: boolean;
+  message: string;
+  data: { deletedCount: number };
+}> {
+  const response = await apiClient.delete('/patient/notifications/delete-all');
+  return response.data;
+}
 }
 
 export const patientAPI = new PatientAPI();

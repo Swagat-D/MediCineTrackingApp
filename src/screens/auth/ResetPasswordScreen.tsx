@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
-  Alert,
   Dimensions,
   Animated,
   Image,
@@ -29,6 +28,7 @@ import { COLORS, TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/them
 import { VALIDATION_RULES } from '../../constants/app';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { resetPassword, clearError } from '../../store/slices/authSlice';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 const { width, height } = Dimensions.get('window');
 const isSmallDevice = width < 375;
@@ -120,7 +120,7 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
       }));
       
       if (resetPassword.fulfilled.match(result)) {
-        Alert.alert(
+        CustomAlertStatic.alert(
           'Password Reset Successfully',
           'Your password has been reset successfully. Please login with your new password.',
           [
@@ -135,14 +135,14 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
         );
         reset();
       } else {
-        Alert.alert(
+        CustomAlertStatic.alert(
           'Reset Failed',
           result.payload || 'Failed to reset password. Please try again.'
         );
       }
     } catch (err) {
       console.error('Reset password error:', err);
-      Alert.alert('Error', 'An unexpected error occurred');
+      CustomAlertStatic.alert('Error', 'An unexpected error occurred');
     }
   };
 

@@ -1,32 +1,33 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useEffect, useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  TextInput,
-  Alert,
-  Dimensions,
-  Platform,
-  Image,
-  Modal,
-  Animated,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Animated,
+  Dimensions,
+  Image,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Button from '../../components/common/Button/Button';
-import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
 import CaregiverNavbar from '../../components/common/CaregiverNavbar';
-import { CaregiverStackScreenProps } from '../../types/navigation.types';
-import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../constants/themes/theme';
+import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
+import { RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../../constants/themes/theme';
 import { caregiverAPI, Patient as PatientType } from '../../services/api/caregiverAPI';
+import { CaregiverStackScreenProps } from '../../types/navigation.types';
+import { formatRelativeTime } from '../../utils/dateUtils';
+import { CustomAlertStatic } from '../../components/common/CustomAlert';
 
-import * as XLSX from 'xlsx';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as XLSX from 'xlsx';
 
 const { width } = Dimensions.get('window');
 
@@ -200,7 +201,7 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleDeletePatient = async (patientId: string, patientName: string) => {
-    Alert.alert(
+    CustomAlertStatic.alert(
       'Remove Patient',
       `Are you sure you want to remove ${patientName} from your patient list?`,
       [
@@ -211,10 +212,10 @@ const PatientsScreen: React.FC<Props> = ({ navigation }) => {
           onPress: async () => {
             try {
               await caregiverAPI.removePatient(patientId);
-              Alert.alert('Success', `${patientName} has been removed from your patient list`);
+              CustomAlertStatic.alert('Success', `${patientName} has been removed from your patient list`);
               await loadPatients();
             } catch (error) {
-              Alert.alert('Error', 'Failed to remove patient');
+              CustomAlertStatic.alert('Error', 'Failed to remove patient');
             }
           },
         },
@@ -309,7 +310,7 @@ useEffect(() => {
         'Status': patient.status.charAt(0).toUpperCase() + patient.status.slice(1),
         'Number of Medications': patient.medicationsCount,
         'Adherence Rate (%)': patient.adherenceRate,
-        'Last Activity': patient.lastActivity,
+        'Last Activity': formatRelativeTime(patient.lastActivity),
         'Alerts': patient.alerts,
       }));
 
@@ -341,7 +342,7 @@ useEffect(() => {
           await FileSystem.StorageAccessFramework.createFileAsync(permissions.directoryUri, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             .then(async (uri) => {
               await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
-              Alert.alert(
+              CustomAlertStatic.alert(
                 'Download Complete',
                 `Patient list has been downloaded successfully as ${fileName}`,
                 [{ text: 'OK' }]
@@ -349,10 +350,10 @@ useEffect(() => {
             })
             .catch((error) => {
               console.error(error);
-              Alert.alert('Download Failed', 'Unable to save file to Downloads folder.');
+              CustomAlertStatic.alert('Download Failed', 'Unable to save file to Downloads folder.');
             });
         } else {
-          Alert.alert('Permission Required', 'Please grant permission to save files to Downloads folder.');
+          CustomAlertStatic.alert('Permission Required', 'Please grant permission to save files to Downloads folder.');
         }
       } else {
         const fileUri = `${FileSystem.documentDirectory}${fileName}`;
@@ -372,7 +373,7 @@ useEffect(() => {
 
     } catch (error) {
       console.error('Error exporting patient list:', error);
-      Alert.alert('Export Failed', 'Unable to export patient list. Please try again.');
+      CustomAlertStatic.alert('Export Failed', 'Unable to export patient list. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -712,7 +713,7 @@ useEffect(() => {
                       </View>
                       <View style={styles.patientMeta}>
                         <Text style={styles.patientDetails}>{patient.email} • {patient.gender}, {patient.age}</Text>
-                        <Text style={styles.patientActivity}>Last activity: {patient.lastActivity}</Text>
+                        <Text style={styles.patientActivity}>Last activity: {formatRelativeTime(patient.lastActivity)}</Text>
                       </View>
                     </View>
                     {patient.alerts > 0 && (

@@ -10,13 +10,13 @@ import {
   LayoutAnimation,
   Linking,
   Clipboard,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
 import SecondaryNavbar from '@/components/common/SecondaryNavbar';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 interface PrivacyPolicyScreenProps {
   navigation: any;
@@ -75,7 +75,7 @@ const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = ({
 
   const handleCopyEmail = () => {
     Clipboard.setString('privacy@meditracker.com');
-    Alert.alert('Email Copied', 'Privacy email address has been copied to clipboard');
+    CustomAlertStatic.alert('Email Copied', 'Privacy email address has been copied to clipboard');
   };
 
   const collapsibleSections = [

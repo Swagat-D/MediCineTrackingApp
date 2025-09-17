@@ -9,7 +9,6 @@ import {
   Platform,
   Image,
   Clipboard,
-  Alert,
   ColorValue
 } from 'react-native';
 
@@ -17,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 interface PatientAboutScreenProps {
   navigation: any;
@@ -40,7 +40,7 @@ const PatientAboutScreen: React.FC<PatientAboutScreenProps> = ({ navigation }) =
 
   const handleCopyEmail = () => {
     Clipboard.setString('support@meditracker.com');
-    Alert.alert('Email Copied', 'Email address has been copied to clipboard');
+    CustomAlertStatic.alert('Email Copied', 'Email address has been copied to clipboard');
   };
 
   const patientContent = {

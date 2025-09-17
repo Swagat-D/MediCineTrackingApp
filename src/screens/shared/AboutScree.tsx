@@ -9,7 +9,6 @@ import {
   Platform,
   Image,
   Clipboard,
-  Alert,
   ColorValue
 } from 'react-native';
 
@@ -17,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import SecondaryNavbar from '../../components/common/SecondaryNavbar';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 interface AboutScreenProps {
   navigation: any;
@@ -41,7 +41,7 @@ const AboutScreen: React.FC<AboutScreenProps> = ({ navigation, userRole = 'careg
 
   const handleCopyEmail = () => {
     Clipboard.setString('info@meditracker.com');
-    Alert.alert('Email Copied', 'Email address has been copied to clipboard');
+    CustomAlertStatic.alert('Email Copied', 'Email address has been copied to clipboard');
   };
 
 

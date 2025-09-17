@@ -317,6 +317,32 @@ private async refreshPatientsInBackground() {
     console.log('Background refresh failed');
   }
 }
+
+// Add to your CaregiverAPI class
+async deleteNotification(notificationId: string): Promise<{ success: boolean; message: string }> {
+  const response = await apiClient.delete(`/caregiver/notifications/${notificationId}`);
+  return response.data;
+}
+
+async deleteMultipleNotifications(notificationIds: string[]): Promise<{
+  success: boolean;
+  message: string;
+  data: { deletedCount: number; requestedCount: number };
+}> {
+  const response = await apiClient.delete('/caregiver/notifications/delete-multiple', {
+    data: { notificationIds }
+  });
+  return response.data;
+}
+
+async deleteAllNotifications(): Promise<{
+  success: boolean;
+  message: string;
+  data: { deletedCount: number };
+}> {
+  const response = await apiClient.delete('/caregiver/notifications/delete-all');
+  return response.data;
+}
 }
 
 export const caregiverAPI = new CaregiverAPI();

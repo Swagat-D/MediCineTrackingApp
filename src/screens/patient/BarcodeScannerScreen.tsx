@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Dimensions,
   Platform,
   Vibration,
@@ -24,6 +23,7 @@ import {
 import { patientAPI } from '../../services/api/patientAPI';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { width, height } = Dimensions.get('window');
@@ -116,7 +116,7 @@ const BarcodeScannerScreen: React.FC<Props> = ({ navigation }) => {
     console.error('Barcode scan error:', error);
     dispatch(setError(error.message));
     
-    Alert.alert(
+    CustomAlertStatic.alert(
       'Scan Failed',
       error.message || 'Failed to scan barcode. Please try again.',
       [
@@ -155,7 +155,7 @@ const showMedicationDialog = (data: any) => {
       detailsText += `\nLast taken: ${new Date(medication.lastTaken).toLocaleString()}`;
     }
     
-    Alert.alert(
+    CustomAlertStatic.alert(
       '🔴 STOP - Do Not Take',
       `${medication.name} (${medication.dosage}${medication.dosageUnit})\n\n` +
       `❌ ${primaryReason}${detailsText}\n\n` +
@@ -186,8 +186,8 @@ const showMedicationDialog = (data: any) => {
     } else if (dosingSafety.timingRelation === 'anytime') {
       timingInfo = '\n✅ This medication can be taken anytime';
     }
-    
-    Alert.alert(
+
+    CustomAlertStatic.alert(
       '🟢 SAFE TO TAKE',
       `${medication.name} (${medication.dosage}${medication.dosageUnit})\n\n` +
       `✅ Safe to take now${timingInfo}\n\n` +
@@ -212,9 +212,9 @@ const showMedicationDialog = (data: any) => {
 };
 
 const showEmergencyOverride = (medication: any) => {
-  Alert.alert(
+  CustomAlertStatic.alert(
     '⚠️ Emergency Override',
-    'This should only be used in medical emergencies or under doctor supervision.\n\nAre you sure you want to record this dose?',
+    `This will record an emergency dose of ${medication.name}.\n\nThis should only be used in medical emergencies or under doctor supervision.\n\nAre you sure you want to proceed?`,
     [
       {
         text: 'Cancel',
@@ -222,7 +222,7 @@ const showEmergencyOverride = (medication: any) => {
         onPress: resetScanner,
       },
       {
-        text: 'Emergency Take',
+        text: '🚨 Emergency Take',
         style: 'destructive',
         onPress: () => confirmMedicationTaken(medication, true),
       },
@@ -232,24 +232,31 @@ const showEmergencyOverride = (medication: any) => {
 
 const confirmMedicationTaken = async (medication: any, isEmergency = false) => {
   try {
-    console.log('Recording medication taken:', medication.id);
+    console.log('Recording medication taken:', medication.id, 'Emergency:', isEmergency);
+    
+    // Show loading state
+    dispatch(setScanningBarcode(true));
     
     const result = await patientAPI.recordMedicationTaken(medication.id, {
-      notes: isEmergency ? 'Emergency override dose' : 'Taken via barcode scan',
+      notes: isEmergency ? '🚨 Emergency override dose - taken outside recommended timing' : 'Taken via barcode scan',
+      override: isEmergency, // Use 'override' instead of 'isEmergencyOverride'
       takenAt: new Date().toISOString()
     });
 
     console.log('Medication recorded successfully:', result);
 
-    Alert.alert(
-      '✅ Dose Recorded',
-      `Your ${medication.name} dose has been logged successfully.\n\n` +
-      `Taken at: ${new Date().toLocaleTimeString()}\n` +
-      `Remaining quantity: ${result.data?.remainingQuantity || 'Unknown'}\n` +
-      `Days left: ${result.data?.remainingDays || 'Unknown'}`,
+    // Show different success messages for emergency vs normal
+    const title = isEmergency ? '🚨 Emergency Dose Recorded' : '✅ Dose Recorded';
+    const message = isEmergency 
+      ? `Emergency dose of ${medication.name} has been logged.\n\n⚠️ Please consult your doctor about this emergency dose.\n\nTaken at: ${new Date().toLocaleTimeString()}\nRemaining quantity: ${result.data?.remainingQuantity || 'Unknown'}`
+      : `Your ${medication.name} dose has been logged successfully.\n\nTaken at: ${new Date().toLocaleTimeString()}\nRemaining quantity: ${result.data?.remainingQuantity || 'Unknown'}\nRemaining days: ${result.data?.remainingDays || 'Unknown'}`;
+
+    CustomAlertStatic.alert(
+      title,
+      message,
       [
         {
-          text: 'OK',
+          text: isEmergency ? 'I Understand' : 'OK',
           onPress: () => {
             resetScanner();
             navigation.navigate('Home');
@@ -259,11 +266,42 @@ const confirmMedicationTaken = async (medication: any, isEmergency = false) => {
     );
   } catch (error: any) {
     console.error('Error recording medication:', error);
-    Alert.alert(
+    
+    // Handle the specific 400 error case (timing check failed)
+    if (error.response?.status === 400) {
+      const errorMessage = error.response?.data?.message || 'It\'s not time for this medication yet.';
+      
+      CustomAlertStatic.alert(
+        '⏰ Wrong Timing',
+        `${errorMessage}\n\nWould you like to take this as an emergency override?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: resetScanner,
+          },
+          {
+            text: '🚨 Emergency Override',
+            style: 'destructive',
+            onPress: () => showEmergencyOverride(medication),
+          },
+        ]
+      );
+      return;
+    }
+    
+    // Other errors
+    const errorMessage = isEmergency 
+      ? 'Failed to record emergency dose. Please contact your caregiver immediately.'
+      : error.message || 'Failed to record medication. Please try again.';
+    
+    CustomAlertStatic.alert(
       'Error', 
-      error.message || 'Failed to record medication. Please try again.',
+      errorMessage,
       [{ text: 'OK', onPress: resetScanner }]
     );
+  } finally {
+    dispatch(setScanningBarcode(false));
   }
 };
   

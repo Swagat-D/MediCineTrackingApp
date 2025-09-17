@@ -8,7 +8,6 @@ import {
   RefreshControl,
   TextInput,
   Platform,
-  Alert,
   ActivityIndicator,
   StyleSheet,
   Modal,
@@ -30,6 +29,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
 import BarcodeDisplay from '@/components/common/BarcodeDisplay';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 interface Props {
   navigation: any;
@@ -116,7 +116,7 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
             takenAt: new Date().toISOString(),
             notes: 'Taken from medication list'
           });
-          Alert.alert('Success', 'Dose recorded successfully');
+          CustomAlertStatic.alert('Success', 'Dose recorded successfully');
           loadMedications();
           break;
         case 'details':
@@ -124,7 +124,7 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
           break;
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      CustomAlertStatic.alert('Error', error.message);
     }
   };
 
@@ -135,7 +135,7 @@ const MedicationListScreen: React.FC<Props> = ({ navigation }) => {
       const medication = await patientAPI.getMedicationDetails(medicationId);
       setSelectedMedication(medication);
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      CustomAlertStatic.alert('Error', error.message);
       setDetailsModalVisible(false);
     } finally {
       setIsLoadingDetails(false);

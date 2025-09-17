@@ -1,29 +1,34 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  Alert,
-  Platform,
-  Dimensions,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useState } from 'react';
+import {
+  Dimensions,
+  Linking,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { CustomAlertStatic } from '../../components/common/CustomAlert';
 import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
-import CaregiverSecondaryNavbar from '../../components/common/SecondaryNavbar';
+import NotificationDetailModal from '../../components/common/NotificationDetailModal';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
-import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
+import CaregiverSecondaryNavbar from '../../components/common/SecondaryNavbar';
+import { RADIUS, SPACING, TYPOGRAPHY } from '../../constants/themes/theme';
+import { caregiverAPI } from '../../services/api/caregiverAPI';
 import { useAppDispatch, useAppSelector } from '../../store';
-import { 
-  fetchNotifications, 
-  markNotificationAsRead, 
+import {
+  clearError,
+  deleteMultipleNotifications,
+  deleteNotification,
+  fetchNotifications,
   markAllNotificationsAsRead,
-  removeNotification,
-  clearError
+  markNotificationAsRead
 } from '../../store/slices/notificationSlice';
+import { formatRelativeTime } from '../../utils/dateUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -36,6 +41,14 @@ interface Notification {
   priority: 'low' | 'medium' | 'high' | 'critical';
   createdAt: string;
   data?: any;
+  // Updated to match actual API response structure
+  patientId?: string;
+  patientName?: string;
+  patient?: {
+    id: string;
+    name?: string;
+    phoneNumber?: string;
+  };
 }
 
 const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
@@ -46,8 +59,16 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isCaregiver = user?.role === 'caregiver';
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set());
+  const [modalNotification, setModalNotification] = useState<Notification | null>(null);
 
-  const themeColors = {
+  const themeColors: {
+    primary: string;
+    primaryLight: string;
+    primaryBorder: string;
+    gradient: [string, string, ...string[]];
+  } = {
     primary: isCaregiver ? '#059669' : '#2563EB',
     primaryLight: isCaregiver ? '#ECFDF5' : '#EBF4FF',
     primaryBorder: isCaregiver ? '#D1FAE5' : '#BFDBFE',
@@ -61,7 +82,7 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   useEffect(() => {
     if (error) {
-      Alert.alert('Error', error);
+      CustomAlertStatic.alert('Error', error);
       dispatch(clearError());
     }
   }, [error, dispatch]);
@@ -71,7 +92,6 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       await dispatch(fetchNotifications(user?.role || 'patient')).unwrap();
     } catch (error: any) {
       console.error('Error loading notifications:', error);
-      // Error is handled by the slice
     }
   };
 
@@ -89,12 +109,12 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       })).unwrap();
     } catch (error: any) {
       console.error('Error marking notification as read:', error);
-      Alert.alert('Error', 'Failed to mark notification as read');
+      CustomAlertStatic.alert('Error', 'Failed to mark notification as read');
     }
   };
 
   const handleMarkAllAsRead = () => {
-    Alert.alert(
+    CustomAlertStatic.alert(
       'Mark All as Read',
       'Mark all notifications as read?',
       [
@@ -106,7 +126,7 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               await dispatch(markAllNotificationsAsRead(user?.role || 'patient')).unwrap();
             } catch (error: any) {
               console.error('Error marking all as read:', error);
-              Alert.alert('Error', 'Failed to mark all notifications as read');
+              CustomAlertStatic.alert('Error', 'Failed to mark all notifications as read');
             }
           }
         }
@@ -114,158 +134,299 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     );
   };
 
-  const handleDeleteNotification = (notificationId: string, title: string) => {
-    Alert.alert(
-      'Delete Notification',
-      `Delete "${title}"?`,
+  const handleDeleteNotification = async (notificationId: string) => {
+    try {
+      await dispatch(deleteNotification({ 
+        notificationId, 
+        userRole: user?.role || 'patient' 
+      })).unwrap();
+    } catch (error: any) {
+      console.error('Error deleting notification:', error);
+      CustomAlertStatic.alert('Error', 'Failed to delete notification');
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedNotifications.size === 0) return;
+
+    CustomAlertStatic.alert(
+      'Delete Notifications',
+      `Delete ${selectedNotifications.size} selected notification${selectedNotifications.size > 1 ? 's' : ''}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            dispatch(removeNotification(notificationId));
+          onPress: async () => {
+            try {
+              await dispatch(deleteMultipleNotifications({
+                notificationIds: Array.from(selectedNotifications),
+                userRole: user?.role || 'patient'
+              })).unwrap();
+              setSelectedNotifications(new Set());
+              setSelectionMode(false);
+            } catch (error: any) {
+              console.error('Error deleting notifications:', error);
+              CustomAlertStatic.alert('Error', 'Failed to delete notifications');
+            }
           }
         }
       ]
     );
   };
 
+  const toggleSelection = (notificationId: string) => {
+    const newSelection = new Set(selectedNotifications);
+    if (newSelection.has(notificationId)) {
+      newSelection.delete(notificationId);
+    } else {
+      newSelection.add(notificationId);
+    }
+    setSelectedNotifications(newSelection);
+  };
+
+  const selectAll = () => {
+    setSelectedNotifications(new Set(filteredNotifications.map(n => n.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedNotifications(new Set());
+    setSelectionMode(false);
+  };
+
   const handleNotificationAction = (notification: Notification) => {
-    // Mark as read first
+    if (selectionMode) {
+      toggleSelection(notification.id);
+      return;
+    }
+
     if (!notification.isRead) {
       handleMarkAsRead(notification.id);
     }
 
-    // Handle different notification types based on user role
+    // Show modal
+    setModalNotification(notification);
+  };
+
+  const extractPatientNameFromMessage = (message: string): string | null => {
+    const sosPattern = /Emergency alert from (.+?)\./;
+    const sosMatch = message.match(sosPattern);
+    if (sosMatch) return sosMatch[1];
+    
+    const medicationPattern = /added for (.+)$/;
+    const medicationMatch = message.match(medicationPattern);
+    if (medicationMatch) return medicationMatch[1];
+    
+    const patientAddedPattern = /Patient (.+?) added to your care/;
+    const patientAddedMatch = message.match(patientAddedPattern);
+    if (patientAddedMatch) return patientAddedMatch[1];
+    
+    return null;
+  };
+
+  const findPatientIdByName = async (patientName: string, notification: any): Promise<string | null> => {
+    try {
+      const patients = await caregiverAPI.getPatients();
+      const matchingPatients = patients.filter(p => p.name.toLowerCase() === patientName.toLowerCase());
+      
+      console.log(`Found ${matchingPatients.length} patients with name "${patientName}"`);
+      
+      if (matchingPatients.length === 0) {
+        console.log('No patients found with that name');
+        return null;
+      }
+      
+      if (matchingPatients.length === 1) {
+        console.log('Single patient found:', matchingPatients[0].id);
+        return matchingPatients[0].id;
+      }
+      
+      console.log('Multiple patients found with same name, applying disambiguation strategies...');
+      
+      if (notification.createdAt) {
+        const notificationDate = new Date(notification.createdAt);
+        let bestMatch = matchingPatients[0];
+        let bestScore = 0;
+        
+        for (const patient of matchingPatients) {
+          let score = 0;
+          
+          if (patient.lastActivity) {
+            const activityDate = new Date(patient.lastActivity);
+            const daysDiff = Math.abs((notificationDate.getTime() - activityDate.getTime()) / (1000 * 60 * 60 * 24));
+            
+            if (daysDiff <= 30) {
+              score += 10;
+            }
+          }
+          
+          if (patient.status === 'active') {
+            score += 5;
+          } else if (patient.status === 'critical') {
+            score += 8;
+          }
+          
+          if (notification.type === 'sos_alert' && patient.alerts > 0) {
+            score += patient.alerts;
+          }
+          
+          console.log(`Patient ${patient.name} (${patient.id}) score: ${score}`);
+          
+          if (score > bestScore) {
+            bestScore = score;
+            bestMatch = patient;
+          }
+        }
+        
+        console.log(`Selected patient: ${bestMatch.name} (${bestMatch.id}) with score ${bestScore}`);
+        return bestMatch.id;
+      }
+      
+      return await showPatientSelectionDialog(matchingPatients, patientName);
+      
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+      return null;
+    }
+  };
+
+  const showPatientSelectionDialog = (patients: any[], patientName: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const options = [
+        ...patients.map(p => ({
+          text: `${p.name} (Age: ${p.age}, Status: ${p.status})`,
+          onPress: () => resolve(p.id)
+        })),
+        {
+          text: 'Cancel',
+          onPress: () => resolve(null)
+        }
+      ];
+      
+      CustomAlertStatic.alert(
+        'Multiple Patients Found',
+        `Multiple patients named "${patientName}" found. Please select the correct one:`,
+        options
+      );
+    });
+  };
+
+  const handleModalAction = async (action: string) => {
+    if (!modalNotification) return;
+
+    console.log('Notification structure:', JSON.stringify(modalNotification, null, 2));
+
     if (isCaregiver) {
-      // Caregiver-specific actions
-      switch (notification.type) {
-        case 'sos_alert':
-          Alert.alert(
-            'Emergency Alert',
-            `Critical emergency from ${(notification as any).patient?.name || 'patient'} - contact immediately`,
-            [
-              { text: 'Call Patient', onPress: () => Alert.alert('Calling...', 'Feature coming soon') },
-              { text: 'View Patient', onPress: () => {
-                if ((notification as any).patient?.id) {
-                  navigation.navigate('PatientDetails', { patientId: (notification as any).patient.id });
-                }
-              }},
-              { text: 'Dismiss', style: 'cancel' },
-            ]
-          );
+      switch (action) {
+        case 'call':
+          try {
+            let patientId = modalNotification.patientId || 
+                           modalNotification.patient?.id || 
+                           modalNotification.data?.patientId;
+            
+            if (!patientId) {
+              const patientName = extractPatientNameFromMessage(modalNotification.message);
+              console.log('Extracted patient name:', patientName);
+              
+              if (patientName) {
+                patientId = await findPatientIdByName(patientName, modalNotification);
+                console.log('Found patient ID by name:', patientId);
+              }
+            }
+                             
+            console.log('Patient ID found:', patientId);
+                             
+            if (!patientId) {
+              CustomAlertStatic.alert('Error', 'Patient information not available');
+              return;
+            }
+
+            const patientDetails = await caregiverAPI.getPatientDetails(patientId);
+            console.log('Patient details:', patientDetails);
+            const phoneNumber = patientDetails.patient.phoneNumber;
+            
+            if (phoneNumber) {
+              const phoneURL = `tel:${phoneNumber}`;
+              
+              Linking.canOpenURL(phoneURL)
+                .then(supported => {
+                  if (supported) {
+                    Linking.openURL(phoneURL);
+                    setModalNotification(null); // Close modal
+                  } else {
+                    CustomAlertStatic.alert('Error', 'Phone calling is not supported on this device');
+                  }
+                })
+                .catch(err => {
+                  console.error('Error opening phone dialer:', err);
+                  CustomAlertStatic.alert('Error', 'Could not open phone dialer');
+                });
+            } else {
+              CustomAlertStatic.alert('No Phone Number', 'Patient phone number not available');
+            }
+          } catch (error) {
+            console.error('Error fetching patient details:', error);
+            CustomAlertStatic.alert('Error', 'Could not fetch patient information');
+          }
           break;
+        case 'view_patient':
+          let patientId = modalNotification.patientId || 
+                         modalNotification.patient?.id || 
+                         modalNotification.data?.patientId;
           
-        case 'dose_missed':
-          Alert.alert(
-            'Missed Dose Alert',
-            `${(notification as any).patient?.name || 'Patient'} missed a medication dose`,
-            [
-              { text: 'Send Reminder', onPress: () => Alert.alert('Sent', 'Patient reminder sent') },
-              { text: 'View Patient', onPress: () => {
-                if ((notification as any).patient?.id) {
-                  navigation.navigate('PatientDetails', { patientId: (notification as any).patient.id });
-                }
-              }},
-              { text: 'Dismiss', style: 'cancel' },
-            ]
-          );
-          break;
-
-        case 'dose_taken':
-          Alert.alert(
-            'Medication Taken',
-            `${(notification as any).patient?.name || 'Patient'} has successfully taken their medication`,
-            [
-              { text: 'View Patient', onPress: () => {
-                if ((notification as any).patient?.id) {
-                  navigation.navigate('PatientDetails', { patientId: (notification as any).patient.id });
-                }
-              }},
-              { text: 'OK' }
-            ]
-          );
-          break;
-
-        case 'low_stock':
-          Alert.alert(
-            'Low Stock Alert',
-            `${(notification as any).patient?.name || 'Patient'}'s medication is running low`,
-            [
-              { text: 'View Medications', onPress: () => {
-                if ((notification as any).patient?.id) {
-                  navigation.navigate('PatientDetails', { patientId: (notification as any).patient.id });
-                }
-              }},
-              { text: 'Dismiss', style: 'cancel' },
-            ]
-          );
-          break;
-
-        case 'medication_added':
-          Alert.alert(
-            'Medication Added',
-            `New medication added for ${(notification as any).patient?.name || 'patient'}`,
-            [
-              { text: 'View Patient', onPress: () => {
-                if ((notification as any).patient?.id) {
-                  navigation.navigate('PatientDetails', { patientId: (notification as any).patient.id });
-                }
-              }},
-              { text: 'OK' }
-            ]
-          );
-          break;
+          if (!patientId) {
+            const patientName = extractPatientNameFromMessage(modalNotification.message);
+            console.log('View patient - Extracted patient name:', patientName);
+            
+            if (patientName) {
+              patientId = await findPatientIdByName(patientName, modalNotification);
+              console.log('View patient - Found patient ID by name:', patientId);
+            }
+          }
           
-        default:
-          // Just mark as read for other notification types
+          console.log('View patient - Patient ID:', patientId);
+          if (patientId) {
+            navigation.navigate('PatientDetails', { patientId });
+            setModalNotification(null); // Close modal
+          } else {
+            CustomAlertStatic.alert('Error', 'Patient information not available');
+          }
+          break;
+        case 'send_reminder':
+          CustomAlertStatic.alert('Sent', 'Patient reminder sent', undefined, { type: 'success' });
+          setModalNotification(null); // Close modal
+          break;
+        case 'view_medications':
+          let medicationPatientId = modalNotification.patientId || 
+                                   modalNotification.patient?.id || 
+                                   modalNotification.data?.patientId;
+          
+          if (!medicationPatientId) {
+            const patientName = extractPatientNameFromMessage(modalNotification.message);
+            console.log('View medications - Extracted patient name:', patientName);
+            
+            if (patientName) {
+              medicationPatientId = await findPatientIdByName(patientName, modalNotification);
+              console.log('View medications - Found patient ID by name:', medicationPatientId);
+            }
+          }
+          
+          if (medicationPatientId) {
+            navigation.navigate('PatientDetails', { patientId: medicationPatientId });
+            setModalNotification(null); // Close modal
+          } else {
+            CustomAlertStatic.alert('Error', 'Patient information not available');
+          }
           break;
       }
     } else {
-      // Patient-specific actions
-      switch (notification.type) {
-        case 'sos_alert':
-          Alert.alert(
-            'Emergency Alert',
-            'Your emergency alert has been sent to your caregivers',
-            [{ text: 'OK' }]
-          );
+      switch (action) {
+        case 'call_pharmacy':
+          CustomAlertStatic.alert('Calling', 'Feature coming soon', undefined, { type: 'info' });
           break;
-
-        case 'dose_taken':
-          Alert.alert(
-            'Medication Taken',
-            'Your medication dose has been recorded',
-            [{ text: 'OK' }]
-          );
-          break;
-
-        case 'low_stock':
-          Alert.alert(
-            'Low Stock Alert',
-            'Your medication is running low. Contact pharmacy?',
-            [
-              { text: 'Call Pharmacy', onPress: () => Alert.alert('Calling', 'Feature coming soon') },
-              { text: 'View Medications', onPress: () => navigation.navigate('Medications') },
-              { text: 'Dismiss', style: 'cancel' },
-            ]
-          );
-          break;
-
-        case 'medication_added':
-          Alert.alert(
-            'New Medication',
-            'A new medication has been added to your treatment plan',
-            [
-              { text: 'View Medications', onPress: () => navigation.navigate('Medications') },
-              { text: 'OK' },
-            ]
-          );
-          break;
-          
-        default:
-          // Just mark as read for other notification types
+        case 'view_medications':
+          navigation.navigate('Medications');
+          setModalNotification(null); // Close modal
           break;
       }
     }
@@ -273,84 +434,23 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case 'sos_alert':
-        return 'alert-circle';
-      case 'dose_missed':
-        return 'time-outline';
-      case 'low_stock':
-        return 'medkit-outline';
-      case 'dose_taken':
-        return 'checkmark-circle-outline';
-      case 'medication_added':
-        return 'add-circle-outline';
-      default:
-        return 'information-circle-outline';
+      case 'sos_alert': return 'alert-circle';
+      case 'dose_missed': return 'time-outline';
+      case 'low_stock': return 'medkit-outline';
+      case 'dose_taken': return 'checkmark-circle-outline';
+      case 'medication_added': return 'add-circle-outline';
+      default: return 'information-circle-outline';
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'critical':
-        return '#EF4444';
-      case 'high':
-        return '#F59E0B';
-      case 'medium':
-        return themeColors.primary;
-      case 'low':
-        return '#6B7280';
-      default:
-        return '#6B7280';
+      case 'critical': return '#EF4444';
+      case 'high': return '#F59E0B';
+      case 'medium': return themeColors.primary;
+      case 'low': return '#6B7280';
+      default: return '#6B7280';
     }
-  };
-
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
-    if (diffInMinutes < 10080) return `${Math.floor(diffInMinutes / 1440)}d ago`;
-    return date.toLocaleDateString();
-  };
-
-  const getCaregiverNotificationTitle = (type: string): string => {
-    switch (type) {
-      case 'dose_taken': 
-        return 'Patient Took Medication';
-      case 'dose_missed': 
-        return 'Patient Missed Dose';
-      case 'low_stock': 
-        return 'Low Medication Stock';
-      case 'sos_alert': 
-        return 'Emergency Alert from Patient';
-      case 'medication_added': 
-        return 'Medication Added Successfully';
-      default: 
-        return 'Notification';
-    }
-  };
-
-  const getPatientNotificationTitle = (type: string): string => {
-    switch (type) {
-      case 'dose_taken': 
-        return 'Dose Recorded';
-      case 'dose_missed': 
-        return 'Missed Dose';
-      case 'low_stock': 
-        return 'Low Stock Alert';
-      case 'sos_alert': 
-        return 'Emergency Alert Sent';
-      case 'medication_added': 
-        return 'New Medication Added';
-      default: 
-        return 'Notification';
-    }
-  };
-
-  const getNotificationTitle = (type: string): string => {
-    return isCaregiver ? getCaregiverNotificationTitle(type) : getPatientNotificationTitle(type);
   };
 
   const filteredNotifications = notifications.filter(notification => {
@@ -360,10 +460,9 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   const NotificationItem = ({ notification }: { notification: Notification }) => {
     const priorityColor = getPriorityColor(notification.priority);
-    const displayTitle = notification.title || getNotificationTitle(notification.type);
-    
-    // Show patient name for caregiver notifications
-    const patientName = isCaregiver && (notification as any).patient?.name;
+    const isSelected = selectedNotifications.has(notification.id);
+    const patientName = isCaregiver && notification.patient?.name;
+    const displayTitle = notification.title || 'Notification';
     const fullTitle = patientName ? `${displayTitle} - ${patientName}` : displayTitle;
     
     return (
@@ -371,11 +470,33 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         style={[
           styles.notificationItem,
           !notification.isRead && styles.unreadNotification,
+          isSelected && styles.selectedNotification,
         ]}
         onPress={() => handleNotificationAction(notification)}
+        onLongPress={() => {
+          setSelectionMode(true);
+          toggleSelection(notification.id);
+        }}
         activeOpacity={0.7}
       >
         <View style={styles.notificationContent}>
+          {/* Selection Checkbox */}
+          {selectionMode && (
+            <TouchableOpacity
+              style={styles.checkbox}
+              onPress={() => toggleSelection(notification.id)}
+            >
+              <View style={[
+                styles.checkboxInner,
+                isSelected && { backgroundColor: themeColors.primary }
+              ]}>
+                {isSelected && (
+                  <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                )}
+              </View>
+            </TouchableOpacity>
+          )}
+
           {/* Priority Indicator */}
           <View style={[styles.priorityIndicator, { backgroundColor: priorityColor }]} />
           
@@ -399,7 +520,7 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               </Text>
               <View style={styles.notificationMeta}>
                 <Text style={styles.notificationTime}>
-                  {formatTimestamp(notification.createdAt)}
+                  {formatRelativeTime(notification.createdAt)}
                 </Text>
                 {!notification.isRead && (
                   <View style={[styles.unreadDot, { backgroundColor: themeColors.primary }]} />
@@ -411,24 +532,28 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               {notification.message}
             </Text>
             
-            <View style={styles.actionIndicator}>
-              <Ionicons name="chevron-forward" size={14} color={themeColors.primary} />
-              <Text style={[styles.actionText, { color: themeColors.primary }]}>Tap to view</Text>
-            </View>
+            {!selectionMode && (
+              <View style={styles.actionIndicator}>
+                <Ionicons name="chevron-forward" size={14} color={themeColors.primary} />
+                <Text style={[styles.actionText, { color: themeColors.primary }]}>Tap to view</Text>
+              </View>
+            )}
           </View>
         </View>
 
-        {/* Delete Button */}
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleDeleteNotification(notification.id, fullTitle);
-          }}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="close" size={18} color="#9CA3AF" />
-        </TouchableOpacity>
+        {/* Delete Button (only when not in selection mode) */}
+        {!selectionMode && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleDeleteNotification(notification.id);
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="trash-outline" size={18} color="#EF4444" />
+          </TouchableOpacity>
+        )}
       </TouchableOpacity>
     );
   };
@@ -460,39 +585,101 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     <View style={styles.container}>
       {isCaregiver ? (
         <CaregiverSecondaryNavbar
-          title="Notifications"
-          subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
-          onBackPress={() => navigation.goBack()}
+          title={selectionMode ? `${selectedNotifications.size} Selected` : "Notifications"}
+          subtitle={selectionMode ? 
+            `${selectedNotifications.size} of ${filteredNotifications.length} notifications` :
+            (unreadCount > 0 ? `${unreadCount} unread` : 'All caught up')
+          }
+          onBackPress={selectionMode ? clearSelection : () => navigation.goBack()}
           rightActions={
-            unreadCount > 0 ? (
-              <TouchableOpacity
-                style={[styles.markAllButton, { backgroundColor: themeColors.primaryLight, borderColor: themeColors.primaryBorder }]}
-                onPress={handleMarkAllAsRead}
-              >
-                <Text style={[styles.markAllButtonText, { color: themeColors.primary }]}>
-                  Mark All
-                </Text>
-              </TouchableOpacity>
-            ) : null
+            selectionMode ? (
+              <View style={styles.selectionActions}>
+                <TouchableOpacity
+                  style={[styles.selectionButton, { backgroundColor: themeColors.primaryLight }]}
+                  onPress={selectAll}
+                >
+                  <Text style={[styles.selectionButtonText, { color: themeColors.primary }]}>
+                    All
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.selectionButton, styles.deleteSelectionButton]}
+                  onPress={handleDeleteSelected}
+                  disabled={selectedNotifications.size === 0}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.headerActions}>
+                {unreadCount > 0 && (
+                  <TouchableOpacity
+                    style={[styles.markAllButton, { backgroundColor: themeColors.primaryLight, borderColor: themeColors.primaryBorder }]}
+                    onPress={handleMarkAllAsRead}
+                  >
+                    <Text style={[styles.markAllButtonText, { color: themeColors.primary }]}>
+                      Mark All
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.selectButton}
+                  onPress={() => setSelectionMode(true)}
+                >
+                  <Ionicons name="checkmark-circle-outline" size={18} color={themeColors.primary} />
+                </TouchableOpacity>
+              </View>
+            )
           }
         />
       ) : (
         <PatientSecondaryNavbar
-          title="Notifications"
-          subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
-          onBackPress={() => navigation.goBack()}
+          title={selectionMode ? `${selectedNotifications.size} Selected` : "Notifications"}
+          subtitle={selectionMode ? 
+            `${selectedNotifications.size} of ${filteredNotifications.length} notifications` :
+            (unreadCount > 0 ? `${unreadCount} unread` : 'All caught up')
+          }
+          onBackPress={selectionMode ? clearSelection : () => navigation.goBack()}
           onSOSPress={() => navigation.navigate('SOS')}
           rightActions={
-            unreadCount > 0 ? (
-              <TouchableOpacity
-                style={[styles.markAllButton, { backgroundColor: themeColors.primaryLight, borderColor: themeColors.primaryBorder }]}
-                onPress={handleMarkAllAsRead}
-              >
-                <Text style={[styles.markAllButtonText, { color: themeColors.primary }]}>
-                  Mark All
-                </Text>
-              </TouchableOpacity>
-            ) : null
+            selectionMode ? (
+              <View style={styles.selectionActions}>
+                <TouchableOpacity
+                  style={[styles.selectionButton, { backgroundColor: themeColors.primaryLight }]}
+                  onPress={selectAll}
+                >
+                  <Text style={[styles.selectionButtonText, { color: themeColors.primary }]}>
+                    All
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.selectionButton, styles.deleteSelectionButton]}
+                  onPress={handleDeleteSelected}
+                  disabled={selectedNotifications.size === 0}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.headerActions}>
+                {unreadCount > 0 && (
+                  <TouchableOpacity
+                    style={[styles.markAllButton, { backgroundColor: themeColors.primaryLight, borderColor: themeColors.primaryBorder }]}
+                    onPress={handleMarkAllAsRead}
+                  >
+                    <Text style={[styles.markAllButtonText, { color: themeColors.primary }]}>
+                      Mark All
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.selectButton}
+                  onPress={() => setSelectionMode(true)}
+                >
+                  <Ionicons name="checkmark-circle-outline" size={18} color={themeColors.primary} />
+                </TouchableOpacity>
+              </View>
+            )
           }
         />
       )}
@@ -511,41 +698,43 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
       >
         {/* Filter Toggle */}
-        <View style={styles.filterSection}>
-          <View style={styles.filterToggle}>
-            <TouchableOpacity
-              style={[
-                styles.filterOption,
-                filter === 'all' && styles.activeFilter,
-                filter === 'all' && { backgroundColor: themeColors.primary }
-              ]}
-              onPress={() => setFilter('all')}
-            >
-              <Text style={[
-                styles.filterText,
-                filter === 'all' && styles.activeFilterText
-              ]}>
-                All ({notifications.length})
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[
-                styles.filterOption,
-                filter === 'unread' && styles.activeFilter,
-                filter === 'unread' && { backgroundColor: themeColors.primary }
-              ]}
-              onPress={() => setFilter('unread')}
-            >
-              <Text style={[
-                styles.filterText,
-                filter === 'unread' && styles.activeFilterText
-              ]}>
-                Unread ({unreadCount})
-              </Text>
-            </TouchableOpacity>
+        {!selectionMode && (
+          <View style={styles.filterSection}>
+            <View style={styles.filterToggle}>
+              <TouchableOpacity
+                style={[
+                  styles.filterOption,
+                  filter === 'all' && styles.activeFilter,
+                  filter === 'all' && { backgroundColor: themeColors.primary }
+                ]}
+                onPress={() => setFilter('all')}
+              >
+                <Text style={[
+                  styles.filterText,
+                  filter === 'all' && styles.activeFilterText
+                ]}>
+                  All ({notifications.length})
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.filterOption,
+                  filter === 'unread' && styles.activeFilter,
+                  filter === 'unread' && { backgroundColor: themeColors.primary }
+                ]}
+                onPress={() => setFilter('unread')}
+              >
+                <Text style={[
+                  styles.filterText,
+                  filter === 'unread' && styles.activeFilterText
+                ]}>
+                  Unread ({unreadCount})
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Notifications List */}
         <View style={styles.notificationsSection}>
@@ -585,11 +774,67 @@ const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           )}
         </View>
       </ScrollView>
+
+      {/* Notification Detail Modal */}
+      <NotificationDetailModal
+        visible={!!modalNotification}
+        onClose={() => setModalNotification(null)}
+        notification={modalNotification}
+        isCaregiver={isCaregiver}
+        onAction={handleModalAction}
+        themeColors={themeColors}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+  },
+  selectButton: {
+    padding: SPACING[2],
+  },
+  selectionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+  },
+  selectionButton: {
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[2],
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteSelectionButton: {
+    backgroundColor: '#EF4444',
+    minWidth: 36,
+  },
+  selectionButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: '600',
+  },
+  selectedNotification: {
+    backgroundColor: '#F0F9FF',
+    borderColor: '#0EA5E9',
+    borderWidth: 1,
+  },
+  checkbox: {
+    marginRight: SPACING[2],
+    padding: SPACING[1],
+  },
+  checkboxInner: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
@@ -770,7 +1015,7 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     position: 'absolute',
-    top: SPACING[2],
+    top: SPACING[12],
     right: SPACING[2],
     padding: SPACING[2],
     backgroundColor: 'rgba(255, 255, 255, 0.9)',

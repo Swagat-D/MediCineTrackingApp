@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Input from '../../components/common/Input/Input';
 import CaregiverNavbar from '../../components/common/CaregiverNavbar';
 import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
+import { CustomAlertStatic } from '../../components/common/CustomAlert';
 
 // Types and Constants
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
@@ -109,18 +109,18 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
       }));
       
       setIsEditing(false);
-      Alert.alert('Success', 'Profile updated successfully!');
+      CustomAlertStatic.alert('Success', 'Profile updated successfully!');
       
     } catch (error: any) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', error.message || 'Failed to update profile. Please try again.');
+      CustomAlertStatic.alert('Error', error.message || 'Failed to update profile. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleLogout = () => {
-    Alert.alert(
+    CustomAlertStatic.alert(
       'Logout',
       'Are you sure you want to logout?',
       [

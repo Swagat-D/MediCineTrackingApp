@@ -10,7 +10,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
-  Alert,
   Dimensions,
   Animated,
   Image,
@@ -29,6 +28,7 @@ import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import { VALIDATION_RULES, ALERT_MESSAGES } from '../../constants/app';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { loginUser, clearError } from '../../store/slices/authSlice';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 const { width } = Dimensions.get('window');
 const isSmallDevice = width < 375;
@@ -107,14 +107,14 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
       if (loginUser.fulfilled.match(result)) {
         reset();
       } else {
-        Alert.alert(
+        CustomAlertStatic.alert(
           'Login Failed',
           result.payload || ALERT_MESSAGES.ERROR.INVALID_CREDENTIALS
         );
       }
     } catch (err) {
       console.error(err)
-      Alert.alert('Error', 'An unexpected error occurred');
+      CustomAlertStatic.alert('Error', 'An unexpected error occurred');
     }
   };
 

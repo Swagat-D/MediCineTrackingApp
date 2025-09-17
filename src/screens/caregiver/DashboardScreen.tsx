@@ -1,25 +1,26 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  Dimensions,
-  Platform,
-  Modal,
-  Image,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAppSelector, RootState,AppDispatch } from '../../store';
-import { CaregiverStackScreenProps } from '../../types/navigation.types';
-import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
-import CaregiverNavbar from '../../components/common/CaregiverNavbar';
+import React, { useEffect, useState } from 'react';
+import {
+  Dimensions,
+  Image,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
+import CaregiverNavbar from '../../components/common/CaregiverNavbar';
+import { RADIUS, SPACING, TYPOGRAPHY } from '../../constants/themes/theme';
+import { AppDispatch, RootState, useAppSelector } from '../../store';
 import { loadDashboardWithCache, refreshDashboard } from '../../store/slices/caregiverSlice';
+import { CaregiverStackScreenProps } from '../../types/navigation.types';
+import { formatRelativeTime } from '../../utils/dateUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -142,7 +143,7 @@ const {
                 <View style={styles.activityContent}>
                   <View style={styles.activityHeader}>
                     <Text style={styles.activityPatient}>{activity.patientName}</Text>
-                    <Text style={styles.activityTime}>{activity.timestamp}</Text>
+                    <Text style={styles.activityTime}>{formatRelativeTime(activity.timestamp)}</Text>
                   </View>
                   <Text style={styles.activityMessage}>{activity.message}</Text>
                 </View>
@@ -351,7 +352,7 @@ const {
                 <View style={styles.activityContent}>
                   <View style={styles.activityHeader}>
                     <Text style={styles.activityPatient}>{activity.patientName}</Text>
-                    <Text style={styles.activityTime}>{activity.timestamp}</Text>
+                    <Text style={styles.activityTime}>{formatRelativeTime(activity.timestamp)}</Text>
                   </View>
                   <Text style={styles.activityMessage}>{activity.message}</Text>
                 </View>

@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
-  Alert,
   Dimensions,
   Animated,
   Image,
@@ -29,6 +28,7 @@ import { COLORS, TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/them
 import { VALIDATION_RULES } from '../../constants/app';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { forgotPassword, clearError } from '../../store/slices/authSlice';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 const { width, height } = Dimensions.get('window');
 const isSmallDevice = width < 375;
@@ -112,7 +112,7 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
       
       if (forgotPassword.fulfilled.match(result)) {
         setEmailSent(true);
-        Alert.alert(
+        CustomAlertStatic.alert(
           'Reset Code Sent',
           `We've sent a password reset code to ${data.email}. Please check your email and enter the verification code.`,
           [
@@ -129,7 +129,7 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
           ]
         );
       } else {
-        Alert.alert(
+        CustomAlertStatic.alert(
           'Error',
           result.payload || 'Failed to send reset email. Please try again.'
         );
@@ -137,7 +137,7 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
       
     } catch (err) {
       console.error('Forgot password error:', err);
-      Alert.alert('Error', 'Failed to send reset email. Please try again.');
+      CustomAlertStatic.alert('Error', 'Failed to send reset email. Please try again.');
     }
   };
 
@@ -153,20 +153,20 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
         const result = await dispatch(forgotPassword({ email }));
         
         if (forgotPassword.fulfilled.match(result)) {
-          Alert.alert(
+          CustomAlertStatic.alert(
             'Code Resent',
             'A new verification code has been sent to your email.',
             [{ text: 'OK' }]
           );
         } else {
-          Alert.alert(
+          CustomAlertStatic.alert(
             'Error',
             result.payload || 'Failed to resend email. Please try again.'
           );
         }
       } catch (err) {
         console.error('Resend email error:', err);
-        Alert.alert('Error', 'Failed to resend email. Please try again.');
+        CustomAlertStatic.alert('Error', 'Failed to resend email. Please try again.');
       }
     }
   };

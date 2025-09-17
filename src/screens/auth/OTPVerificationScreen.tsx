@@ -7,7 +7,6 @@ import {
   StatusBar,
   TextInput,
   TouchableOpacity,
-  Alert,
   Keyboard,
   Dimensions,
   Animated,
@@ -31,6 +30,7 @@ import { APP_CONFIG } from '../../constants/app';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { verifyOTP, clearError } from '../../store/slices/authSlice';
 import { authAPI } from '@/services/api/authAPI';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 const { width, height } = Dimensions.get('window');
 const isSmallDevice = width < 375;
@@ -152,7 +152,7 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
     const otpToVerify = otpCode || otp.join('');
     
     if (otpToVerify.length !== APP_CONFIG.OTP_LENGTH) {
-      Alert.alert('Invalid OTP', 'Please enter the complete 6-digit code.');
+      CustomAlertStatic.alert('Invalid OTP', 'Please enter the complete 6-digit code.');
       return;
     }
 
@@ -174,14 +174,14 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
           });
         } else {
           // Signup success - MainNavigator will handle navigation
-          Alert.alert(
+          CustomAlertStatic.alert(
             'Success',
             'Account created successfully!',
             [{ text: 'OK' }]
           );
         }
       } else {
-        Alert.alert(
+        CustomAlertStatic.alert(
           'Verification Failed',
           result.payload || 'Invalid OTP. Please try again.'
         );
@@ -190,7 +190,7 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
       }
     } catch (err) {
       console.error(err)
-      Alert.alert('Error', 'An unexpected error occurred');
+      CustomAlertStatic.alert('Error', 'An unexpected error occurred');
     }
   };
 
@@ -205,7 +205,7 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
       
      await authAPI.resendOTP(email);
       
-      Alert.alert(
+      CustomAlertStatic.alert(
         'OTP Sent',
         'A new verification code has been sent to your email.'
       );
@@ -213,7 +213,7 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
       inputRefs.current[0]?.focus();
     } catch (err) {
       console.error(err)
-      Alert.alert('Error', 'Failed to resend OTP. Please try again.');
+      CustomAlertStatic.alert('Error', 'Failed to resend OTP. Please try again.');
     }
   };
 

@@ -1,26 +1,28 @@
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  Alert,
   Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 
 // Components
-import SecondaryNavbar from '../../components/common/SecondaryNavbar';
 import Button from '../../components/common/Button/Button';
 import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
+import SecondaryNavbar from '../../components/common/SecondaryNavbar';
 
 // Types and Constants
-import { CaregiverStackScreenProps } from '../../types/navigation.types';
-import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
+import { RADIUS, SPACING, TYPOGRAPHY } from '../../constants/themes/theme';
 import { caregiverAPI, PatientDetails } from '../../services/api/caregiverAPI';
+import { CaregiverStackScreenProps } from '../../types/navigation.types';
+import { formatRelativeTime } from '../../utils/dateUtils';
+import { CustomAlertStatic } from '../../components/common/CustomAlert';
+
 
 type Props = CaregiverStackScreenProps<'PatientDetails'>;
 
@@ -62,7 +64,7 @@ const [medicationHistory, setMedicationHistory] = useState<{
     setMedicationHistory(historyData);
   } catch (error: any) {
     console.error('Error loading patient details:', error);
-    Alert.alert('Error', error.message || 'Failed to load patient details. Please try again.');
+    CustomAlertStatic.alert('Error', error.message || 'Failed to load patient details. Please try again.');
   } finally {
     setIsLoading(false);
   }
@@ -78,7 +80,7 @@ const [medicationHistory, setMedicationHistory] = useState<{
   };
 
   const handleDeleteMedication = async (medicationId: string, medicationName: string) => {
-    Alert.alert(
+    CustomAlertStatic.alert(
       'Delete Medication',
       `Are you sure you want to delete ${medicationName}?`,
       [
@@ -89,10 +91,10 @@ const [medicationHistory, setMedicationHistory] = useState<{
           onPress: async () => {
             try {
               await caregiverAPI.deleteMedication(medicationId);
-              Alert.alert('Success', 'Medication deleted successfully');
+              CustomAlertStatic.alert('Success', 'Medication deleted successfully');
               await loadPatientDetails();
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to delete medication');
+              CustomAlertStatic.alert('Error', error.message || 'Failed to delete medication');
             }
           },
         },
@@ -127,19 +129,9 @@ const [medicationHistory, setMedicationHistory] = useState<{
   };
 
   const formatLastActivity = (lastActivity?: string) => {
-  if (!lastActivity) return 'No recent activity';
-  
-  const date = new Date(lastActivity);
-  const now = new Date();
-  const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-  
-  if (diffInHours < 24) {
-    return diffInHours < 1 ? 'Just now' : `${diffInHours}h ago`;
-  } else {
-    const diffInDays = Math.floor(diffInHours / 24);
-    return diffInDays === 1 ? '1 day ago' : `${diffInDays} days ago`;
-  }
-};
+    if (!lastActivity) return 'No recent activity';
+    return formatRelativeTime(lastActivity);
+  };
 
   const formatLastTaken = (lastTaken?: string) => {
     if (!lastTaken) return 'Never';
@@ -506,7 +498,7 @@ const [medicationHistory, setMedicationHistory] = useState<{
                         style={styles.medicationAction}
                           onPress={() => {
                             // Show barcode modal or navigate to barcode screen
-                            Alert.alert(
+                            CustomAlertStatic.alert(
                               'Medication Barcode',
                               `Medication ID: ${medication.id}`,
                               [

@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Platform,
   ActivityIndicator,
   StyleSheet,
@@ -25,6 +24,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 interface Props {
   navigation: any;
@@ -211,7 +211,7 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
     
     // Prevent disabling required meals
     if (meal && !meal.isOptional && meal.enabled) {
-      Alert.alert(
+      CustomAlertStatic.alert(
         'Required Meal',
         `${meal.name} is required and cannot be disabled. It's essential for proper medication scheduling.`,
         [{ text: 'OK' }]
@@ -245,7 +245,7 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
       await patientAPI.updateMealTimes(mealTimesData);
       dispatch(setMealTimes(localMealTimes));
       
-      Alert.alert(
+      CustomAlertStatic.alert(
         'Settings Saved',
         'Your meal times have been updated successfully!',
         [{ text: 'OK', onPress: () => {
@@ -254,14 +254,14 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
       );
     } catch (error: any) {
       dispatch(setError(error.message));
-      Alert.alert('Save Failed', error.message || 'Failed to save meal settings');
+      CustomAlertStatic.alert('Save Failed', error.message || 'Failed to save meal settings');
     } finally {
       setSavingChanges(false);
     }
   };
 
   const resetToDefaults = () => {
-    Alert.alert(
+    CustomAlertStatic.alert(
       'Reset to Defaults',
       'Are you sure you want to reset all meal times to default values?',
       [
@@ -318,7 +318,7 @@ const MealSettingsScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleBackPress = () => {
     if (hasChanges) {
-      Alert.alert(
+      CustomAlertStatic.alert(
         'Unsaved Changes',
         'You have unsaved changes. What would you like to do?',
         [

@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
-  Alert,
   Dimensions,
   Animated,
   Image,
@@ -30,6 +29,7 @@ import { COLORS, TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/them
 import { VALIDATION_RULES } from '../../constants/app';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { signupUser, clearError } from '../../store/slices/authSlice';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 const { width, height } = Dimensions.get('window');
 const isSmallDevice = width < 375;
@@ -155,14 +155,14 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
         });
         reset();
       } else {
-        Alert.alert(
+        CustomAlertStatic.alert(
           'Signup Failed',
           result.payload || 'Failed to create account. Please try again.'
         );
       }
     } catch (err) {
       console.error(err)
-      Alert.alert('Error', 'An unexpected error occurred');
+      CustomAlertStatic.alert('Error', 'An unexpected error occurred');
     }
   };
 

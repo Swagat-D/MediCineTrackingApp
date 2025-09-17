@@ -8,7 +8,6 @@ import {
   Modal,
   TextInput,
   Platform,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +16,7 @@ import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
 import { CaregiverStackScreenProps } from '../../types/navigation.types';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import { caregiverAPI } from '../../services/api/caregiverAPI';
+import { CustomAlertStatic } from '../../components/common/CustomAlert';
 
 type Props = CaregiverStackScreenProps<'AddPatient'>;
 
@@ -53,14 +53,14 @@ const AddPatientScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
-      Alert.alert('Search Error', 'Please enter an email or phone number');
+      CustomAlertStatic.alert('Search Error', 'Please enter an email or phone number');
       return;
     }
 
     const cleanQuery = searchQuery.trim();
     
     if (!isValidEmail(cleanQuery) && !isValidPhone(cleanQuery)) {
-      Alert.alert(
+      CustomAlertStatic.alert(
         'Invalid Input', 
         'Please enter a valid email address or phone number'
       );
@@ -83,13 +83,13 @@ const AddPatientScreen: React.FC<Props> = ({ navigation }) => {
       setSearchResults(mappedResults);
       
       if (results.length === 0) {
-        Alert.alert(
+        CustomAlertStatic.alert(
           'No Results', 
           'No patient found with this email or phone number'
         );
       }
     } catch (error: any) {
-      Alert.alert('Search Error', error.message || 'Failed to search patients');
+      CustomAlertStatic.alert('Search Error', error.message || 'Failed to search patients');
       setSearchResults([]);
     } finally {
       setIsSearching(false);
@@ -102,18 +102,18 @@ const AddPatientScreen: React.FC<Props> = ({ navigation }) => {
       const response = await caregiverAPI.sendPatientOTP(patient.id);
       setPatientEmail(response.patientEmail);
       setOtpModalVisible(true);
-      Alert.alert(
+      CustomAlertStatic.alert(
         'OTP Sent', 
         `Verification code sent to ${response.patientEmail}. Please ask the patient to share the code with you.`
       );
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send OTP');
+      CustomAlertStatic.alert('Error', error.message || 'Failed to send OTP');
     }
   };
 
   const handleVerifyOTP = async () => {
     if (otp.length !== 6) {
-      Alert.alert('Invalid OTP', 'Please enter a 6-digit OTP');
+      CustomAlertStatic.alert('Invalid OTP', 'Please enter a 6-digit OTP');
       return;
     }
 
@@ -127,10 +127,10 @@ const AddPatientScreen: React.FC<Props> = ({ navigation }) => {
       setSelectedPatient(null);
       setSearchQuery('');
       setSearchResults([]);
-      Alert.alert('Success', 'Patient added successfully!');
+      CustomAlertStatic.alert('Success', 'Patient added successfully!');
       navigation.goBack();
     } catch (error: any) {
-      Alert.alert('Verification Failed', error.message || 'Invalid OTP');
+      CustomAlertStatic.alert('Verification Failed', error.message || 'Invalid OTP');
     } finally {
       setIsVerifying(false);
     }

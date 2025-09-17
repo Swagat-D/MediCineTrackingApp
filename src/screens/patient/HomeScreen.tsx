@@ -1,31 +1,32 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  Platform,
-  Alert,
-  StyleSheet,
-  Modal,
-  Image,
-  Dimensions,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAppSelector, useAppDispatch } from '../../store';
+import React, { useCallback, useState } from 'react';
+import {
+  Dimensions,
+  Image,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
+import PatientNavbar from '../../components/common/PatientNavbar';
+import { RADIUS, SPACING, TYPOGRAPHY } from '../../constants/themes/theme';
+import { apiClient } from '../../services/api/apiClient';
+import { patientAPI } from '../../services/api/patientAPI';
+import { useAppDispatch, useAppSelector } from '../../store';
 import {
   loadDashboardWithCache,
   refreshDashboard
 } from '../../store/slices/patientSlice';
-import { patientAPI } from '../../services/api/patientAPI';
-import { apiClient } from '../../services/api/apiClient';
-import { useFocusEffect } from '@react-navigation/native';
-import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
-import PatientNavbar from '../../components/common/PatientNavbar';
-import { LoadingSpinner } from '../../components/common/Loading/LoadingSpinner';
+import { formatRelativeTime } from '../../utils/dateUtils';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { width, height } = Dimensions.get('window');
@@ -117,7 +118,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     if (response.success) {
       const wasOverridden = response.data?.wasOverridden;
       
-      Alert.alert(
+      CustomAlertStatic.alert(
         'Success', 
         wasOverridden 
           ? `${response.data?.medicationName} recorded with safety override`
@@ -139,7 +140,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       const safetyData = error.response.data.data;
       showSafetyWarningModal(safetyData, medicationId);
     } else {
-      Alert.alert('Error', error.message || 'Failed to record medication dose');
+      CustomAlertStatic.alert('Error', error.message || 'Failed to record medication dose');
     }
   }
 };
@@ -157,7 +158,7 @@ const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
     warningMessage += `\n\nNext recommended time: ${timingInfo.timeUntilNextWindow}`;
   }
 
-  Alert.alert(
+  CustomAlertStatic.alert(
     '⚠️ Safety Warning',
     warningMessage,
     [
@@ -170,7 +171,7 @@ const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
         style: 'destructive',
         onPress: () => {
           // Show confirmation for override
-          Alert.alert(
+          CustomAlertStatic.alert(
             'Override Safety Check?',
             'Are you sure you want to take this medication despite the safety warning? This should only be done in consultation with your healthcare provider.',
             [
@@ -340,7 +341,7 @@ const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
                 <View style={styles.activityContent}>
                   <View style={styles.activityHeader}>
                     <Text style={styles.activityMedication}>{activity.medicationName}</Text>
-                    <Text style={styles.activityTime}>{activity.timestamp}</Text>
+                    <Text style={styles.activityTime}>{formatRelativeTime(activity.timestamp)}</Text>
                   </View>
                   <Text style={styles.activityMessage}>{activity.message}</Text>
                 </View>
@@ -623,7 +624,7 @@ const showSafetyWarningModal = (safetyData: any, medicationId: string) => {
                   <View style={styles.activityContent}>
                     <View style={styles.activityHeader}>
                       <Text style={styles.activityMedication}>{activity.medicationName}</Text>
-                      <Text style={styles.activityTime}>{activity.timestamp}</Text>
+                      <Text style={styles.activityTime}>{formatRelativeTime(activity.timestamp)}</Text>
                     </View>
                     <Text style={styles.activityMessage}>{activity.message}</Text>
                   </View>

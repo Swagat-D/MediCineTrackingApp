@@ -1,25 +1,21 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
+import * as Print from 'expo-print';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  Alert,
-  Share,
   Dimensions,
+  Modal,
   ScrollView,
-  Platform,
-  Linking
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as Print from 'expo-print';
-import * as MediaLibrary from 'expo-media-library';
-import { Picker } from '@react-native-picker/picker';
-import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
+import { CustomAlertStatic } from '../../components/common/CustomAlert';
+import { RADIUS, SPACING, TYPOGRAPHY } from '../../constants/themes/theme';
 import BarcodeDisplay from './BarcodeDisplay';
-import { generateBarcodeSVG } from '@/utils/barcodeUtils';
 
 interface BarcodeData {
   patientName: string;
@@ -345,7 +341,7 @@ const generateSingleBarcodeHTML = () => {
           PAPER_SIZES[printSettings.paperSize].height,
       });
 
-      Alert.alert(
+      CustomAlertStatic.alert(
         'Success', 
         isBulkPrint ? 
           `${barcodes.length} labels sent to printer successfully!` :
@@ -354,78 +350,18 @@ const generateSingleBarcodeHTML = () => {
       
     } catch (error) {
       console.error('Error printing barcode:', error);
-      Alert.alert('Error', 'Failed to print labels. Please try again.');
+      CustomAlertStatic.alert('Error', 'Failed to print labels. Please try again.');
     }
   };
 
-  const handleDownload = async () => {
-    try {
-      let { status } = await MediaLibrary.getPermissionsAsync();
-      
-      if (status !== 'granted') {
-        const { status: newStatus } = await MediaLibrary.requestPermissionsAsync();
-        status = newStatus;
-      }
-      
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission Required',
-          'Media library access is required to save files. Please enable it in your device settings.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { 
-              text: 'Open Settings', 
-              onPress: () => {
-                if (Platform.OS === 'android') {
-                  Linking.openSettings();
-                } else {
-                  Linking.openURL('app-settings:');
-                }
-              }
-            },
-            {
-              text: 'Try Again',
-              onPress: () => handleDownload()
-            }
-          ]
-        );
-        return;
-      }
-
-      let htmlContent: string;
-      let filename: string;
-
-      if (isBulkPrint && barcodes.length > 1) {
-        htmlContent = generatePositionedPrintHTML();
-        filename = `MediTracker_Labels_${new Date().toISOString().split('T')[0]}.pdf`;
-      } else {
-        htmlContent = generateSingleBarcodeHTML();
-        filename = `MediTracker_${singleBarcode.patientName.replace(/\s+/g, '_')}_${singleBarcode.medicationName.replace(/\s+/g, '_')}.pdf`;
-      }
-
-      const { uri } = await Print.printToFileAsync({ 
-        html: htmlContent,
-        width: printSettings.orientation === 'landscape' ? 
-          PAPER_SIZES[printSettings.paperSize].height : 
-          PAPER_SIZES[printSettings.paperSize].width,
-        height: printSettings.orientation === 'landscape' ? 
-          PAPER_SIZES[printSettings.paperSize].width : 
-          PAPER_SIZES[printSettings.paperSize].height,
-      });
-
-      const asset = await MediaLibrary.createAssetAsync(uri);
-      
-      Alert.alert(
-        'Download Complete', 
-        isBulkPrint ? 
-          `${barcodes.length} labels downloaded as PDF successfully!` :
-          `Label downloaded as PDF successfully!`
-      );
-
-    } catch (error: any) {
-      console.error('Error downloading barcode:', error);
-      Alert.alert('Download Error', 'Failed to download labels. Please try again.');
-    }
+  const handleDownload = () => {
+    CustomAlertStatic.alert(
+      'Feature Temporarily Unavailable',
+      'We are currently not supporting barcode downloads due to privacy concerns. We will add this feature soon with enhanced security measures.',
+      [
+        { text: 'OK', style: 'default' }
+      ]
+    );
   };
 
   const handleShare = async () => {

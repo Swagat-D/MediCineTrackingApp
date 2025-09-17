@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Alert,
   Platform,
   Vibration,
   Animated,
@@ -22,6 +21,7 @@ import { patientAPI } from '../../services/api/patientAPI';
 import * as Location from 'expo-location';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 interface Props {
   navigation: any;
@@ -100,7 +100,7 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
   }, [pulseAnim]);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     if (isEmergencyActive && countdown > 0) {
       timer = setTimeout(() => {
         setCountdown(countdown - 1);
@@ -129,10 +129,10 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
       // Set default emergency contacts
       setEmergencyContacts([
         {
-          id: '911',
+          id: '108',
           name: 'Emergency Services',
           relationship: 'Emergency',
-          phone: '911',
+          phone: '108',
           isPrimary: false,
         }
       ]);
@@ -163,7 +163,7 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleSOSPress = () => {
-    Alert.alert(
+    CustomAlertStatic.alert(
       'Emergency Alert',
       `This will send an emergency alert to your caregivers and emergency contacts.${!isConnected ? '\n\nNote: You are currently offline. The alert will be sent when connection is restored.' : ''}\n\nAre you sure?`,
       [
@@ -194,19 +194,19 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
 
       await patientAPI.sendSOSAlert(alertData);
       
-      Alert.alert(
+      CustomAlertStatic.alert(
         'Emergency Alert Sent',
         `Your emergency alert has been sent to all your caregivers and emergency contacts.${currentLocation ? '\n\nYour location has been shared.' : '\n\nLocation sharing was unavailable.'}\n\nHelp is on the way.`,
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (error: any) {
       dispatch(setError(error.message));
-      Alert.alert(
+      CustomAlertStatic.alert(
         'Alert Failed',
         error.message || 'Failed to send emergency alert. Please try calling emergency services directly.',
         [
           { text: 'Retry', onPress: () => setIsEmergencyActive(true) },
-          { text: 'Call 911', onPress: () => makeDirectCall('911') },
+          { text: 'Call 108', onPress: () => makeDirectCall('108') },
           { text: 'Cancel' }
         ]
       );
@@ -218,7 +218,7 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
   const cancelEmergency = () => {
     setIsEmergencyActive(false);
     setCountdown(5);
-    Alert.alert('Emergency Alert Cancelled', 'The emergency alert has been cancelled.');
+    CustomAlertStatic.alert('Emergency Alert Cancelled', 'The emergency alert has been cancelled.');
   };
 
   const makeDirectCall = (phoneNumber: string) => {
@@ -227,7 +227,7 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
       Linking.openURL(`tel:${cleanPhone}`);
     } catch (error) {
       console.error('Call failed:', error);
-      Alert.alert('Call Failed', `Unable to make call to ${phoneNumber}`);
+      CustomAlertStatic.alert('Call Failed', `Unable to make call to ${phoneNumber}`);
     }
   };
 
@@ -235,7 +235,7 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
     const name = contact.name;
     const phone = 'phone' in contact ? contact.phone : contact.phoneNumber;
     
-    Alert.alert(
+    CustomAlertStatic.alert(
       `Call ${name}`,
       `Do you want to call ${name}?`,
       [
@@ -267,12 +267,12 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
           <View style={[
             styles.contactIcon, 
             contact.isPrimary && styles.primaryContactIcon,
-            { backgroundColor: contact.phone === '911' ? '#FEF2F2' : theme.primaryLight }
+            { backgroundColor: contact.phone === '108' ? '#FEF2F2' : theme.primaryLight }
           ]}>
             <Ionicons 
-              name={contact.phone === '911' ? 'call' : 'person'} 
+              name={contact.phone === '108' ? 'call' : 'person'} 
               size={20} 
-              color={contact.phone === '911' ? '#EF4444' : theme.primary} 
+              color={contact.phone === '108' ? '#EF4444' : theme.primary} 
             />
           </View>
           <View style={styles.contactDetails}>
@@ -292,7 +292,7 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.contactRelationship}>{contact.relationship}</Text>
             <Text style={[
               styles.contactPhone,
-              { color: contact.phone === '911' ? '#EF4444' : theme.primary }
+              { color: contact.phone === '108' ? '#EF4444' : theme.primary }
             ]}>
               {contact.phone}
             </Text>
@@ -301,7 +301,7 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
         <TouchableOpacity 
           style={[
             styles.callButton,
-            { backgroundColor: contact.phone === '911' ? '#EF4444' : '#059669' }
+            { backgroundColor: contact.phone === '108' ? '#EF4444' : '#059669' }
           ]}
           onPress={() => handleContactCall(contact)}
         >
@@ -533,12 +533,12 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.quickCallGrid}>
             <TouchableOpacity 
               style={styles.quickCallButton}
-              onPress={() => makeDirectCall('911')}
+              onPress={() => makeDirectCall('108')}
             >
               <View style={[styles.quickCallIcon, { backgroundColor: '#FEF2F2' }]}>
                 <Ionicons name="call" size={24} color="#EF4444" />
               </View>
-              <Text style={styles.quickCallText}>911</Text>
+              <Text style={styles.quickCallText}>108</Text>
               <Text style={styles.quickCallSubtext}>Emergency</Text>
             </TouchableOpacity>
             
@@ -594,7 +594,7 @@ const SOSScreen: React.FC<Props> = ({ navigation }) => {
             </View>
             <Text style={styles.infoText}>
               • Use the emergency button for life-threatening situations{'\n'}
-              • Call 911 immediately for severe medical emergencies{'\n'}
+              • Call 108 immediately for severe medical emergencies{'\n'}
               • Contact your caregiver for medication-related concerns{'\n'}
               • Your location will be shared automatically when possible
             </Text>

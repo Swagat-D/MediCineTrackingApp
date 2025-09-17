@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Linking,
-  Alert,
   Platform,
   Clipboard,
   Animated,
@@ -17,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import PatientSecondaryNavbar from '../../components/common/PatientSecondaryNavbar';
 import SecondaryNavbar from '@/components/common/SecondaryNavbar';
+import { CustomAlertStatic } from '@/components/common/CustomAlert/CustomAlertStatic';
 
 interface HelpSupportScreenProps {
   navigation: any;
@@ -59,7 +59,7 @@ const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({
 
   const handleCopyToClipboard = (text: string, type: string) => {
     Clipboard.setString(text);
-    Alert.alert(
+    CustomAlertStatic.alert(
       'Copied!', 
       `${type} has been copied to clipboard`,
       [{ text: 'OK' }]

@@ -70,84 +70,89 @@ const PatientNavigator: React.FC = () => {
   return (
     <Tab.Navigator
       screenOptions={({
-        route,
+      route,
       }: {
-        route: { name: keyof PatientTabParamList };
-      }) => ({
+      route: { name: keyof PatientTabParamList };
+      }) => {
+
+      const showTabBar = true;
+
+      return {
         tabBarIcon: ({
-          focused,
-          color,
-          size,
+        focused,
+        color,
+        size,
         }: {
-          focused: boolean;
-          color: string;
-          size: number;
+        focused: boolean;
+        color: string;
+        size: number;
         }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
+        let iconName: keyof typeof Ionicons.glyphMap;
 
-          if (route.name === 'Home') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Medications') {
-            iconName = focused ? 'medical' : 'medical-outline';
-          } else if (route.name === 'Scanner') {
-            iconName = focused ? 'scan' : 'scan-outline';
-          } else {
-            iconName = focused ? 'person' : 'person-outline';
-          }
+        if (route.name === 'Home') {
+          iconName = focused ? 'home' : 'home-outline';
+        } else if (route.name === 'Medications') {
+          iconName = focused ? 'medical' : 'medical-outline';
+        } else if (route.name === 'Scanner') {
+          iconName = focused ? 'scan' : 'scan-outline';
+        } else {
+          iconName = focused ? 'person' : 'person-outline';
+        }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
+        return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarButton: (props: React.ComponentProps<typeof Pressable> & { children: React.ReactNode }) => (
-          <Pressable
-            {...props}
-            android_ripple={{ color: 'transparent' }}
-            style={props.style}
-          >
-            {props.children}
-          </Pressable>
+        <Pressable
+          {...props}
+          android_ripple={{ color: 'transparent' }}
+          style={props.style}
+        >
+          {props.children}
+        </Pressable>
         ),
         tabBarActiveTintColor: '#2563EB',
         tabBarInactiveTintColor: '#6B7280',
         tabBarLabelStyle: {
-          fontSize: TYPOGRAPHY.fontSize.xs,
-          fontWeight: TYPOGRAPHY.fontWeight.medium,
+        fontSize: TYPOGRAPHY.fontSize.xs,
+        fontWeight: TYPOGRAPHY.fontWeight.medium,
         },
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopWidth: 1,
-          borderTopColor: '#E2E8F0',
-          height: 65 + insets.bottom,
-          paddingBottom: 8 + insets.bottom,
-          paddingTop: 8,
-          shadowColor: '#64748B',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
-          elevation: 8,
+        backgroundColor: '#FFFFFF',
+        borderTopWidth: 1,
+        borderTopColor: '#E2E8F0',
+        height: 60 + (showTabBar ? (insets.bottom - 5) : 0),
+        paddingBottom: 8 + (showTabBar ? (insets.bottom - 5) : 0),
+        paddingTop: 8,
+        shadowColor: '#64748B',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 8,
         },
-        tabBarSafeAreaInset: { bottom: 'always' },
+        tabBarSafeAreaInset: { bottom: showTabBar ? 'always' : 0 },
         headerShown: false,
-      })}
+      };
+      }}
     >
       <Tab.Screen 
-        name="Home" 
-        component={HomeStack}
-        options={{ tabBarLabel: 'Home' }}
+      name="Home" 
+      component={HomeStack}
+      options={{ tabBarLabel: 'Home' }}
       />
       <Tab.Screen 
-        name="Medications" 
-        component={MedicationsStack}
-        options={{ tabBarLabel: 'Medications' }}
+      name="Medications" 
+      component={MedicationsStack}
+      options={{ tabBarLabel: 'Medications' }}
       />
       <Tab.Screen 
-        name="Scanner" 
-        component={ScannerStack}
-        options={{ tabBarLabel: 'Scanner' }}
+      name="Scanner" 
+      component={ScannerStack}
+      options={{ tabBarLabel: 'Scanner' }}
       />
       <Tab.Screen 
-        name="Profile" 
-        component={ProfileStack}
-        options={{ tabBarLabel: 'Profile' }}
+      name="Profile" 
+      component={ProfileStack}
+      options={{ tabBarLabel: 'Profile' }}
       />
     </Tab.Navigator>
   );

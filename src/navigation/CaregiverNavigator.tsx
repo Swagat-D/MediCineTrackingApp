@@ -2,6 +2,8 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable } from 'react-native';
 
 // Screens
 import DashboardScreen from '../screens/caregiver/DashboardScreen';
@@ -19,7 +21,6 @@ import PrivacyPolicyScreen from '@/screens/shared/PrivacyPolicyScree';
 // Types
 import { CaregiverTabParamList, CaregiverStackParamList } from '../types/navigation.types';
 import { COLORS, TYPOGRAPHY } from '../constants/themes/theme';
-import { Pressable } from 'react-native';
 
 const Tab = createBottomTabNavigator<CaregiverTabParamList>();
 const Stack = createStackNavigator<CaregiverStackParamList>();
@@ -64,53 +65,65 @@ const ProfileStack: React.FC = () => (
 );
 
 const CaregiverNavigator: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const showTabBar = true;
+
   return (
     <Tab.Navigator
       screenOptions={({
         route,
       }: {
         route: { name: keyof CaregiverTabParamList };
-      }) => ({
-        tabBarIcon: ({ focused, color, size }: { focused: boolean; color: string; size: number }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
+      }) => {
+        return {
+          tabBarIcon: ({ focused, color, size }: { focused: boolean; color: string; size: number }) => {
+            let iconName: keyof typeof Ionicons.glyphMap;
 
-          if (route.name === 'Dashboard') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Patients') {
-            iconName = focused ? 'people' : 'people-outline';
-          } else if (route.name === 'Barcodes') {
-            iconName = focused ? 'qr-code' : 'qr-code-outline';
-          } else {
-            iconName = focused ? 'person' : 'person-outline';
-          }
+            if (route.name === 'Dashboard') {
+              iconName = focused ? 'home' : 'home-outline';
+            } else if (route.name === 'Patients') {
+              iconName = focused ? 'people' : 'people-outline';
+            } else if (route.name === 'Barcodes') {
+              iconName = focused ? 'qr-code' : 'qr-code-outline';
+            } else {
+              iconName = focused ? 'person' : 'person-outline';
+            }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarButton: (props: React.ComponentProps<typeof Pressable> & { children: React.ReactNode }) => (
-          <Pressable
-            {...props}
-            android_ripple={{ color: 'transparent' }}
-            style={props.style}
-          >
-            {props.children}
-          </Pressable>
-        ),
-        tabBarActiveTintColor: COLORS.secondary[500],
-        tabBarInactiveTintColor: COLORS.gray[500],
-        tabBarLabelStyle: {
-          fontSize: TYPOGRAPHY.fontSize.xs,
-          fontWeight: TYPOGRAPHY.fontWeight.medium,
-        },
-        tabBarStyle: {
-          backgroundColor: COLORS.background,
-          borderTopWidth: 1,
-          borderTopColor: COLORS.gray[200],
-          height: 70,
-          paddingBottom: 8,
-          paddingTop: 8,
-        },
-        headerShown: false,
-      })}
+            return <Ionicons name={iconName} size={size} color={color} />;
+          },
+          tabBarButton: (props: React.ComponentProps<typeof Pressable> & { children: React.ReactNode }) => (
+            <Pressable
+              {...props}
+              android_ripple={{ color: 'transparent' }}
+              style={props.style}
+            >
+              {props.children}
+            </Pressable>
+          ),
+          tabBarActiveTintColor: COLORS.secondary[500],
+          tabBarInactiveTintColor: COLORS.gray[500],
+          tabBarLabelStyle: {
+            fontSize: TYPOGRAPHY.fontSize.xs,
+            fontWeight: TYPOGRAPHY.fontWeight.medium,
+          },
+          tabBarStyle: {
+            backgroundColor: COLORS.background,
+            borderTopWidth: 1,
+            borderTopColor: COLORS.gray[200],
+            height: 60 + (showTabBar ? (insets.bottom - 5) : 0),
+            paddingBottom: 8 + (showTabBar ? (insets.bottom - 5) : 0),
+            paddingTop: 8,
+            shadowColor: '#64748B',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 8,
+            zIndex: 1000,
+          },
+          tabBarSafeAreaInset: { bottom: showTabBar ? 'always' : 0 },
+          headerShown: false,
+        };
+      }}
     >
       <Tab.Screen 
         name="Dashboard" 

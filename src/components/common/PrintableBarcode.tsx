@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { Picker } from '@react-native-picker/picker';
 import { TYPOGRAPHY, SPACING, RADIUS } from '../../constants/themes/theme';
 import BarcodeDisplay from './BarcodeDisplay';
+import { generateBarcodeSVG } from '@/utils/barcodeUtils';
 
 interface BarcodeData {
   patientName: string;
@@ -32,29 +33,29 @@ interface BarcodeData {
 interface PrintableBarcodeProps {
   visible: boolean;
   onClose: () => void;
-  barcodes: BarcodeData[]; // Support multiple barcodes
+  barcodes: BarcodeData[];
   isBulkPrint?: boolean;
 }
 
 interface PrintSettings {
-  paperSize: 'A4' | 'Letter' | 'Label';
+  paperSize: 'A4' | 'Letter';
   orientation: 'portrait' | 'landscape';
   labelsPerRow: number;
   labelSize: 'small' | 'medium' | 'large';
+  startPosition: { row: number; col: number };
 }
 
 const { width, height } = Dimensions.get('window');
 
 const PAPER_SIZES = {
   A4: { width: 595, height: 842, name: 'A4 (210 × 297 mm)' },
-  Letter: { width: 612, height: 792, name: 'Letter (8.5 × 11 in)' },
-  Label: { width: 288, height: 432, name: 'Label Sheet (4 × 6 in)' }
+  Letter: { width: 612, height: 792, name: 'Letter (8.5 × 11 in)' }
 };
 
 const LABEL_SIZES = {
-  small: { width: 140, height: 80, name: 'Small (2" × 1.5")' },
-  medium: { width: 180, height: 100, name: 'Medium (2.5" × 2")' },
-  large: { width: 220, height: 120, name: 'Large (3" × 2.5")' }
+  small: { width: 180, height: 90, name: 'Small (2.5" × 1.25")' },
+  medium: { width: 220, height: 110, name: 'Medium (3" × 1.5")' },
+  large: { width: 260, height: 130, name: 'Large (3.5" × 1.8")' }
 };
 
 const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
@@ -67,16 +68,42 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
   const [printSettings, setPrintSettings] = useState<PrintSettings>({
     paperSize: 'A4',
     orientation: 'portrait',
-    labelsPerRow: 2,
-    labelSize: 'medium'
+    labelsPerRow: 3,
+    labelSize: 'medium',
+    startPosition: { row: 1, col: 1 }
   });
 
-  // Use first barcode for single print mode
+  const updatePrintSetting = useCallback(<K extends keyof PrintSettings>(
+    key: K, 
+    value: PrintSettings[K]
+  ) => {
+    setPrintSettings(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  const updateStartPosition = useCallback((position: Partial<{ row: number; col: number }>) => {
+    setPrintSettings(prev => ({ 
+      ...prev, 
+      startPosition: { ...prev.startPosition, ...position }
+    }));
+  }, []);
+
+  // Memoize computed values
+  const previewText = useMemo(() => {
+    return `${barcodes.length} label${barcodes.length > 1 ? 's' : ''} • ${printSettings.labelSize} size • ${printSettings.labelsPerRow} per row`;
+  }, [barcodes.length, printSettings.labelSize, printSettings.labelsPerRow]);
+
+  const previewSubtext = useMemo(() => {
+    return `Starting at Row ${printSettings.startPosition.row}, Column ${printSettings.startPosition.col}`;
+  }, [printSettings.startPosition.row, printSettings.startPosition.col]);
+
   const singleBarcode = barcodes[0];
 
-  const generateSingleBarcodeHTML = (barcode: BarcodeData, labelSize: keyof typeof LABEL_SIZES) => {
+  const generateSimpleBarcodeHTML = (barcode: BarcodeData, labelSize: keyof typeof LABEL_SIZES) => {
   const size = LABEL_SIZES[labelSize];
-  const barcodeHeight = labelSize === 'small' ? 30 : labelSize === 'medium' ? 35 : 40;
+  const barcodeHeight = labelSize === 'small' ? 35 : labelSize === 'medium' ? 40 : 45;
+  
+  // Use the same API service as your display component
+  const barcodeImageUrl = `https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(barcode.barcodeData)}&scale=3&width=200&height=${barcodeHeight}&includetext=false&backgroundcolor=FFFFFF`;
   
   return `
     <div class="barcode-label" style="
@@ -88,54 +115,46 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
       text-align: center;
       box-sizing: border-box;
       display: inline-block;
-      margin: 5px;
+      margin: 3px;
       page-break-inside: avoid;
+      font-family: Arial, sans-serif;
     ">
-      <div class="patient-name" style="
-        font-size: ${labelSize === 'small' ? '12px' : labelSize === 'medium' ? '14px' : '16px'}; 
+      <div style="
+        font-size: ${labelSize === 'small' ? '11px' : labelSize === 'medium' ? '13px' : '15px'}; 
         font-weight: bold; 
-        color: #059669; 
-        margin-bottom: 8px;
+        color: #000; 
+        margin-bottom: 6px;
         text-transform: uppercase;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        letter-spacing: 0.5px;
       ">${barcode.patientName}</div>
       
-      <div style="display: flex; justify-content: center; margin: 8px 0;">
-        <svg id="barcode-${barcode.barcodeData}" width="${size.width - 20}" height="${barcodeHeight}"></svg>
+      <div style="display: flex; justify-content: center; margin: 6px 0;">
+        <img src="${barcodeImageUrl}" 
+             alt="${barcode.barcodeData}" 
+             style="max-width: ${size.width - 20}px; height: ${barcodeHeight}px; object-fit: contain; image-rendering: pixelated;"
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+        <div style="display: none; font: 8px monospace; padding: 2px; border: 1px solid #000; background: #fff; text-align: center;">
+          ${barcode.barcodeData}
+        </div>
       </div>
       
-      <div class="barcode-data" style="
-        font-size: ${labelSize === 'small' ? '8px' : labelSize === 'medium' ? '9px' : '10px'}; 
-        color: #666;
+      <div style="
+        font-size: ${labelSize === 'small' ? '9px' : labelSize === 'medium' ? '10px' : '11px'}; 
+        color: #333;
         margin-top: 4px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        font-family: monospace;
-        font-weight: bold;
-      ">${barcode.barcodeData}</div>
-      
-      <div class="medication-info" style="
-        font-size: ${labelSize === 'small' ? '8px' : labelSize === 'medium' ? '9px' : '10px'}; 
-        color: #666;
-        margin-top: 4px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        font-weight: 500;
       ">${barcode.medicationName}</div>
-      
-      <div class="footer" style="
-        font-size: ${labelSize === 'small' ? '6px' : '7px'};
-        color: #999;
-        margin-top: 2px;
-      ">MediTracker</div>
     </div>
   `;
 };
 
-  const generateBulkPrintHTML = () => {
+const generatePositionedPrintHTML = () => {
   const paper = PAPER_SIZES[printSettings.paperSize];
   const isLandscape = printSettings.orientation === 'landscape';
   const pageWidth = isLandscape ? paper.height : paper.width;
@@ -143,17 +162,64 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
 
   const labelSize = LABEL_SIZES[printSettings.labelSize];
   const labelsPerRow = printSettings.labelsPerRow;
+  const labelWidthWithMargin = labelSize.width + 6;
+  const labelHeightWithMargin = labelSize.height + 6;
   
-  const rowHeight = labelSize.height + 20;
-  const labelsPerPage = Math.floor((pageHeight - 40) / rowHeight) * labelsPerRow;
+  const maxRows = Math.floor((pageHeight - 40) / labelHeightWithMargin);
+  const maxCols = labelsPerRow;
+  
+  const startRow = printSettings.startPosition.row - 1;
+  const startCol = printSettings.startPosition.col - 1;
+  
+  const grid = Array(maxRows).fill(null).map(() => Array(maxCols).fill(null));
+  
+  let barcodeIndex = 0;
+  let currentRow = startRow;
+  let currentCol = startCol;
+  
+  while (barcodeIndex < barcodes.length && currentRow < maxRows) {
+    grid[currentRow][currentCol] = barcodes[barcodeIndex];
+    barcodeIndex++;
+    
+    currentCol++;
+    if (currentCol >= maxCols) {
+      currentCol = 0;
+      currentRow++;
+    }
+  }
+
+  const generateGridHTML = () => {
+    return grid.map((row) => {
+      return `
+        <div style="
+          display: flex; 
+          justify-content: flex-start; 
+          margin-bottom: 3px;
+          height: ${labelHeightWithMargin}px;
+        ">
+          ${row.map((barcode) => {
+            if (barcode) {
+              return generateSimpleBarcodeHTML(barcode, printSettings.labelSize);
+            } else {
+              return `<div style="
+                width: ${labelSize.width}px; 
+                height: ${labelSize.height}px;
+                margin: 3px;
+                display: inline-block;
+              "></div>`;
+            }
+          }).join('')}
+        </div>
+      `;
+    }).join('');
+  };
 
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
-      <title>Medication Barcodes - Bulk Print</title>
-      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+      <title>Medication Labels</title>
       <style>
         @page {
           size: ${printSettings.paperSize} ${printSettings.orientation};
@@ -167,78 +233,93 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
         .page {
           width: ${pageWidth - 40}px;
           min-height: ${pageHeight - 40}px;
-          page-break-after: always;
         }
-        .page:last-child {
-          page-break-after: avoid;
-        }
-        .labels-container {
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: flex-start;
-          align-content: flex-start;
-          gap: 10px;
-        }
-        .page-header {
-          text-align: center;
-          margin-bottom: 15px;
-          font-size: 14px;
-          color: #666;
-          border-bottom: 1px solid #ddd;
-          padding-bottom: 10px;
+        img {
+          image-rendering: pixelated;
+          image-rendering: -moz-crisp-edges;
+          image-rendering: crisp-edges;
         }
       </style>
     </head>
-    <body onload="generateAllBarcodes()">
-      ${Math.ceil(barcodes.length / labelsPerPage) === 1 ? 
-        `<div class="page">
-           <div class="page-header">MediTracker - Medication Labels (${barcodes.length} items)</div>
-           <div class="labels-container">
-             ${barcodes.map(barcode => generateSingleBarcodeHTML(barcode, printSettings.labelSize)).join('')}
-           </div>
-         </div>` :
-        Array.from({ length: Math.ceil(barcodes.length / labelsPerPage) }, (_, pageIndex) => {
-          const startIndex = pageIndex * labelsPerPage;
-          const endIndex = Math.min(startIndex + labelsPerPage, barcodes.length);
-          const pageItems = barcodes.slice(startIndex, endIndex);
-          
-          return `
-            <div class="page">
-              <div class="page-header">MediTracker - Medication Labels (Page ${pageIndex + 1})</div>
-              <div class="labels-container">
-                ${pageItems.map(barcode => generateSingleBarcodeHTML(barcode, printSettings.labelSize)).join('')}
-              </div>
-            </div>
-          `;
-        }).join('')
-      }
-      
-      <script>
-        function generateAllBarcodes() {
-          if (typeof JsBarcode === 'undefined') {
-            setTimeout(generateAllBarcodes, 100);
-            return;
-          }
-          
-          document.querySelectorAll('[id^="barcode-"]').forEach(function(element) {
-            const barcodeData = element.id.replace('barcode-', '');
-            try {
-              JsBarcode(element, barcodeData, {
-                format: "CODE128",
-                width: 2,
-                height: ${LABEL_SIZES[printSettings.labelSize].height * 0.4},
-                displayValue: false,
-                margin: 0,
-                background: "#ffffff",
-                lineColor: "#000000"
-              });
-            } catch (e) {
-              console.error('Failed to generate barcode:', barcodeData, e);
-              element.innerHTML = '<text x="50%" y="50%" text-anchor="middle" font-family="monospace">' + barcodeData + '</text>';
-            }
-          });
+    <body>
+      <div class="page">
+        ${generateGridHTML()}
+      </div>
+    </body>
+    </html>
+  `;
+};
+
+const generateSingleBarcodeHTML = () => {
+  const barcodeImageUrl = `https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(singleBarcode.barcodeData)}&scale=3&width=200&height=60&includetext=false&backgroundcolor=FFFFFF`;
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Medication Label - ${singleBarcode.patientName}</title>
+      <style>
+        @page {
+          size: A4 portrait;
+          margin: 20px;
         }
-      </script>
+        body { 
+          font-family: Arial, sans-serif; 
+          margin: 0; 
+          padding: 20px;
+        }
+        .barcode-container {
+          position: absolute;
+          top: 20px;
+          left: 20px;
+        }
+        img {
+          image-rendering: pixelated;
+          image-rendering: -moz-crisp-edges;
+          image-rendering: crisp-edges;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="barcode-container">
+        <div class="barcode-label" style="
+          width: 260px; 
+          height: 130px;
+          border: 2px solid #000; 
+          padding: 8px; 
+          background: white; 
+          text-align: center;
+          box-sizing: border-box;
+          font-family: Arial, sans-serif;
+        ">
+          <div style="
+            font-size: 15px; 
+            font-weight: bold; 
+            color: #000; 
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          ">${singleBarcode.patientName}</div>
+          
+          <div style="display: flex; justify-content: center; margin: 6px 0;">
+            <img src="${barcodeImageUrl}" 
+                 alt="${singleBarcode.barcodeData}" 
+                 style="max-width: 240px; height: 60px; object-fit: contain; image-rendering: pixelated;"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+            <div style="display: none; font: 10px monospace; padding: 5px; border: 1px solid #000; background: #fff; text-align: center;">
+              ${singleBarcode.barcodeData}
+            </div>
+          </div>
+          
+          <div style="
+            font-size: 11px; 
+            color: #333;
+            margin-top: 4px;
+            font-weight: 500;
+          ">${singleBarcode.medicationName}</div>
+        </div>
+      </div>
     </body>
     </html>
   `;
@@ -247,64 +328,12 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
   const handlePrint = async () => {
     try {
       let htmlContent: string;
-      let filename: string;
 
       if (isBulkPrint && barcodes.length > 1) {
-      htmlContent = generateBulkPrintHTML();
-      filename = `MediTracker_BulkBarcodes_${new Date().toISOString().split('T')[0]}.pdf`;
-    } else {
-      const paper = PAPER_SIZES.A4;
-      htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Medication Barcode - ${singleBarcode.patientName}</title>
-          <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-          <style>
-            body { 
-              font-family: Arial, sans-serif; 
-              margin: 0; 
-              padding: 20px; 
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              min-height: 100vh;
-            }
-          </style>
-        </head>
-        <body onload="generateBarcode()">
-          ${generateSingleBarcodeHTML(singleBarcode, 'large')}
-          <script>
-            function generateBarcode() {
-              if (typeof JsBarcode === 'undefined') {
-                setTimeout(generateBarcode, 100);
-                return;
-              }
-              
-              const element = document.getElementById('barcode-${singleBarcode.barcodeData}');
-              if (element) {
-                try {
-                  JsBarcode(element, '${singleBarcode.barcodeData}', {
-                    format: "CODE128",
-                    width: 2,
-                    height: 40,
-                    displayValue: false,
-                    margin: 0,
-                    background: "#ffffff",
-                    lineColor: "#000000"
-                  });
-                } catch (e) {
-                  console.error('Failed to generate barcode:', e);
-                }
-              }
-            }
-          </script>
-        </body>
-        </html>
-      `;
-      filename = `MediTracker_${singleBarcode.patientName.replace(/[^a-zA-Z0-9]/g, '_')}_${singleBarcode.medicationName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-    }
+        htmlContent = generatePositionedPrintHTML();
+      } else {
+        htmlContent = generateSingleBarcodeHTML();
+      }
 
       await Print.printAsync({ 
         html: htmlContent,
@@ -319,309 +348,262 @@ const PrintableBarcode: React.FC<PrintableBarcodeProps> = ({
       Alert.alert(
         'Success', 
         isBulkPrint ? 
-          `${barcodes.length} barcodes sent to printer successfully!` :
-          'Barcode sent to printer successfully!'
+          `${barcodes.length} labels sent to printer successfully!` :
+          'Label sent to printer successfully!'
       );
       
     } catch (error) {
       console.error('Error printing barcode:', error);
-      Alert.alert('Error', 'Failed to print barcode. Please try again.');
+      Alert.alert('Error', 'Failed to print labels. Please try again.');
     }
   };
 
   const handleDownload = async () => {
-  try {
-    // Check current permission status
-    let { status } = await MediaLibrary.getPermissionsAsync();
-    
-    // If permission not granted, request it
-    if (status !== 'granted') {
-      const { status: newStatus } = await MediaLibrary.requestPermissionsAsync();
-      status = newStatus;
-    }
-    
-    // If still not granted after request, show alert with option to open settings
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permission Required',
-        'Media library access is required to save files. Please enable it in your device settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Open Settings', 
-            onPress: () => {
-              // On Android, this will open app settings
-              if (Platform.OS === 'android') {
-                Linking.openSettings();
-              }else{
-                Linking.openURL('app-settings:');
+    try {
+      let { status } = await MediaLibrary.getPermissionsAsync();
+      
+      if (status !== 'granted') {
+        const { status: newStatus } = await MediaLibrary.requestPermissionsAsync();
+        status = newStatus;
+      }
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Media library access is required to save files. Please enable it in your device settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Open Settings', 
+              onPress: () => {
+                if (Platform.OS === 'android') {
+                  Linking.openSettings();
+                } else {
+                  Linking.openURL('app-settings:');
+                }
               }
+            },
+            {
+              text: 'Try Again',
+              onPress: () => handleDownload()
             }
-          },
-          {
-            text: 'Try Again',
-            onPress: () => handleDownload() // Retry the download
-          }
-        ]
+          ]
+        );
+        return;
+      }
+
+      let htmlContent: string;
+      let filename: string;
+
+      if (isBulkPrint && barcodes.length > 1) {
+        htmlContent = generatePositionedPrintHTML();
+        filename = `MediTracker_Labels_${new Date().toISOString().split('T')[0]}.pdf`;
+      } else {
+        htmlContent = generateSingleBarcodeHTML();
+        filename = `MediTracker_${singleBarcode.patientName.replace(/\s+/g, '_')}_${singleBarcode.medicationName.replace(/\s+/g, '_')}.pdf`;
+      }
+
+      const { uri } = await Print.printToFileAsync({ 
+        html: htmlContent,
+        width: printSettings.orientation === 'landscape' ? 
+          PAPER_SIZES[printSettings.paperSize].height : 
+          PAPER_SIZES[printSettings.paperSize].width,
+        height: printSettings.orientation === 'landscape' ? 
+          PAPER_SIZES[printSettings.paperSize].width : 
+          PAPER_SIZES[printSettings.paperSize].height,
+      });
+
+      const asset = await MediaLibrary.createAssetAsync(uri);
+      
+      Alert.alert(
+        'Download Complete', 
+        isBulkPrint ? 
+          `${barcodes.length} labels downloaded as PDF successfully!` :
+          `Label downloaded as PDF successfully!`
       );
-      return;
+
+    } catch (error: any) {
+      console.error('Error downloading barcode:', error);
+      Alert.alert('Download Error', 'Failed to download labels. Please try again.');
     }
-
-    let htmlContent: string;
-    let filename: string;
-
-    if (isBulkPrint && barcodes.length > 1) {
-      htmlContent = generateBulkPrintHTML();
-      filename = `MediTracker_BulkBarcodes_${new Date().toISOString().split('T')[0]}.pdf`;
-    } else {
-      htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Medication Barcode - ${singleBarcode.patientName}</title>
-          <style>
-            body { 
-              font-family: Arial, sans-serif; 
-              margin: 0; 
-              padding: 20px; 
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              min-height: 100vh;
-            }
-          </style>
-        </head>
-        <body>
-          ${generateSingleBarcodeHTML(singleBarcode, 'large')}
-        </body>
-        </html>
-      `;
-      filename = `MediTracker_${singleBarcode.patientName.replace(/\s+/g, '_')}_${singleBarcode.medicationName.replace(/\s+/g, '_')}.pdf`;
-    }
-
-    // Generate PDF
-    const { uri } = await Print.printToFileAsync({ 
-      html: htmlContent,
-      width: printSettings.orientation === 'landscape' ? 
-        PAPER_SIZES[printSettings.paperSize].height : 
-        PAPER_SIZES[printSettings.paperSize].width,
-      height: printSettings.orientation === 'landscape' ? 
-        PAPER_SIZES[printSettings.paperSize].width : 
-        PAPER_SIZES[printSettings.paperSize].height,
-    });
-
-    // Save to device
-    const asset = await MediaLibrary.createAssetAsync(uri);
-    
-    Alert.alert(
-      'Download Complete', 
-      isBulkPrint ? 
-        `${barcodes.length} barcodes downloaded as PDF successfully!\n\nSaved to: ${filename}` :
-        `Barcode downloaded as PDF successfully!\n\nSaved to: ${filename}`
-    );
-
-  } catch (error: any) {
-    console.error('Error downloading barcode:', error);
-
-    let errorMessage = 'Failed to download barcode. ';
-    if (error.message?.includes('permission')) {
-      errorMessage += 'Please check app permissions in settings.';
-    } else if (error.message?.includes('storage') || error.message?.includes('space')) {
-      errorMessage += 'Please check your storage space.';
-    } else {
-      errorMessage += 'Please try again.';
-    }
-
-
-    Alert.alert(
-      'Download Error', 
-      errorMessage,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Try Again', onPress: () => handleDownload() }
-      ]
-    );
-  }
-};
+  };
 
   const handleShare = async () => {
     try {
       let message: string;
 
       if (isBulkPrint && barcodes.length > 1) {
-        message = `Medication Barcodes (${barcodes.length} items)\n\n${barcodes.map(barcode => 
+        message = `Medication Labels (${barcodes.length} items)\n\n${barcodes.map(barcode => 
           `Patient: ${barcode.patientName}\nMedication: ${barcode.medicationName}\nBarcode: ${barcode.barcodeData}\n`
         ).join('\n')}\nGenerated by MediTracker`;
       } else {
-        message = `Medication Label for ${singleBarcode.patientName}
-
-Barcode: ${singleBarcode.barcodeData}
-Medication: ${singleBarcode.medicationName}
-${singleBarcode.dosage ? `Dosage: ${singleBarcode.dosage}` : ''}
-${singleBarcode.frequency ? `Frequency: ${singleBarcode.frequency}` : ''}
-
-Generated by MediTracker`;
+        message = `Medication Label\n\nPatient: ${singleBarcode.patientName}\nMedication: ${singleBarcode.medicationName}\nBarcode: ${singleBarcode.barcodeData}\n\nGenerated by MediTracker`;
       }
 
       await Share.share({ 
         message, 
-        title: isBulkPrint ? 'Medication Barcodes' : `${singleBarcode.patientName} - Medication Barcode`
+        title: isBulkPrint ? 'Medication Labels' : `${singleBarcode.patientName} - Medication Label`
       });
     } catch (error) {
       console.error('Error sharing barcode:', error);
     }
   };
 
-const PrintSettingsModal = () => (
-  <Modal
-    visible={showPrintSettings}
-    transparent={true}
-    animationType="slide"
-    onRequestClose={() => setShowPrintSettings(false)}
-  >
-    <View style={styles.modalOverlay}>
-      <View style={styles.settingsModalContainer}>
-        <View style={styles.settingsHeader}>
-          <Text style={styles.settingsTitle}>Print Settings</Text>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setShowPrintSettings(false)}
-          >
-            <Ionicons name="close" size={24} color="#64748B" />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.settingsContent} showsVerticalScrollIndicator={false}>
-          {/* Paper Size */}
-          <View style={styles.settingGroup}>
-            <Text style={styles.settingLabel}>Paper Size</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={printSettings.paperSize}
-                onValueChange={(value) => setPrintSettings(prev => ({ ...prev, paperSize: value }))}
-                style={styles.picker}
-              >
-                {Object.entries(PAPER_SIZES).map(([key, size]) => (
-                  <Picker.Item key={key} label={size.name} value={key} />
-                ))}
-              </Picker>
-            </View>
+  const PrintSettingsModal = () => (
+    <Modal
+      visible={showPrintSettings}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowPrintSettings(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.settingsModalContainer}>
+          <View style={styles.settingsHeader}>
+            <Text style={styles.settingsTitle}>Print Settings</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowPrintSettings(false)}
+            >
+              <Ionicons name="close" size={24} color="#64748B" />
+            </TouchableOpacity>
           </View>
 
-          {/* Orientation */}
-          <View style={styles.settingGroup}>
-            <Text style={styles.settingLabel}>Orientation</Text>
-            <View style={styles.orientationButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.orientationButton,
-                  printSettings.orientation === 'portrait' && styles.orientationButtonActive
-                ]}
-                onPress={() => setPrintSettings(prev => ({ ...prev, orientation: 'portrait' }))}
-              >
-                <Ionicons name="phone-portrait-outline" size={20} color={
-                  printSettings.orientation === 'portrait' ? '#059669' : '#64748B'
-                } />
-                <Text style={[
-                  styles.orientationButtonText,
-                  printSettings.orientation === 'portrait' && styles.orientationButtonTextActive
-                ]}>Portrait</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.orientationButton,
-                  printSettings.orientation === 'landscape' && styles.orientationButtonActive
-                ]}
-                onPress={() => setPrintSettings(prev => ({ ...prev, orientation: 'landscape' }))}
-              >
-                <Ionicons name="phone-landscape-outline" size={20} color={
-                  printSettings.orientation === 'landscape' ? '#059669' : '#64748B'
-                } />
-                <Text style={[
-                  styles.orientationButtonText,
-                  printSettings.orientation === 'landscape' && styles.orientationButtonTextActive
-                ]}>Landscape</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Label Size */}
-          <View style={styles.settingGroup}>
-            <Text style={styles.settingLabel}>Label Size</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={printSettings.labelSize}
-                onValueChange={(value) => setPrintSettings(prev => ({ ...prev, labelSize: value }))}
-                style={styles.picker}
-              >
-                {Object.entries(LABEL_SIZES).map(([key, size]) => (
-                  <Picker.Item key={key} label={size.name} value={key} />
-                ))}
-              </Picker>
-            </View>
-          </View>
-
-          {/* Labels Per Row */}
-          <View style={styles.settingGroup}>
-            <Text style={styles.settingLabel}>Labels Per Row</Text>
-            <View style={styles.labelsPerRowContainer}>
-              {[1, 2, 3, 4].map((num) => (
-                <TouchableOpacity
-                  key={num}
-                  style={[
-                    styles.labelsPerRowButton,
-                    printSettings.labelsPerRow === num && styles.labelsPerRowButtonActive
-                  ]}
-                  onPress={() => setPrintSettings(prev => ({ ...prev, labelsPerRow: num }))}
+          <ScrollView style={styles.settingsContent} showsVerticalScrollIndicator={false}>
+            {/* Paper Size */}
+            <View style={styles.settingGroup}>
+              <Text style={styles.settingLabel}>Paper Size</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={printSettings.paperSize}
+                  onValueChange={(value) => updatePrintSetting('paperSize', value)}
+                  style={styles.picker}
                 >
-                  <Text style={[
-                    styles.labelsPerRowButtonText,
-                    printSettings.labelsPerRow === num && styles.labelsPerRowButtonTextActive
-                  ]}>{num}</Text>
-                </TouchableOpacity>
-              ))}
+                  {Object.entries(PAPER_SIZES).map(([key, size]) => (
+                    <Picker.Item key={key} label={size.name} value={key} />
+                  ))}
+                </Picker>
+              </View>
             </View>
-          </View>
 
-          {/* Preview */}
-          <View style={styles.settingGroup}>
-            <Text style={styles.settingLabel}>Preview</Text>
-            <View style={styles.previewContainer}>
-              <Text style={styles.previewText}>
-                {barcodes.length} barcode{barcodes.length > 1 ? 's' : ''} • {printSettings.labelSize} labels • {printSettings.labelsPerRow} per row
-              </Text>
-              <Text style={styles.previewSubtext}>
-                Paper: {PAPER_SIZES[printSettings.paperSize].name} ({printSettings.orientation})
-              </Text>
+            {/* Label Size */}
+            <View style={styles.settingGroup}>
+              <Text style={styles.settingLabel}>Label Size</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={printSettings.labelSize}
+                  onValueChange={(value) => updatePrintSetting('labelSize', value)}
+                  style={styles.picker}
+                >
+                  {Object.entries(LABEL_SIZES).map(([key, size]) => (
+                    <Picker.Item key={key} label={size.name} value={key} />
+                  ))}
+                </Picker>
+              </View>
             </View>
-          </View>
-        </ScrollView>
 
-        <View style={styles.settingsActions}>
-          <TouchableOpacity
-            style={styles.settingsCancelButton}
-            onPress={() => setShowPrintSettings(false)}
-          >
-            <Text style={styles.settingsCancelText}>Cancel</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.settingsPrintButton}
-            onPress={() => {
-              setShowPrintSettings(false);
-              handlePrint();
-            }}
-          >
-            <Ionicons name="print" size={18} color="#FFFFFF" />
-            <Text style={styles.settingsPrintText}>Print Now</Text>
-          </TouchableOpacity>
+            {/* Labels Per Row */}
+            <View style={styles.settingGroup}>
+              <Text style={styles.settingLabel}>Labels Per Row</Text>
+              <View style={styles.labelsPerRowContainer}>
+                {[1, 2, 3, 4].map((num) => (
+                  <TouchableOpacity
+                    key={num}
+                    style={[
+                      styles.labelsPerRowButton,
+                      printSettings.labelsPerRow === num && styles.labelsPerRowButtonActive
+                    ]}
+                    onPress={() => updatePrintSetting('labelsPerRow', num)}
+                  >
+                    <Text style={[
+                      styles.labelsPerRowButtonText,
+                      printSettings.labelsPerRow === num && styles.labelsPerRowButtonTextActive
+                    ]}>{num}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Starting Position */}
+            <View style={styles.settingGroup}>
+              <Text style={styles.settingLabel}>Start Position (Row, Column)</Text>
+              <View style={styles.positionContainer}>
+                <View style={styles.positionInputContainer}>
+                  <Text style={styles.positionLabel}>Row:</Text>
+                  <View style={styles.positionButtons}>
+                    {[1, 2, 3, 4, 5].map((num) => (
+                      <TouchableOpacity
+                        key={num}
+                        style={[
+                          styles.positionButton,
+                          printSettings.startPosition.row === num && styles.positionButtonActive
+                        ]}
+                        onPress={() => updateStartPosition({ row: num })}
+                      >
+                        <Text style={[
+                          styles.positionButtonText,
+                          printSettings.startPosition.row === num && styles.positionButtonTextActive
+                        ]}>{num}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+                
+                <View style={styles.positionInputContainer}>
+                  <Text style={styles.positionLabel}>Col:</Text>
+                  <View style={styles.positionButtons}>
+                    {Array.from({ length: printSettings.labelsPerRow }, (_, i) => i + 1).map((num) => (
+                      <TouchableOpacity
+                        key={num}
+                        style={[
+                          styles.positionButton,
+                          printSettings.startPosition.col === num && styles.positionButtonActive
+                        ]}
+                        onPress={() => updateStartPosition({ col: num })}
+                      >
+                        <Text style={[
+                          styles.positionButtonText,
+                          printSettings.startPosition.col === num && styles.positionButtonTextActive
+                        ]}>{num}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Preview */}
+            <View style={styles.settingGroup}>
+              <Text style={styles.settingLabel}>Preview</Text>
+              <View style={styles.previewContainer}>
+                <Text style={styles.previewText}>{previewText}</Text>
+                <Text style={styles.previewSubtext}>{previewSubtext}</Text>
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={styles.settingsActions}>
+            <TouchableOpacity
+              style={styles.settingsCancelButton}
+              onPress={() => setShowPrintSettings(false)}
+            >
+              <Text style={styles.settingsCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.settingsPrintButton}
+              onPress={() => {
+                setShowPrintSettings(false);
+                handlePrint();
+              }}
+            >
+              <Ionicons name="print" size={18} color="#FFFFFF" />
+              <Text style={styles.settingsPrintText}>Print Now</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
-  </Modal>
-);
+    </Modal>
+  );
 
   if (!visible) return null;
 
@@ -638,7 +620,7 @@ const PrintSettingsModal = () => (
             {/* Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {isBulkPrint ? `${barcodes.length} Medication Barcodes` : 'Medication Barcode'}
+                {isBulkPrint ? `${barcodes.length} Medication Labels` : 'Medication Label'}
               </Text>
               <TouchableOpacity
                 style={styles.closeButton}
@@ -648,39 +630,25 @@ const PrintSettingsModal = () => (
               </TouchableOpacity>
             </View>
 
-            {/* Barcode Preview */}
+            {/* Simple Preview */}
             {!isBulkPrint ? (
-              <View style={styles.barcodePreview}>
-                <View style={styles.patientNameContainer}>
-                  <Text style={styles.patientNameText}>{singleBarcode.patientName.toUpperCase()}</Text>
-                </View>
-
+              <View style={styles.simpleBarcodePreview}>
+                <Text style={styles.previewPatientName}>{singleBarcode.patientName.toUpperCase()}</Text>
+                
                 <View style={styles.barcodeContainer}>
                   <BarcodeDisplay 
-                    barcodeData= {singleBarcode.barcodeData}
+                    barcodeData={singleBarcode.barcodeData}
                     size='medium'
-                    showData={true}
+                    showData={false}
                   />
                 </View>
 
-                <View style={styles.footerContainer}>
-                  <Text style={styles.footerText}>MediTracker • {singleBarcode.medicationName}</Text>
-                </View>
+                <Text style={styles.previewMedicationName}>{singleBarcode.medicationName}</Text>
               </View>
             ) : (
               <View style={styles.bulkPreviewContainer}>
-                <Text style={styles.bulkPreviewTitle}>Bulk Print Preview</Text>
-                <ScrollView style={styles.bulkPreviewList} showsVerticalScrollIndicator={false}>
-                  {barcodes.slice(0, 5).map((barcode, index) => (
-                    <View key={index} style={styles.bulkPreviewItem}>
-                      <Text style={styles.bulkPreviewPatient}>{barcode.patientName}</Text>
-                      <Text style={styles.bulkPreviewMedication}>{barcode.medicationName}</Text>
-                    </View>
-                  ))}
-                  {barcodes.length > 5 && (
-                    <Text style={styles.bulkPreviewMore}>... and {barcodes.length - 5} more</Text>
-                  )}
-                </ScrollView>
+                <Text style={styles.bulkPreviewTitle}>Ready to Print {barcodes.length} Labels</Text>
+                <Text style={styles.bulkPreviewSubtitle}>Configure position and settings below</Text>
               </View>
             )}
 
@@ -719,17 +687,6 @@ const PrintSettingsModal = () => (
                 {isBulkPrint && barcodes.length > 1 ? 'Print Settings' : 'Print Label'}
               </Text>
             </TouchableOpacity>
-
-            {/* Instructions */}
-            <View style={styles.instructionsContainer}>
-              <Text style={styles.instructionsTitle}>Printing Instructions:</Text>
-              <Text style={styles.instructionsText}>
-                • Use adhesive label paper for best results{'\n'}
-                • Ensure printer settings match paper size{'\n'}
-                • Attach labels to medication containers{'\n'}
-                • Keep barcodes clean and visible
-              </Text>
-            </View>
           </View>
         </View>
       </Modal>
@@ -775,7 +732,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  barcodePreview: {
+  simpleBarcodePreview: {
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#000000',
@@ -784,103 +741,45 @@ const styles = StyleSheet.create({
     marginBottom: SPACING[6],
     alignItems: 'center',
   },
-  patientNameContainer: {
-    marginBottom: SPACING[4],
-    paddingBottom: SPACING[3],
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    width: '100%',
-  },
-  patientNameText: {
+  previewPatientName: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: '700',
-    color: '#059669',
+    color: '#000000',
     textAlign: 'center',
-    letterSpacing: 1,
+    marginBottom: SPACING[3],
+    letterSpacing: 0.5,
   },
   barcodeContainer: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: RADIUS.md,
-    padding: SPACING[4],
-    marginVertical: SPACING[4],
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    width: '100%',
-  },
-  barcodeStripes: {
-    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    padding: SPACING[3],
+    marginVertical: SPACING[3],
     alignItems: 'center',
-    justifyContent: 'center',
-    height: 40,
-    gap: 1,
   },
-  barcodeStripe: {
-    height: '100%',
-  },
-  barcodeDataContainer: {
-    marginTop: SPACING[3],
-    paddingTop: SPACING[3],
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    width: '100%',
-  },
-  barcodeDataText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: '600',
-    color: '#1E293B',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    letterSpacing: 1,
+  previewMedicationName: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: '#333333',
     textAlign: 'center',
-  },
-  footerContainer: {
     marginTop: SPACING[2],
-  },
-  footerText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: '#64748B',
-    textAlign: 'center',
+    fontWeight: '500',
   },
   bulkPreviewContainer: {
     backgroundColor: '#F8FAFC',
     borderRadius: RADIUS.lg,
-    padding: SPACING[4],
+    padding: SPACING[6],
     marginBottom: SPACING[6],
-    maxHeight: 200,
+    alignItems: 'center',
   },
   bulkPreviewTitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
+    fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: '600',
     color: '#1E293B',
-    marginBottom: SPACING[3],
-    textAlign: 'center',
-  },
-  bulkPreviewList: {
-    maxHeight: 150,
-  },
-  bulkPreviewItem: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.md,
-    padding: SPACING[3],
     marginBottom: SPACING[2],
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  bulkPreviewPatient: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: '600',
-    color: '#059669',
-    marginBottom: 2,
-  },
-  bulkPreviewMedication: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: '#64748B',
-  },
-  bulkPreviewMore: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: '#94A3B8',
     textAlign: 'center',
-    fontStyle: 'italic',
-    marginTop: SPACING[2],
+  },
+  bulkPreviewSubtitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: '#64748B',
+    textAlign: 'center',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -915,7 +814,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0EA5E9',
     borderRadius: RADIUS.lg,
     paddingVertical: SPACING[4],
-    marginBottom: SPACING[6],
+    marginBottom: SPACING[4],
     gap: SPACING[2],
   },
   printButtonText: {
@@ -923,37 +822,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  instructionsContainer: {
-    backgroundColor: '#FFFBEB',
-    borderRadius: RADIUS.lg,
-    padding: SPACING[4],
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  instructionsTitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: '600',
-    color: '#92400E',
-    marginBottom: SPACING[2],
-  },
-  instructionsText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: '#A16207',
-    lineHeight: 16,
-  },
   // Print Settings Modal Styles
   settingsModalContainer: {
     backgroundColor: '#FFFFFF',
-  borderTopLeftRadius: RADIUS['2xl'],
-  borderTopRightRadius: RADIUS['2xl'],
-  width: '100%',
-  minHeight: height * 0.75,
-  maxHeight: height * 0.9,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: -4 },
-  shadowOpacity: 0.25,
-  shadowRadius: 20,
-  elevation: 25,
+    borderTopLeftRadius: RADIUS['2xl'],
+    borderTopRightRadius: RADIUS['2xl'],
+    width: '100%',
+    minHeight: height * 0.75,
+    maxHeight: height * 0.9,
   },
   settingsHeader: {
     flexDirection: 'row',
@@ -992,34 +868,6 @@ const styles = StyleSheet.create({
     height: 50,
     color: '#1E293B',
   },
-  orientationButtons: {
-    flexDirection: 'row',
-    gap: SPACING[3],
-  },
-  orientationButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: RADIUS.lg,
-    paddingVertical: SPACING[3],
-    gap: SPACING[2],
-    backgroundColor: '#FFFFFF',
-  },
-  orientationButtonActive: {
-    borderColor: '#059669',
-    backgroundColor: '#F0FDF4',
-  },
-  orientationButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: '500',
-    color: '#64748B',
-  },
-  orientationButtonTextActive: {
-    color: '#059669',
-  },
   labelsPerRowContainer: {
     flexDirection: 'row',
     gap: SPACING[2],
@@ -1044,6 +892,47 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   labelsPerRowButtonTextActive: {
+    color: '#059669',
+  },
+  positionContainer: {
+    gap: SPACING[4],
+  },
+  positionInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[3],
+  },
+  positionLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '500',
+    color: '#64748B',
+    minWidth: 40,
+  },
+  positionButtons: {
+    flexDirection: 'row',
+    gap: SPACING[2],
+    flex: 1,
+  },
+  positionButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: RADIUS.md,
+    backgroundColor: '#FFFFFF',
+  },
+  positionButtonActive: {
+    borderColor: '#059669',
+    backgroundColor: '#F0FDF4',
+  },
+  positionButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  positionButtonTextActive: {
     color: '#059669',
   },
   previewContainer: {

@@ -33,32 +33,26 @@ export const isValidShortBarcode = (barcodeData: string): boolean => {
 };
 
 /**
- * Generate HTML with real barcode for printing
+ * Generate barcode image URL using external API service (for React Native display)
  */
-export const generateBarcodeHTML = (barcodeData: string, width: number = 200, height: number = 40): string => {
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    </head>
-    <body style="margin: 0; padding: 10px; display: flex; justify-content: center;">
-      <div>
-        <svg id="barcode"></svg>
-        <div style="text-align: center; margin-top: 5px; font-family: monospace; font-size: 12px;">${barcodeData}</div>
-      </div>
-      <script>
-        JsBarcode("#barcode", "${barcodeData}", {
-          format: "CODE128",
-          width: 2,
-          height: ${height},
-          displayValue: false,
-          margin: 0,
-          background: "#ffffff",
-          lineColor: "#000000"
-        });
-      </script>
-    </body>
-    </html>
-  `;
-};
+export function generateBarcodeSVG(data: string, width = 200, height = 40): string {
+  return `https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(data)}&scale=2&height=${height}&includetext=false&backgroundcolor=FFFFFF`;
+}
+
+/**
+ * Generate barcode image URL for printing (PNG format for better print quality)
+ */
+export function generateBarcodeImageURL(data: string, width = 200, height = 40): string {
+  return `https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(data)}&scale=3&height=${height}&includetext=false&backgroundcolor=FFFFFF`;
+}
+
+export async function fetchBarcodeSVG(data: string, width = 200, height = 40): Promise<string> {
+  const url = `https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(data)}&scale=2&height=${height}&width=${width}&includetext=false`;
+  try {
+    const response = await fetch(url);
+    return await response.text();
+  } catch (error) {
+    console.error('Error fetching barcode:', error);
+    return `<svg width="${width}" height="${height}"><text x="50%" y="50%" text-anchor="middle" font-size="12">${data}</text></svg>`;
+  }
+}
